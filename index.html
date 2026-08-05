@@ -61,8 +61,9 @@
     border-radius:9px;padding:9px;font-size:13px;font-family:inherit}
   textarea{resize:vertical;min-height:70px}
   label{font-size:11px;color:var(--muted);display:block;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px}
-  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:flex;align-items:flex-end;justify-content:center}
-  .modal{background:var(--bg);width:100%;max-width:620px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 24px}
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto}
+  .modal{background:var(--bg);width:100%;max-width:620px;max-height:90vh;overflow:auto;border-radius:16px;padding:16px 16px 24px}
+  .modal-actions{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding-top:12px;margin-top:10px;display:flex;gap:10px;flex-wrap:wrap}
   @media(min-width:640px){.modal{margin:auto;border-radius:16px}}
   .modal h2{margin-top:4px}
   .grade-grid{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center}
@@ -134,9 +135,19 @@
     <header class="app">
       <h1>Student Grading Portal</h1>
       <span class="spacer"></span>
+      <label class="year-pick">Year
+        <select v-model="activeYear">
+          <option v-for="y in years" :key="y" :value="y">{{y}}</option>
+          <option v-if="!years.length" value="">—</option>
+        </select>
+      </label>
       <span class="role-badge" :class="role">{{role}}</span>
       <button class="btn-logout" @click="doLogout">Sign out</button>
     </header>
+
+    <div class="notice pending" v-if="isPending">
+      Your account is awaiting role approval. You can view data, but editing is locked until an admin sets your role.
+    </div>
 
     <nav class="tabs">
       <button class="tab-btn" :class="{active:tab==='dashboard'}" @click="setTab('dashboard')">Dashboard</button>
@@ -163,7 +174,7 @@
         <div class="card" style="margin-top:12px">
           <h3>Recent Evaluations</h3>
           <ul class="list">
-            <li v-for="e in evaluations.slice().reverse().slice(0,6)" :key="e.id">
+            <li v-for="e in evaluations.filter(x=>x.flightYear===activeYearResolved).slice().reverse().slice(0,6)" :key="e.id" class="clickable" @click="openEval(e)">
               <div class="row">
                 <strong>{{e.studentName}}</strong>
                 <span class="muted">· {{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</span>
@@ -173,7 +184,7 @@
               </div>
               <div class="muted" v-if="e.tripNotes">{{e.tripNotes}}</div>
             </li>
-            <li v-if="!evaluations.length" class="muted">No evaluations yet. Add one from the Evaluations tab.</li>
+            <li v-if="!evaluations.filter(x=>x.flightYear===activeYearResolved).length" class="muted">No evaluations yet for {{activeYearResolved}}. Add one from the Evaluations tab.</li>
           </ul>
         </div>
       </section>
@@ -183,16 +194,17 @@
         <div class="topbar"><h2 style="margin:0">Students</h2><span class="spacer"></span>
           <button class="btn sm" v-if="canEdit" @click="addStudent">+ Add</button></div>
         <ul class="list">
-          <li v-for="s in students" :key="s.id">
+          <li v-for="s in studentsInYear" :key="s.id" class="clickable" @click="openStudent(s)">
             <div class="row">
               <strong>{{s.name}}</strong>
               <span class="pill" :class="s.active?'good':'pending'">{{s.active?'Active':'Inactive'}}</span>
               <span class="muted">{{(s.activeYears||[]).join(', ')}}</span>
               <span class="spacer" style="flex:1"></span>
-              <button class="btn sm ghost" v-if="canEdit" @click="toggleStudentActive(s)">{{s.active?'Deactivate':'Activate'}}</button>
-              <button class="btn sm danger" v-if="canEdit" @click="deleteStudent(s)">Delete</button>
+              <button class="btn sm ghost" v-if="canEdit" @click.stop="toggleStudentActive(s)">{{s.active?'Deactivate':'Activate'}}</button>
+              <button class="btn sm danger" v-if="canEdit" @click.stop="deleteStudent(s)">Delete</button>
             </div>
           </li>
+          <li v-if="!studentsInYear.length" class="muted">No students for {{activeYearResolved}}.</li>
         </ul>
       </section>
 
@@ -258,25 +270,25 @@
 
       <!-- EVALUATIONS -->
       <section v-show="tab==='evaluations'">
-        <div class="topbar"><h2 style="margin:0">Evaluations</h2><span class="spacer"></span>
+        <div class="topbar"><h2 style="margin:0">Evaluations · {{activeYearResolved}}</h2><span class="spacer"></span>
           <button class="btn sm" v-if="canEdit" @click="openNewEval">+ New Evaluation</button></div>
-        <div v-for="(evs, sid) in evalsByStudent" :key="sid">
+        <div v-for="(evs, sid) in evalsByStudentInYear" :key="sid">
           <h3 style="color:var(--text);text-transform:none;letter-spacing:0">{{studentName(sid)}}</h3>
           <ul class="list">
-            <li v-for="e in evs" :key="e.id">
+            <li v-for="e in evs" :key="e.id" class="clickable" @click="openEval(e)">
               <div class="row">
                 <strong>{{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
                 <span class="muted">{{fmt(e.date)}} · {{e.instructorName}}</span>
                 <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
                 <span class="pill" :class="statusColor(e.overallMifStatus)">{{e.overallMifStatus}}</span>
                 <span class="spacer" style="flex:1"></span>
-                <button class="btn sm danger" v-if="canEdit" @click="deleteEval(e)">Delete</button>
+                <button class="btn sm danger" v-if="canEdit" @click.stop="deleteEval(e)">Delete</button>
               </div>
               <div class="muted" v-if="e.tripNotes">{{e.tripNotes}}</div>
             </li>
           </ul>
         </div>
-        <div v-if="!evaluations.length" class="muted">No evaluations yet.</div>
+        <div v-if="!Object.keys(evalsByStudentInYear).length" class="muted">No evaluations for {{activeYearResolved}}.</div>
       </section>
 
       <!-- ANNOUNCEMENTS -->
@@ -350,23 +362,24 @@
         </div>
       </div>
       <div class="row" style="gap:10px">
-        <div style="flex:1"><label>Date</label><input type="date" v-model="evalForm.date" /></div>
-        <div style="flex:1"><label>Flight year</label><input v-model="evalForm.flightYear" /></div>
-        <div style="flex:1"><label>Duration (h)</label><input v-model="evalForm.duration" /></div>
+        <div style="flex:1"><label>Date</label><input type="date" v-model="evalForm.date" @change="onEvalDateChange" /></div>
+        <div style="flex:1"><label>Flight year</label><input :value="evalForm.flightYear" readonly title="Auto from date" /></div>
+        <div style="flex:1"><label>Duration</label>
+          <select v-model="evalForm.duration">
+            <option v-for="d in DURATIONS" :key="d" :value="String(d)">{{d.toFixed(1)}} h</option>
+          </select>
+        </div>
       </div>
       <label>Maneuver Grades</label>
       <div class="card" v-if="evalForm.maneuverGrades.length">
-        <div class="grade-grid" v-for="(m,idx) in evalForm.maneuverGrades" :key="m.name" style="margin-bottom:8px">
+        <div class="grade-grid" v-for="(m,idx) in evalForm.maneuverGrades" :key="m.name" style="margin-bottom:10px">
           <div>
             <div style="font-size:13px">{{m.name}}</div>
             <div class="muted">req MIF {{m.requiredMif}} · weight {{m.factor}}</div>
           </div>
           <div class="grade-pick">
-            <button :class="{on:m.studentGrade===0}" @click="m.studentGrade=0">–</button>
-            <button :class="{on:m.studentGrade===1}" @click="m.studentGrade=1">1</button>
-            <button :class="{on:m.studentGrade===2}" @click="m.studentGrade=2">2</button>
-            <button :class="{on:m.studentGrade===3}" @click="m.studentGrade=3">3</button>
-            <button :class="{on:m.studentGrade===4}" @click="m.studentGrade=4">4</button>
+            <button class="gx" :class="{on:m.studentGrade===0}" @click="m.studentGrade=0">N/A</button>
+            <button class="gx" v-for="n in [1,2,3,4]" :key="n" :class="{on:m.studentGrade===n, [n<=(m.requiredMif||0)?'meets':'below']:m.studentGrade===n}" @click="m.studentGrade=n">{{gradeLabel(n)}}</button>
           </div>
         </div>
       </div>
@@ -383,10 +396,78 @@
           <div class="muted" style="margin-top:4px">{{evalPreview.failCount}} maneuver(s) below required MIF</div>
         </div>
       </div>
-      <div class="row" style="margin-top:10px">
+      <div class="modal-actions">
         <button class="btn" @click="saveEval">Save Evaluation</button>
         <button class="btn ghost" @click="showEvalModal=false">Cancel</button>
       </div>
+    </div>
+  </div>
+
+  </div>
+
+  <!-- EVALUATION DETAIL MODAL -->
+  <div class="modal-mask" v-if="loggedIn && selectedEval" @click.self="closeDetail">
+    <div class="modal">
+      <div class="row">
+        <h2 style="margin:0">{{selectedEval.studentName}}</h2>
+        <span class="spacer" style="flex:1"></span>
+        <button class="btn sm danger" v-if="canEdit" @click="deleteEval(selectedEval); closeDetail()">Delete</button>
+      </div>
+      <div class="muted" style="margin:4px 0 12px">{{selectedEval.aircraftType}} · {{selectedEval.phaseName}} {{selectedEval.tripNumber}} · {{fmt(selectedEval.date)}} · {{selectedEval.instructorName}} · {{selectedEval.duration}} h</div>
+      <div class="row" style="gap:10px;margin-bottom:12px">
+        <span class="pill" :class="gradeColor(selectedEval.finalGrade)">Final {{selectedEval.finalGrade ? selectedEval.finalGrade.toFixed(1) : '-'}}</span>
+        <span class="pill" :class="statusColor(selectedEval.overallMifStatus)">{{selectedEval.overallMifStatus}}</span>
+        <span class="muted">School year {{selectedEval.flightYear}}</span>
+      </div>
+      <h3>Maneuver Grades</h3>
+      <table style="width:100%">
+        <thead><tr><th>Maneuver</th><th>Req MIF</th><th>Grade</th><th>Weight</th></tr></thead>
+        <tbody>
+          <tr v-for="m in (selectedEval.maneuverGrades||[])" :key="m.name">
+            <td>{{m.name}}</td><td>{{m.requiredMif}}</td>
+            <td :class="m.studentGrade < m.requiredMif ? 'bad' : 'good'">{{m.studentGrade}}</td><td>{{m.factor}}</td>
+          </tr>
+          <tr v-if="!(selectedEval.maneuverGrades||[]).length"><td colspan="4" class="muted">No maneuver grades recorded.</td></tr>
+        </tbody>
+      </table>
+      <div v-if="selectedEval.tripNotes" style="margin-top:12px">
+        <h3>Trip Notes</h3>
+        <div class="mannote" style="white-space:pre-wrap">{{selectedEval.tripNotes}}</div>
+      </div>
+      <div class="modal-actions"><button class="btn ghost" @click="closeDetail">Close</button></div>
+    </div>
+  </div>
+
+  <!-- STUDENT PROFILE MODAL -->
+  <div class="modal-mask" v-if="loggedIn && selectedStudent" @click.self="closeDetail">
+    <div class="modal">
+      <div class="row">
+        <h2 style="margin:0">{{selectedStudent.name}}</h2>
+        <span class="spacer" style="flex:1"></span>
+        <button class="btn sm ghost" v-if="canEdit" @click="toggleStudentActive(selectedStudent)">{{selectedStudent.active?'Deactivate':'Activate'}}</button>
+      </div>
+      <div class="muted" style="margin:4px 0 12px">
+        <span class="pill" :class="selectedStudent.active?'good':'pending'">{{selectedStudent.active?'Active':'Inactive'}}</span>
+        {{ (selectedStudent.activeYears||[]).join(', ') }}
+      </div>
+      <h3>Evaluations</h3>
+      <ul class="list">
+        <li v-for="e in evalForStudent(selectedStudent.id)" :key="e.id" class="clickable" @click="openEval(e); selectedStudent=null">
+          <div class="row">
+            <strong>{{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
+            <span class="muted">{{fmt(e.date)}}</span>
+            <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
+            <span class="pill" :class="statusColor(e.overallMifStatus)">{{e.overallMifStatus}}</span>
+          </div>
+        </li>
+        <li v-if="!evalForStudent(selectedStudent.id).length" class="muted">No evaluations for this student.</li>
+      </ul>
+      <div class="modal-actions">
+        <button class="btn" @click="runAIForStudent">Generate AI Feedback</button>
+        <button class="btn ghost" @click="closeDetail">Close</button>
+      </div>
+      <div v-if="aiForStudent===selectedStudent.id && aiLoading" class="muted" style="margin-top:10px">Analyzing…</div>
+      <div v-if="aiForStudent===selectedStudent.id && aiResult" class="mannote" style="margin-top:10px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:300px;overflow:auto">{{aiResult}}</div>
     </div>
   </div>
 
@@ -394,7 +475,20 @@
   <footer v-if="loggedIn">Student Grading Portal · web PWA · Firebase</footer>
 </div>
 
-<style>[v-cloak]{display:none}</style>
+<style>
+[v-cloak]{display:none}
+.clickable{cursor:pointer;transition:background .15s}
+.clickable:active{background:var(--bg2)}
+.year-pick{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.year-pick select{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 6px;font-size:12px}
+.notice{margin:10px 14px 0;padding:10px 12px;border-radius:10px;font-size:13px}
+.notice.pending{background:rgba(255,193,7,.15);border:1px solid rgba(255,193,7,.5);color:#ffd54f}
+.grade-pick{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.grade-pick .gx{font-size:12px;padding:7px 9px}
+.grade-pick .gx.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.grade-pick .gx.on.meets{background:#2e7d32}
+.grade-pick .gx.on.below{background:#c62828}
+</style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>

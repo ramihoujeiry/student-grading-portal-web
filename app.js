@@ -23,6 +23,11 @@ const app = createApp({
       // ui
       evalForm: blankEval(),
       showEvalModal: false,
+      selectedEval: null,    // evaluation detail
+      selectedStudent: null, // student profile
+      aiForStudent: null,    // student id for AI on profile
+      activeYear: '',        // school-year filter
+      DURATIONS: [0.5, 0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0], // duration picker presets (h)
       toast: '',
       aiStudentId: '', aiResult: '', aiLoading: false
     };
@@ -61,7 +66,29 @@ const app = createApp({
       let fail = 0;
       (this.evalForm.maneuverGrades || []).forEach(m => { if (m.studentGrade != null && m.requiredMif != null && m.studentGrade < m.requiredMif) fail++; });
       return { finalGrade: fg, status: st, failCount: fail };
-    }
+    },
+
+    // available school years (sorted desc), defaulting to the most recent
+    years() {
+      const set = new Set();
+      this.evaluations.forEach(e => { if (e.flightYear) set.add(e.flightYear); });
+      this.students.forEach(s => (s.activeYears || []).forEach(y => set.add(y)));
+      return Array.from(set).sort().reverse();
+    },
+    activeYearResolved() { return this.activeYear || this.years[0] || ''; },
+
+    // year-scoped views so a student's data never mixes across school years
+    studentsInYear() {
+      const y = this.activeYearResolved;
+      return this.students.filter(s => (s.activeYears || []).includes(y));
+    },
+    evalsByStudentInYear() {
+      const y = this.activeYearResolved;
+      const map = {};
+      this.evaluations.filter(e => e.flightYear === y).forEach(e => { (map[e.studentId] = map[e.studentId] || []).push(e); });
+      return map;
+    },
+    isPending() { return this.role === 'pending'; }
   },
   methods: {
     setTab(t) { this.tab = t; },
@@ -145,6 +172,8 @@ const app = createApp({
       this.evalForm.aircraftType = this.aircraft[0] ? this.aircraft[0].name : '';
       this.evalForm.studentId = this.students[0] ? this.students[0].id : '';
       this.evalForm.instructorName = (this.user && this.user.displayName) || (this.instructors[0] ? this.instructors[0].name : '');
+      this.evalForm.duration = '1.0';
+      this.onEvalDateChange(); // auto flight year from date
       this.showEvalModal = true;
       this.loadManeuversForForm();
     },
@@ -163,6 +192,7 @@ const app = createApp({
       const fg = calcFinalGrade(this.evalForm.maneuverGrades);
       const st = calcMifStatus(this.evalForm.maneuverGrades);
       const student = this.students.find(s => s.id === this.evalForm.studentId);
+      const dateSec = Math.floor(Date.parse(this.evalForm.date) / 1000) || Math.floor(Date.now() / 1000);
       const ev = {
         id: this.evalForm.id || '',
         aircraftType: this.evalForm.aircraftType,
@@ -171,8 +201,8 @@ const app = createApp({
         instructorName: this.evalForm.instructorName,
         phaseName: this.evalForm.phaseName,
         tripNumber: this.evalForm.tripNumber,
-        date: Math.floor(Date.parse(this.evalForm.date) / 1000) || Math.floor(Date.now() / 1000),
-        flightYear: this.evalForm.flightYear,
+        date: dateSec,
+        flightYear: this.getFlightYear(dateSec), // auto from date
         duration: this.evalForm.duration,
         finalGrade: fg || 0,
         overallMifStatus: st,
@@ -186,6 +216,26 @@ const app = createApp({
     },
     async deleteEval(e) { if (confirm('Delete this evaluation?')) await Store.deleteEvaluation(e.id); },
     studentName(id) { const s = this.students.find(x => x.id === id); return s ? s.name : '?'; },
+
+    /* ---- detail views ---- */
+    openEval(e) { this.selectedEval = e; },
+    openStudent(s) { this.selectedStudent = s; this.aiForStudent = null; },
+    closeDetail() { this.selectedEval = null; this.selectedStudent = null; this.aiForStudent = null; },
+    evalForStudent(sid) { return this.evaluations.filter(e => e.studentId === sid).slice().sort((a, b) => (b.date || 0) - (a.date || 0)); },
+
+    /* ---- AI feedback for a student profile ---- */
+    runAIForStudent() {
+      if (!this.selectedStudent) return;
+      this.aiForStudent = this.selectedStudent.id;
+      this.aiLoading = true;
+      const student = this.selectedStudent;
+      const evals = this.evaluations.filter(e => e.studentId === student.id);
+      setTimeout(() => {
+        const data = buildPerformance(student, evals);
+        this.aiResult = generateFeedback(data);
+        this.aiLoading = false;
+      }, 30);
+    },
 
     /* ---- announcements ---- */
     async addAnnouncement() {
@@ -221,12 +271,31 @@ const app = createApp({
     /* ---- helpers ---- */
     fmt(sec) { return fmtDate(sec); },
     gradeColor(g) { return g >= 85 ? 'good' : g >= 70 ? 'ok' : 'bad'; },
-    statusColor(s) { return s === STATUS_MEETS_STANDARD ? 'good' : s === STATUS_BELOW_STANDARD ? 'bad' : 'pending'; }
+    statusColor(s) { return s === STATUS_MEETS_STANDARD ? 'good' : s === STATUS_BELOW_STANDARD ? 'bad' : 'pending'; },
+    // descriptive labels for the 1-4 grading scale (replaces bare numbers)
+    gradeLabel(n) { return ({ 1: '1 · Needs work', 2: '2 · Below', 3: '3 · Good', 4: '4 · Excellent' })[n] || ''; },
+    // school-year from a date: Sep->Jul belongs to that start year (e.g. 2025-2026)
+    getFlightYear(sec) {
+      const d = new Date((sec || Date.now() / 1000) * 1000);
+      const y = d.getFullYear();
+      const m = d.getMonth(); // 0=Jan
+      const start = m >= 8 ? y : y - 1; // Sep(8)..Dec => start year; Jan..Aug => previous year
+      return start + '-' + (start + 1);
+    },
+    onEvalDateChange() {
+      const sec = Math.floor(Date.parse(this.evalForm.date) / 1000);
+      if (!isNaN(sec)) this.evalForm.flightYear = this.getFlightYear(sec);
+    }
   },
   mounted() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-    if (this.fbReady) Auth.onUser(u => this.onUser(u));
-  }
+    if (this.fbReady) {
+      // Seed current user immediately in case the session is already restored
+      // before the onAuthStateChanged listener attaches.
+      if (auth && auth.currentUser) this.onUser(auth.currentUser);
+      Auth.onUser(u => this.onUser(u));
+    }
+  },
 });
 
 function blankEval() {
@@ -238,3 +307,5 @@ function blankEval() {
 }
 
 app.mount('#app');
+// expose for debugging/automation
+window.__app = app;
