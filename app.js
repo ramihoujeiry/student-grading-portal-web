@@ -114,6 +114,7 @@ const app = createApp({
           id: s.id, name: s.name, active: s.active,
           avg: perf.overallScore ? perf.overallScore.toFixed(1) : '-',
           trend: perf.trend, trips: perf.evaluationCount,
+          hours: evals.reduce((sum, e) => sum + (parseFloat(e.duration) || 0), 0),
           weak: perf.weakManeuvers.slice(0, 3).map(w => w.name),
           readiness: perf.readiness,
           mif: perf.overallMifStatus || '-'
@@ -121,6 +122,26 @@ const app = createApp({
       });
       // sort: most trips first, then name
       return out.sort((a, b) => (b.trips - a.trips) || (a.name || '').localeCompare(b.name || ''));
+    },
+
+    // Failed items: per student, maneuvers scored below required MIF (mirrors Android FailedItemsActivity)
+    failedItems() {
+      const out = [];
+      const byStudent = {};
+      this.evaluations.forEach(e => { (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e); });
+      this.students.forEach(s => {
+        const tally = {}; // maneuver -> {count, required}
+        (byStudent[s.id] || []).forEach(e => (e.maneuverGrades || []).forEach(m => {
+          if (m.studentGrade != null && m.studentGrade !== 0 && m.requiredMif != null && m.studentGrade < m.requiredMif) {
+            if (!tally[m.name]) tally[m.name] = { count: 0, required: m.requiredMif };
+            tally[m.name].count++;
+          }
+        }));
+        const items = Object.keys(tally).map(n => ({ name: n, count: tally[n].count, required: tally[n].required }))
+          .sort((a, b) => b.count - a.count);
+        if (items.length) out.push({ id: s.id, name: s.name, items });
+      });
+      return out;
     }
   },
   methods: {
