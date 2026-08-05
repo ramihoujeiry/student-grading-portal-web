@@ -21,7 +21,8 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.uid == uid;
+      // a user can edit their own profile; staff (admin/instructor) can manage roles
+      allow write: if isSignedIn() && (request.auth.uid == uid || isStaff());
     }
 
     match /announcements/{id} {

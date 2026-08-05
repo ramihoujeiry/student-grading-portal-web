@@ -133,6 +133,18 @@ const Store = {
   async addAnnouncement(a) { await dbFs.collection(COL.announcements).add(a); },
   async deleteAnnouncement(id) { await dbFs.collection(COL.announcements).doc(id).delete(); },
 
+  // users (admin only) — mirrors Android UserManagementViewModel
+  async approveUser(uid, role) {
+    await dbFs.collection(COL.users).doc(uid).update({ role, updatedAt: Date.now() / 1000 });
+  },
+  async updateUserRole(uid, role) {
+    await dbFs.collection(COL.users).doc(uid).update({ role, updatedAt: Date.now() / 1000 });
+  },
+  async deleteUser(uid) {
+    // native rejects (removes) the user doc; auth account stays until re-login, matching Android rejectUser
+    await dbFs.collection(COL.users).doc(uid).delete();
+  },
+
   // first-run seeding (admin only). Mirrors the sample data for an empty project.
   async seedIfEmpty(user) {
     if (!fbReady) return;

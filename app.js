@@ -18,7 +18,13 @@ const app = createApp({
       fbReady: FIREBASE_READY,
 
       // collections (live from Firestore)
-      students: [], instructors: [], aircraft: [], mifTables: [], evaluations: [], announcements: [],
+      students: [], instructors: [], aircraft: [], mifTables: [], evaluations: [], announcements: [], users: [],
+
+      // dashboard filters (mirror Android DashboardActivity)
+      dashStudent: 'All Cadets', dashAircraft: 'All Aircraft',
+      dashStart: '', dashEnd: '',
+      // training progress search
+      tpSearch: '', tpAircraft: 'All Aircraft',
 
       // ui
       evalForm: blankEval(),
@@ -142,7 +148,52 @@ const app = createApp({
         if (items.length) out.push({ id: s.id, name: s.name, items });
       });
       return out;
-    }
+    },
+
+    // Dashboard filtered evaluations (mirror Android DashboardActivity student/aircraft/date filters)
+    dashFilteredEvals() {
+      const y = this.activeYearResolved;
+      let list = this.evaluations.filter(e => e.flightYear === y);
+      if (this.dashStudent && this.dashStudent !== 'All Cadets')
+        list = list.filter(e => e.studentName === this.dashStudent);
+      if (this.dashAircraft && this.dashAircraft !== 'All Aircraft')
+        list = list.filter(e => e.aircraftType === this.dashAircraft);
+      if (this.dashStart) list = list.filter(e => (e.date || 0) >= Math.floor(Date.parse(this.dashStart) / 1000));
+      if (this.dashEnd) list = list.filter(e => (e.date || 0) <= Math.floor(Date.parse(this.dashEnd) / 1000) + 86399);
+      return list;
+    },
+    dashTotalHours() {
+      return this.dashFilteredEvals.reduce((sum, e) => sum + (parseFloat(e.duration) || 0), 0);
+    },
+
+    // Training Progress cohort view (mirror Android TrainingProgressViewModel)
+    trainingProgress() {
+      const y = this.activeYearResolved;
+      const evalsInYear = this.evaluations.filter(e => !e.flightYear || e.flightYear === y);
+      const items = [];
+      this.students.forEach(s => {
+        let se = evalsInYear.filter(e => e.studentId === s.id || e.studentName === s.name)
+          .slice().sort((a, b) => (b.date || 0) - (a.date || 0));
+        if (this.tpAircraft && this.tpAircraft !== 'All Aircraft') se = se.filter(e => e.aircraftType === this.tpAircraft);
+        if (this.tpSearch && !s.name.toLowerCase().includes(this.tpSearch.toLowerCase())) return;
+        if (!se.length) return;
+        const latest = se[0];
+        const aircraft = latest.aircraftType, phase = latest.phaseName;
+        const table = this.mifTables.find(t => t.aircraftType === aircraft && t.phaseName === phase);
+        const totalTrips = table ? (table.stages || []).length : 0;
+        const phaseEvals = se.filter(e => e.phaseName === phase && e.aircraftType === aircraft);
+        const completed = phaseEvals.length;
+        const progress = totalTrips ? Math.min(100, Math.round((completed / totalTrips) * 100)) : 0;
+        const avg = phaseEvals.length ? (phaseEvals.reduce((s, e) => s + (e.finalGrade || 0), 0) / phaseEvals.length) : 0;
+        const failures = phaseEvals.filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD).length;
+        items.push({ studentId: s.id, studentName: s.name, aircraftType: aircraft, currentPhase: phase, completedTrips: completed, totalTrips: totalTrips, progressPercent: progress, avgGrade: avg, failureCount: failures, lastFlightDate: latest.date });
+      });
+      return items.sort((a, b) => a.studentName.localeCompare(b.studentName));
+    },
+
+    // User management (admin only) — mirror Android UserManagementActivity
+    pendingUsers() { return this.users.filter(u => (u.role || 'pending') === 'pending'); },
+    allUsers() { return this.users.slice().sort((a, b) => a.name.localeCompare(b.name)); }
   },
   methods: {
     setTab(t) { this.tab = t; },
@@ -195,6 +246,7 @@ const app = createApp({
       Store.watch(COL.mifTables, l => this.mifTables = l);
       Store.watch(COL.evaluations, l => this.evaluations = l);
       Store.watch(COL.announcements, l => this.announcements = l.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+      if (role === 'admin') Store.watch(COL.users, l => this.users = l);
       // first admin seeds an empty project
       if (role === 'admin') await Store.seedIfEmpty(u);
     },
@@ -316,6 +368,14 @@ const app = createApp({
       this.toastMsg('Announcement posted');
     },
     async deleteAnnouncement(a) { if (confirm('Delete announcement?')) await Store.deleteAnnouncement(a.id); },
+
+    /* ---- user management (admin only, mirror Android UserManagementActivity) ---- */
+    async approveUser(u, role) { await Store.approveUser(u.uid, role); this.toastMsg(u.name + ' → ' + role); },
+    async changeUserRole(u) {
+      const role = prompt('New role for ' + u.name + ' (viewer / instructor / admin):', u.role);
+      if (role && ['viewer', 'instructor', 'admin'].includes(role)) { await Store.updateUserRole(u.uid, role); this.toastMsg('Role updated'); }
+    },
+    async deleteUser(u) { if (confirm('Delete user ' + u.name + '? This removes their access.')) { await Store.deleteUser(u.uid); this.toastMsg('User removed'); } },
     filterAnnouncements(list) { return list.filter(a => a.targetRole === 'all' || a.targetRole === this.role || this.role === 'admin'); },
 
     /* ---- CSV export (mirrors Android CsvExporter) ---- */
@@ -359,6 +419,7 @@ const app = createApp({
 
     /* ---- helpers ---- */
     fmt(sec) { return fmtDate(sec); },
+    fmtDateTime(sec) { if (!sec) return '—'; const d = new Date(sec * 1000); return d.toISOString().slice(0, 10); },
     gradeColor(g) { return g >= 85 ? 'good' : g >= 70 ? 'ok' : 'bad'; },
     statusColor(s) { return s === STATUS_MEETS_STANDARD ? 'good' : s === STATUS_BELOW_STANDARD ? 'bad' : 'pending'; },
     // descriptive labels for the 1-4 grading scale (replaces bare numbers)
