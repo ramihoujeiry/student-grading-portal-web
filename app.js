@@ -100,7 +100,28 @@ const app = createApp({
       this.evaluations.filter(e => e.flightYear === y).forEach(e => { (map[e.studentId] = map[e.studentId] || []).push(e); });
       return map;
     },
-    isPending() { return this.role === 'pending'; }
+    isPending() { return this.role === 'pending'; },
+
+    // per-student analytics for the Analytics tab (reuses buildPerformance from store.js)
+    perStudentAnalytics() {
+      const out = [];
+      const byStudent = {};
+      this.evaluations.forEach(e => { (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e); });
+      this.students.forEach(s => {
+        const evals = (byStudent[s.id] || []).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
+        const perf = buildPerformance(s, evals);
+        out.push({
+          id: s.id, name: s.name, active: s.active,
+          avg: perf.overallScore ? perf.overallScore.toFixed(1) : '-',
+          trend: perf.trend, trips: perf.evaluationCount,
+          weak: perf.weakManeuvers.slice(0, 3).map(w => w.name),
+          readiness: perf.readiness,
+          mif: perf.overallMifStatus || '-'
+        });
+      });
+      // sort: most trips first, then name
+      return out.sort((a, b) => (b.trips - a.trips) || (a.name || '').localeCompare(b.name || ''));
+    }
   },
   methods: {
     setTab(t) { this.tab = t; },
@@ -275,6 +296,28 @@ const app = createApp({
     },
     async deleteAnnouncement(a) { if (confirm('Delete announcement?')) await Store.deleteAnnouncement(a.id); },
     filterAnnouncements(list) { return list.filter(a => a.targetRole === 'all' || a.targetRole === this.role || this.role === 'admin'); },
+
+    /* ---- CSV export (mirrors Android CsvExporter) ---- */
+    exportCSV() {
+      const rows = [['Student', 'Aircraft', 'Phase', 'Trip', 'Date', 'Instructor', 'Duration(h)', 'FinalGrade', 'MIF Status', 'FlightYear', 'TripNotes']];
+      this.evaluations.slice().sort((a, b) => (a.date || 0) - (b.date || 0)).forEach(e => {
+        rows.push([
+          e.studentName || '', e.aircraftType || '', e.phaseName || '', e.tripNumber || '',
+          this.fmt(e.date) || '', e.instructorName || '', e.duration || '',
+          e.finalGrade != null ? e.finalGrade.toFixed(1) : '', e.overallMifStatus || '', e.flightYear || '',
+          (e.tripNotes || '').replace(/[\n\r]+/g, ' ')
+        ]);
+      });
+      const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
+      const csv = rows.map(r => r.map(esc).join(',')).join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'evaluations_' + (this.activeYearResolved || 'all') + '.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      this.toastMsg('Exported ' + (rows.length - 1) + ' evaluations to CSV');
+    },
 
     /* ---- AI feedback ---- */
     runAI() {

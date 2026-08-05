@@ -157,6 +157,7 @@
       <button class="tab-btn" :class="{active:tab==='mif'}" @click="setTab('mif')">MIF Tables</button>
       <button class="tab-btn" :class="{active:tab==='evaluations'}" @click="setTab('evaluations')">Evaluations</button>
       <button class="tab-btn" :class="{active:tab==='announcements'}" @click="setTab('announcements')">Announcements</button>
+      <button class="tab-btn" :class="{active:tab==='analytics'}" @click="setTab('analytics')">Analytics</button>
       <button class="tab-btn" :class="{active:tab==='ai'}" @click="setTab('ai')">AI Feedback</button>
     </nav>
 
@@ -271,6 +272,7 @@
       <!-- EVALUATIONS -->
       <section v-show="tab==='evaluations'">
         <div class="topbar"><h2 style="margin:0">Evaluations · {{activeYearResolved}}</h2><span class="spacer"></span>
+          <button class="btn sm ghost" @click="exportCSV">Export CSV</button>
           <button class="btn sm" v-if="canEdit" @click="openNewEval">+ New Evaluation</button></div>
         <div v-for="(evs, sid) in evalsByStudentInYear" :key="sid">
           <h3 style="color:var(--text);text-transform:none;letter-spacing:0">{{studentName(sid)}}</h3>
@@ -309,6 +311,32 @@
           </li>
           <li v-if="!filterAnnouncements(announcements).length" class="muted">No announcements.</li>
         </ul>
+      </section>
+
+      <!-- ANALYTICS -->
+      <section v-show="tab==='analytics'">
+        <div class="topbar"><h2 style="margin:0">Progress Analytics</h2><span class="spacer"></span>
+          <button class="btn sm ghost" @click="exportCSV">Export CSV</button></div>
+        <p class="muted" style="margin:4px 2px 12px">Avg grade, trend and readiness per student (same engine as AI Feedback), computed from evaluations in {{activeYearResolved}}.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+          <div class="card" v-for="a in perStudentAnalytics" :key="a.id" style="cursor:pointer" @click="openStudent(students.find(s=>s.id===a.id))">
+            <div class="row" style="align-items:center">
+              <strong style="font-size:15px">{{a.name}}</strong>
+              <span class="spacer" style="flex:1"></span>
+              <span class="pill" :class="gradeColor(parseFloat(a.avg))">{{a.avg}}</span>
+            </div>
+            <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+              <span class="muted">Trips: {{a.trips}}</span>
+              <span class="pill" :class="a.trend==='IMPROVING'?'good':a.trend==='DECLINING'?'bad':'pending'">{{a.trend}}</span>
+              <span class="pill" :class="statusColor(a.mif)">{{a.mif}}</span>
+            </div>
+            <div class="muted" style="margin-top:8px">Readiness: {{a.readiness}}</div>
+            <div class="muted" style="margin-top:6px" v-if="a.weak.length">
+              <span style="color:var(--bad)">Weak:</span> {{a.weak.join(', ')}}
+            </div>
+          </div>
+        </div>
+        <div v-if="!perStudentAnalytics.length" class="muted">No students with evaluations for {{activeYearResolved}}.</div>
       </section>
 
       <!-- AI FEEDBACK -->
