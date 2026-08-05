@@ -13,7 +13,7 @@
  * ========================================================================= */
 
 const FIREBASE_CONFIG = {
-  apiKey: "PASTE_YOUR_FIREBASE_WEB_API_KEY_HERE",
+  apiKey: "AIzaSyBD4vDycohKK7agAr6UrT5y1HWsD8G8Xbk",
   authDomain: "grading-portal-app.firebaseapp.com",
   projectId: "grading-portal-app",
   storageBucket: "grading-portal-app.firebasestorage.app",
