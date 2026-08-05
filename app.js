@@ -274,6 +274,16 @@ const app = createApp({
     statusColor(s) { return s === STATUS_MEETS_STANDARD ? 'good' : s === STATUS_BELOW_STANDARD ? 'bad' : 'pending'; },
     // descriptive labels for the 1-4 grading scale (replaces bare numbers)
     gradeLabel(n) { return ({ 1: '1 · Needs work', 2: '2 · Below', 3: '3 · Good', 4: '4 · Excellent' })[n] || ''; },
+    // class for a grade button: on (selected) + meets/below vs required MIF
+    gradeBtnClass(m, n) {
+      const cls = {};
+      if (m.studentGrade === n) {
+        cls.on = true;
+        cls.meets = n >= (m.requiredMif || 0);
+        cls.below = n < (m.requiredMif || 0);
+      }
+      return cls;
+    },
     // school-year from a date: Sep->Jul belongs to that start year (e.g. 2025-2026)
     getFlightYear(sec) {
       const d = new Date((sec || Date.now() / 1000) * 1000);

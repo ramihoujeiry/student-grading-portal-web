@@ -379,7 +379,7 @@
           </div>
           <div class="grade-pick">
             <button class="gx" :class="{on:m.studentGrade===0}" @click="m.studentGrade=0">N/A</button>
-            <button class="gx" v-for="n in [1,2,3,4]" :key="n" :class="{on:m.studentGrade===n, [n<=(m.requiredMif||0)?'meets':'below']:m.studentGrade===n}" @click="m.studentGrade=n">{{gradeLabel(n)}}</button>
+            <button class="gx" v-for="n in [1,2,3,4]" :key="n" :class="gradeBtnClass(m, n)" @click="m.studentGrade=n">{{gradeLabel(n)}}</button>
           </div>
         </div>
       </div>
@@ -401,8 +401,6 @@
         <button class="btn ghost" @click="showEvalModal=false">Cancel</button>
       </div>
     </div>
-  </div>
-
   </div>
 
   <!-- EVALUATION DETAIL MODAL -->
