@@ -118,9 +118,22 @@ const app = createApp({
 
     async onUser(u) {
       if (!u) { this.user = null; this.role = 'pending'; this.students = []; this.instructors = []; this.aircraft = []; this.mifTables = []; this.evaluations = []; this.announcements = []; return; }
+      // Mirror the Android app's login contract:
+      //  - email must be verified
+      //  - role must exist and not be 'pending'
+      if (!u.emailVerified) {
+        this.authError = 'Please verify your email before logging in. Check your inbox.';
+        await Auth.logout();
+        return;
+      }
       this.user = u;
       const role = await Auth.roleOf(u.uid);
       this.role = role;
+      if (!role || role === 'pending') {
+        this.authError = 'Your account is pending approval. Please contact an administrator.';
+        await Auth.logout();
+        return;
+      }
       // real-time listeners
       Store.watch(COL.students, l => this.students = l, { orderBy: 'name', activeOnly: false });
       Store.watch(COL.instructors, l => this.instructors = l, { orderBy: 'name', activeOnly: false });
