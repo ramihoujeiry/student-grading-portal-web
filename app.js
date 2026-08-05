@@ -77,10 +77,22 @@ const app = createApp({
     },
     activeYearResolved() { return this.activeYear || this.years[0] || ''; },
 
-    // year-scoped views so a student's data never mixes across school years
+    // year-scoped views so a student's data never mixes across school years.
+    // A student belongs to a year if: their activeYears includes it, OR they have
+    // an evaluation in that year (mirrors Android, which derives years from evals),
+    // OR they are unassigned (no activeYears and no evals) -> shown in the active year
+    // so legacy students aren't lost.
     studentsInYear() {
       const y = this.activeYearResolved;
-      return this.students.filter(s => (s.activeYears || []).includes(y));
+      return this.students.filter(s => {
+        const ay = s.activeYears || [];
+        if (ay.length) return ay.includes(y);
+        const hasEvalInYear = this.evaluations.some(e => e.studentId === s.id && e.flightYear === y);
+        if (hasEvalInYear) return true;
+        const hasAnyEval = this.evaluations.some(e => e.studentId === s.id);
+        // unassigned (no activeYears, no evals) -> show in active year
+        return !hasAnyEval;
+      });
     },
     evalsByStudentInYear() {
       const y = this.activeYearResolved;
