@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1a237e" />
+<title>Student Grading Portal</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icons/icon-192.png" />
+<style>
+  :root{
+    --bg:#0d1117; --bg2:#161b22; --card:#1c2230; --card2:#222b3a;
+    --line:#2a3344; --text:#e6edf3; --muted:#98a2b3; --accent:#3b82f6;
+    --accent2:#1a237e; --green:#5fd08a; --amber:#ffb020; --red:#ff5a5a; --blue:#4895ef;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-text-size-adjust:100%}
+  a{color:var(--blue)}
+  header.app{position:sticky;top:0;z-index:30;background:linear-gradient(90deg,var(--accent2),#243056);
+    padding:10px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+  header.app h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.3px}
+  header.app .spacer{flex:1}
+  .role-switch{display:flex;gap:4px}
+  .role-switch button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+    color:var(--text);font-size:11px;padding:5px 9px;border-radius:20px;cursor:pointer}
+  .role-switch button.active{background:#fff;color:#1a237e;font-weight:700;border-color:#fff}
+  nav.tabs{position:sticky;top:46px;z-index:25;display:flex;overflow-x:auto;background:var(--bg2);
+    border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
+  nav.tabs .tab-btn{flex:0 0 auto;background:none;border:none;color:var(--muted);
+    padding:11px 13px;font-size:12px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+  nav.tabs .tab-btn:active{transform:scale(.97)}
+  nav.tabs .tab-btn.active{color:#fff;border-bottom-color:var(--accent)}
+  main{padding:14px;max-width:980px;margin:0 auto 80px}
+  section h2{font-size:15px;margin:4px 0 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:12px}
+  .card h3{margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .muted{color:var(--muted);font-size:12px}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:9px;padding:9px 13px;
+    font-size:13px;font-weight:600;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn.sm{padding:6px 10px;font-size:12px}
+  .btn.danger{background:transparent;border:1px solid var(--red);color:var(--red)}
+  .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
+  .pill.good{background:rgba(95,208,138,.15);color:var(--green)}
+  .pill.ok{background:rgba(72,149,239,.15);color:var(--blue)}
+  .pill.bad{background:rgba(255,90,90,.15);color:var(--red)}
+  .pill.pending{background:rgba(152,162,179,.15);color:var(--muted)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+  .stat .n{font-size:24px;font-weight:800}
+  .stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .list{list-style:none;margin:0;padding:0}
+  .list li{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:12px;margin-bottom:9px}
+  input,select,textarea{width:100%;background:var(--bg2);border:1px solid var(--line);color:var(--text);
+    border-radius:9px;padding:9px;font-size:13px;font-family:inherit}
+  textarea{resize:vertical;min-height:70px}
+  label{font-size:11px;color:var(--muted);display:block;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px}
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+  .modal{background:var(--bg);width:100%;max-width:620px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 24px}
+  @media(min-width:640px){.modal{margin:auto;border-radius:16px}}
+  .modal h2{margin-top:4px}
+  .grade-grid{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center}
+  .grade-pick{display:flex;gap:5px}
+  .grade-pick button{flex:1;background:var(--bg2);border:1px solid var(--line);color:var(--text);
+    border-radius:8px;padding:8px 0;font-weight:700;cursor:pointer}
+  .grade-pick button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .preview{display:flex;gap:14px;align-items:center;margin:12px 0;border-top:1px solid var(--line);padding-top:12px}
+  .preview .big{font-size:28px;font-weight:800}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#000;color:#fff;
+    padding:10px 18px;border-radius:24px;font-size:13px;z-index:80;opacity:.95;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+  footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
+  .mannote{white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);
+    border-radius:9px;padding:12px;max-height:340px;overflow:auto}
+  .topbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+  .topbar .spacer{flex:1}
+</style>
+</head>
+<body>
+<div id="app" v-cloak>
+
+  <header class="app">
+    <h1>Student Grading Portal</h1>
+    <span class="spacer"></span>
+    <div class="role-switch">
+      <button :class="{active:role==='admin'}" @click="setRole('admin')">Admin</button>
+      <button :class="{active:role==='instructor'}" @click="setRole('instructor')">Instructor</button>
+      <button :class="{active:role==='viewer'}" @click="setRole('viewer')">Viewer</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn" :class="{active:tab==='dashboard'}" @click="setTab('dashboard')">Dashboard</button>
+    <button class="tab-btn" :class="{active:tab==='students'}" @click="setTab('students')">Students</button>
+    <button class="tab-btn" :class="{active:tab==='instructors'}" @click="setTab('instructors')">Instructors</button>
+    <button class="tab-btn" :class="{active:tab==='aircraft'}" @click="setTab('aircraft')">Aircraft</button>
+    <button class="tab-btn" :class="{active:tab==='mif'}" @click="setTab('mif')">MIF Tables</button>
+    <button class="tab-btn" :class="{active:tab==='evaluations'}" @click="setTab('evaluations')">Evaluations</button>
+    <button class="tab-btn" :class="{active:tab==='announcements'}" @click="setTab('announcements')">Announcements</button>
+    <button class="tab-btn" :class="{active:tab==='ai'}" @click="setTab('ai')">AI Feedback</button>
+    <button class="tab-btn" :class="{active:tab==='data'}" @click="setTab('data')">Data</button>
+  </nav>
+
+  <main>
+
+    <!-- DASHBOARD -->
+    <section v-show="tab==='dashboard'">
+      <div class="stats">
+        <div class="stat"><div class="n">{{stats.students}}</div><div class="l">Students</div></div>
+        <div class="stat"><div class="n">{{stats.instructors}}</div><div class="l">Instructors</div></div>
+        <div class="stat"><div class="n">{{stats.evals}}</div><div class="l">Evaluations</div></div>
+        <div class="stat"><div class="n" :class="gradeColor(stats.avg)">{{stats.avg}}</div><div class="l">Avg Grade</div></div>
+        <div class="stat"><div class="n good">{{stats.meets}}</div><div class="l">Meets Std</div></div>
+        <div class="stat"><div class="n bad">{{stats.below}}</div><div class="l">Below Std</div></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>Recent Evaluations</h3>
+        <ul class="list">
+          <li v-for="e in evaluations.slice().reverse().slice(0,6)" :key="e.id">
+            <div class="row">
+              <strong>{{e.studentName}}</strong>
+              <span class="muted">· {{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</span>
+              <span class="spacer" style="flex:1"></span>
+              <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
+              <span class="pill" :class="statusColor(e.overallMifStatus)">{{e.overallMifStatus}}</span>
+            </div>
+            <div class="muted" v-if="e.tripNotes">{{e.tripNotes}}</div>
+          </li>
+          <li v-if="!evaluations.length" class="muted">No evaluations yet. Add one from the Evaluations tab.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- STUDENTS -->
+    <section v-show="tab==='students'">
+      <div class="topbar">
+        <h2 style="margin:0">Students</h2>
+        <span class="spacer"></span>
+        <button class="btn sm" v-if="canEdit" @click="addStudent">+ Add</button>
+      </div>
+      <ul class="list">
+        <li v-for="s in students" :key="s.id">
+          <div class="row">
+            <strong>{{s.name}}</strong>
+            <span class="pill" :class="s.active?'good':'pending'">{{s.active?'Active':'Inactive'}}</span>
+            <span class="muted">{{(s.activeYears||[]).join(', ')}}</span>
+            <span class="spacer" style="flex:1"></span>
+            <button class="btn sm ghost" v-if="canEdit" @click="toggleStudentActive(s)">{{s.active?'Deactivate':'Activate'}}</button>
+            <button class="btn sm danger" v-if="canEdit" @click="deleteStudent(s)">Delete</button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- INSTRUCTORS -->
+    <section v-show="tab==='instructors'">
+      <div class="topbar">
+        <h2 style="margin:0">Instructors</h2>
+        <span class="spacer"></span>
+        <button class="btn sm" v-if="canEdit" @click="addInstructor">+ Add</button>
+      </div>
+      <ul class="list">
+        <li v-for="i in instructors" :key="i.id">
+          <div class="row">
+            <strong>{{i.name}}</strong>
+            <span class="pill" :class="i.active?'good':'pending'">{{i.active?'Active':'Inactive'}}</span>
+            <span class="spacer" style="flex:1"></span>
+            <button class="btn sm ghost" v-if="canEdit" @click="toggleInstructorActive(i)">{{i.active?'Deactivate':'Activate'}}</button>
+            <button class="btn sm danger" v-if="canEdit" @click="deleteInstructor(i)">Delete</button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- AIRCRAFT -->
+    <section v-show="tab==='aircraft'">
+      <div class="topbar">
+        <h2 style="margin:0">Aircraft Types</h2>
+        <span class="spacer"></span>
+        <button class="btn sm" v-if="canEdit" @click="addAircraft">+ Add</button>
+      </div>
+      <ul class="list">
+        <li v-for="a in aircraft" :key="a.id">
+          <div class="row">
+            <strong>{{a.name}}</strong>
+            <span class="spacer" style="flex:1"></span>
+            <button class="btn sm danger" v-if="canEdit" @click="deleteAircraft(a)">Delete</button>
+          </div>
+        </li>
+        <li v-if="!aircraft.length" class="muted">No aircraft types yet.</li>
+      </ul>
+    </section>
+
+    <!-- MIF TABLES -->
+    <section v-show="tab==='mif'">
+      <div class="topbar">
+        <h2 style="margin:0">MIF Tables</h2>
+        <span class="spacer"></span>
+        <button class="btn sm" v-if="canEdit" @click="addMifTable">+ New Table</button>
+      </div>
+      <div v-for="(tables, ac) in tablesByAircraft" :key="ac">
+        <h3 style="color:var(--text);text-transform:none;letter-spacing:0">{{ac}}</h3>
+        <div class="card" v-for="t in tables" :key="t.id">
+          <div class="row">
+            <strong>{{t.phaseName}}</strong>
+            <span class="muted">{{t.stages.join(' / ')}}</span>
+            <span class="spacer" style="flex:1"></span>
+            <button class="btn sm ghost" v-if="canEdit" @click="addManeuver(t)">+ Maneuver</button>
+            <button class="btn sm danger" v-if="canEdit" @click="deleteMifTable(t)">Delete</button>
+          </div>
+          <table style="margin-top:10px">
+            <thead><tr><th>Maneuver</th><th>Weight</th><th v-for="st in t.stages" :key="st">{{st}} MIF</th></tr></thead>
+            <tbody>
+              <tr v-for="m in t.maneuvers" :key="m.name">
+                <td>{{m.name}}</td>
+                <td>{{m.factor}}</td>
+                <td v-for="st in t.stages" :key="st">{{m.stageMifs[st]}}</td>
+                <td v-if="canEdit"><button class="btn sm danger" @click="deleteManeuver(t,m)">×</button></td>
+              </tr>
+              <tr v-if="!t.maneuvers.length"><td colspan="5" class="muted">No maneuvers.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div v-if="!mifTables.length" class="muted">No MIF tables yet.</div>
+    </section>
+
+    <!-- EVALUATIONS -->
+    <section v-show="tab==='evaluations'">
+      <div class="topbar">
+        <h2 style="margin:0">Evaluations</h2>
+        <span class="spacer"></span>
+        <button class="btn sm" v-if="canEdit" @click="openNewEval">+ New Evaluation</button>
+      </div>
+      <div v-for="(evs, sid) in evalsByStudent" :key="sid">
+        <h3 style="color:var(--text);text-transform:none;letter-spacing:0">{{studentName(sid)}}</h3>
+        <ul class="list">
+          <li v-for="e in evs" :key="e.id">
+            <div class="row">
+              <strong>{{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
+              <span class="muted">{{fmt(e.date)}} · {{e.instructorName}}</span>
+              <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
+              <span class="pill" :class="statusColor(e.overallMifStatus)">{{e.overallMifStatus}}</span>
+              <span class="spacer" style="flex:1"></span>
+              <button class="btn sm danger" v-if="canEdit" @click="deleteEval(e)">Delete</button>
+            </div>
+            <div class="muted" v-if="e.tripNotes">{{e.tripNotes}}</div>
+          </li>
+        </ul>
+      </div>
+      <div v-if="!evaluations.length" class="muted">No evaluations yet.</div>
+    </section>
+
+    <!-- ANNOUNCEMENTS -->
+    <section v-show="tab==='announcements'">
+      <div class="topbar">
+        <h2 style="margin:0">Announcements</h2>
+        <span class="spacer"></span>
+        <button class="btn sm" v-if="canEdit" @click="addAnnouncement">+ Post</button>
+      </div>
+      <ul class="list">
+        <li v-for="a in filterAnnouncements(announcements)" :key="a.id">
+          <div class="row">
+            <strong>{{a.title}}</strong>
+            <span class="pill" :class="a.targetRole==='all'?'ok':'pending'">{{a.targetRole}}</span>
+            <span class="spacer" style="flex:1"></span>
+            <span class="muted">{{fmt(a.timestamp)}}</span>
+            <button class="btn sm danger" v-if="canEdit" @click="deleteAnnouncement(a)">×</button>
+          </div>
+          <div style="margin-top:6px">{{a.message}}</div>
+          <div class="muted" style="margin-top:4px">From: {{a.senderName}}</div>
+        </li>
+        <li v-if="!filterAnnouncements(announcements).length" class="muted">No announcements.</li>
+      </ul>
+    </section>
+
+    <!-- AI FEEDBACK -->
+    <section v-show="tab==='ai'">
+      <div class="card">
+        <h3>AI Performance Feedback</h3>
+        <label>Student</label>
+        <select v-model="aiStudentId">
+          <option value="">Select a student…</option>
+          <option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option>
+        </select>
+        <div style="margin-top:12px" class="row">
+          <button class="btn" @click="runAI">Generate Analysis</button>
+          <button class="btn ghost" :disabled="!aiResult" @click="copyAI">Copy</button>
+        </div>
+        <div v-if="aiLoading" class="muted" style="margin-top:10px">Analyzing…</div>
+        <div v-if="aiResult" class="mannote" style="margin-top:12px">{{aiResult}}</div>
+        <div v-if="!aiResult && !aiLoading" class="muted" style="margin-top:10px">
+          Picks a student and computes trend, consistency, weak maneuvers and a readiness verdict
+          from their evaluations — offline, deterministic, no network.
+        </div>
+      </div>
+    </section>
+
+    <!-- DATA -->
+    <section v-show="tab==='data'">
+      <div class="card">
+        <h3>Backup &amp; Restore (this device)</h3>
+        <p class="muted">Data is stored in this browser (localStorage). Export to JSON to move it between devices; import to restore. There is no cloud account in this build.</p>
+        <div class="row">
+          <button class="btn" @click="exportJSON">Export JSON</button>
+          <button class="btn ghost" @click="$refs.fileInput.click()">Import JSON</button>
+          <input ref="fileInput" type="file" accept="application/json" style="display:none" @change="importJSON" />
+          <button class="btn danger" @click="resetData">Reset to sample</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>About</h3>
+        <p class="muted">Web edition of the Student Grading Portal — flight-training grading, MIF tables,
+          student/instructor management, announcements and AI performance feedback. Installable to your
+          home screen and works offline. The original is an Android app by Rami Houjeiri.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- EVALUATION MODAL -->
+  <div class="modal-mask" v-if="showEvalModal" @click.self="showEvalModal=false">
+    <div class="modal">
+      <h2>New Evaluation</h2>
+      <label>Aircraft</label>
+      <select v-model="evalForm.aircraftType" @change="onEvalContextChange">
+        <option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option>
+      </select>
+      <label>Student</label>
+      <select v-model="evalForm.studentId"><option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option></select>
+      <label>Instructor</label>
+      <select v-model="evalForm.instructorName">
+        <option v-for="i in instructors" :key="i.id" :value="i.name">{{i.name}}</option>
+      </select>
+      <div class="row" style="gap:10px">
+        <div style="flex:1">
+          <label>Phase</label>
+          <select v-model="evalForm.phaseName" @change="onEvalContextChange">
+            <option v-for="t in mifTables.filter(x=>x.aircraftType===evalForm.aircraftType)" :key="t.id" :value="t.phaseName">{{t.phaseName}}</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label>Trip / Stage</label>
+          <select v-model="evalForm.tripNumber" @change="onEvalContextChange">
+            <option v-for="st in (currentTable? currentTable.stages : ['S1'])" :key="st" :value="st">{{st}}</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="gap:10px">
+        <div style="flex:1"><label>Date</label><input type="date" v-model="evalForm.date" /></div>
+        <div style="flex:1"><label>Flight year</label><input v-model="evalForm.flightYear" /></div>
+        <div style="flex:1"><label>Duration (h)</label><input v-model="evalForm.duration" /></div>
+      </div>
+      <label>Maneuver Grades</label>
+      <div class="card" v-if="evalForm.maneuverGrades.length">
+        <div class="grade-grid" v-for="(m,idx) in evalForm.maneuverGrades" :key="m.name" style="margin-bottom:8px">
+          <div>
+            <div style="font-size:13px">{{m.name}}</div>
+            <div class="muted">req MIF {{m.requiredMif}} · weight {{m.factor}}</div>
+          </div>
+          <div class="grade-pick">
+            <button :class="{on:m.studentGrade===0}" @click="m.studentGrade=0">–</button>
+            <button :class="{on:m.studentGrade===1}" @click="m.studentGrade=1">1</button>
+            <button :class="{on:m.studentGrade===2}" @click="m.studentGrade=2">2</button>
+            <button :class="{on:m.studentGrade===3}" @click="m.studentGrade=3">3</button>
+            <button :class="{on:m.studentGrade===4}" @click="m.studentGrade=4">4</button>
+          </div>
+        </div>
+      </div>
+      <div v-else class="muted">Select an aircraft + phase that has a MIF table.</div>
+      <label>Trip Notes</label>
+      <textarea v-model="evalForm.tripNotes" placeholder="Coach comments, safety items…"></textarea>
+
+      <div class="preview" v-if="evalForm.maneuverGrades.length">
+        <div>
+          <div class="muted">Final grade</div>
+          <div class="big" :class="gradeColor(evalPreview.finalGrade||0)">{{evalPreview.finalGrade!=null?evalPreview.finalGrade.toFixed(2):'-'}}</div>
+        </div>
+        <div style="flex:1">
+          <span class="pill" :class="statusColor(evalPreview.status)">{{evalPreview.status}}</span>
+          <div class="muted" style="margin-top:4px">{{evalPreview.failCount}} maneuver(s) below required MIF</div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px">
+        <button class="btn" @click="saveEval">Save Evaluation</button>
+        <button class="btn ghost" @click="showEvalModal=false">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" v-if="toast">{{toast}}</div>
+  <footer>Student Grading Portal · web PWA · offline-ready</footer>
+</div>
+
+<style>[v-cloak]{display:none}</style>
+<script src="vue.global.prod.js"></script>
+<script src="seed.js"></script>
+<script src="store.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
