@@ -1,0 +1,16 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "firestore.rules"],
+    "headers": [
+      {
+        "source": "sw.js",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ],
+    "rewrites": [{ "source": "**", "regex": "^(?!.*\\.).*$", "destination": "/index.html" }]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}

@@ -1,6 +1,6 @@
 /* =========================================================================
- * app.js — Vue 3 client-side SPA for the Student Grading Portal web PWA.
- * No build step, no backend. Talks to store.js (localStorage).
+ * app.js — Vue 3 SPA for the Student Grading Portal web app (Firebase-backed).
+ * Auth-gated. Mirrors the Android app's role model (admin/instructor/viewer/pending).
  * ========================================================================= */
 
 const { createApp } = Vue;
@@ -9,183 +9,142 @@ const app = createApp({
   data() {
     return {
       tab: 'dashboard',
-      role: 'admin',            // local role switcher (admin | instructor | viewer)
-      db: DB,                   // live reference to store DB
-      // form state for evaluations
+      // auth
+      user: null,            // firebase user
+      role: 'pending',
+      authMode: 'login',     // login | register
+      authEmail: '', authPass: '', authName: '',
+      authError: '', authBusy: false,
+      fbReady: FIREBASE_READY,
+
+      // collections (live from Firestore)
+      students: [], instructors: [], aircraft: [], mifTables: [], evaluations: [], announcements: [],
+
+      // ui
       evalForm: blankEval(),
       showEvalModal: false,
-      // misc ui
       toast: '',
-      // ai feedback
-      aiStudentId: '',
-      aiResult: '',
-      aiLoading: false
+      aiStudentId: '', aiResult: '', aiLoading: false
     };
   },
   computed: {
+    loggedIn() { return !!this.user; },
     isAdmin() { return this.role === 'admin'; },
     isViewer() { return this.role === 'viewer'; },
-    canEdit() { return this.role !== 'viewer'; },
+    canEdit() { return this.role !== 'viewer' && this.role !== 'pending'; },
 
-    currentTable() {
-      if (!this.db || !this.db.mifTables) return null;
-      return this.db.mifTables.find(t => t.aircraftType === this.evalForm.aircraftType && t.phaseName === this.evalForm.phaseName) || null;
-    },
-
-    students() { return this.db.students; },
-    instructors() { return this.db.instructors; },
-    aircraft() { return this.db.aircraft; },
-    mifTables() { return this.db.mifTables; },
-    evaluations() { return this.db.evaluations; },
-    announcements() { return this.db.announcements; },
-
-    activeStudents() { return this.db.students.filter(s => s.active); },
-    activeInstructors() { return this.db.instructors.filter(i => i.active); },
-
-    // dashboard stats
     stats() {
-      const ev = this.db.evaluations;
+      const ev = this.evaluations;
       const meets = ev.filter(e => e.overallMifStatus === STATUS_MEETS_STANDARD).length;
       const below = ev.filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD).length;
       const avg = ev.length ? (ev.reduce((s, e) => s + (e.finalGrade || 0), 0) / ev.length).toFixed(1) : '0.0';
-      return { students: this.db.students.length, instructors: this.db.instructors.length, evals: ev.length, meets, below, avg };
+      return { students: this.students.length, instructors: this.instructors.length, evals: ev.length, meets, below, avg };
     },
-
-    // grouped evaluations for the evaluations tab (by student)
     evalsByStudent() {
       const map = {};
-      this.db.evaluations.forEach(e => {
-        (map[e.studentId] = map[e.studentId] || []).push(e);
-      });
+      this.evaluations.forEach(e => { (map[e.studentId] = map[e.studentId] || []).push(e); });
       return map;
     },
-
-    // mif tables grouped by aircraft
     tablesByAircraft() {
       const map = {};
-      this.db.mifTables.forEach(t => {
-        (map[t.aircraftType] = map[t.aircraftType] || []).push(t);
-      });
+      this.mifTables.forEach(t => { (map[t.aircraftType] = map[t.aircraftType] || []).push(t); });
       return map;
     },
-
-    // live preview while building an evaluation
+    currentTable() {
+      return this.mifTables.find(t => t.aircraftType === this.evalForm.aircraftType && t.phaseName === this.evalForm.phaseName) || null;
+    },
     evalPreview() {
       const mg = (this.evalForm.maneuverGrades || []).filter(m => m.studentGrade != null && m.studentGrade !== 0);
       if (!mg.length) return { finalGrade: null, status: STATUS_PENDING, failCount: 0 };
       const fg = calcFinalGrade(this.evalForm.maneuverGrades);
       const st = calcMifStatus(this.evalForm.maneuverGrades);
       let fail = 0;
-      (this.evalForm.maneuverGrades || []).forEach(m => {
-        if (m.studentGrade != null && m.requiredMif != null && m.studentGrade < m.requiredMif) fail++;
-      });
+      (this.evalForm.maneuverGrades || []).forEach(m => { if (m.studentGrade != null && m.requiredMif != null && m.studentGrade < m.requiredMif) fail++; });
       return { finalGrade: fg, status: st, failCount: fail };
     }
   },
   methods: {
     setTab(t) { this.tab = t; },
-    setRole(r) { this.role = r; this.toastMsg('Viewing as ' + r); },
-
     toastMsg(m) { this.toast = m; setTimeout(() => { if (this.toast === m) this.toast = ''; }, 2200); },
 
-    save() { persist(); this.toastMsg('Saved to this device'); },
-    resetData() {
-      if (confirm('Reset all data to the sample set? This clears changes on this device only.')) {
-        resetDB(); this.db = DB; this.toastMsg('Data reset to sample');
-      }
+    /* ---- auth ---- */
+    async doLogin() {
+      if (!this.fbReady) { this.authError = 'Firebase is not configured (apiKey missing).'; return; }
+      this.authBusy = true; this.authError = '';
+      try { await Auth.login(this.authEmail, this.authPass); }
+      catch (e) { this.authError = e.message || 'Login failed'; }
+      this.authBusy = false;
     },
-    exportJSON() {
-      const blob = new Blob([JSON.stringify(this.db, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'grading-portal-backup.json';
-      a.click();
-      this.toastMsg('Exported backup JSON');
+    async doRegister() {
+      if (!this.fbReady) { this.authError = 'Firebase is not configured (apiKey missing).'; return; }
+      if (!this.authName.trim()) { this.authError = 'Enter your full name.'; return; }
+      this.authBusy = true; this.authError = '';
+      try {
+        await Auth.register(this.authEmail, this.authPass, this.authName.trim());
+        this.authError = '';
+        this.toastMsg('Account created. Verify your email, then log in.');
+        this.authMode = 'login';
+      } catch (e) { this.authError = e.message || 'Registration failed'; }
+      this.authBusy = false;
     },
-    importJSON(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const data = JSON.parse(reader.result);
-          if (!data.students) throw new Error('not a portal backup');
-          DB = data; persist(); this.db = DB;
-          this.toastMsg('Imported backup');
-        } catch (err) { alert('Invalid backup file.'); }
-      };
-      reader.readAsText(file);
-      e.target.value = '';
+    async doLogout() { await Auth.logout(); },
+
+    async onUser(u) {
+      if (!u) { this.user = null; this.role = 'pending'; this.students = []; this.instructors = []; this.aircraft = []; this.mifTables = []; this.evaluations = []; this.announcements = []; return; }
+      this.user = u;
+      const role = await Auth.roleOf(u.uid);
+      this.role = role;
+      // real-time listeners
+      Store.watch(COL.students, l => this.students = l, { orderBy: 'name', activeOnly: false });
+      Store.watch(COL.instructors, l => this.instructors = l, { orderBy: 'name', activeOnly: false });
+      Store.watch(COL.aircraft, l => this.aircraft = l, { orderBy: 'name' });
+      Store.watch(COL.mifTables, l => this.mifTables = l);
+      Store.watch(COL.evaluations, l => this.evaluations = l);
+      Store.watch(COL.announcements, l => this.announcements = l.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+      // first admin seeds an empty project
+      if (role === 'admin') await Store.seedIfEmpty(u);
     },
 
     /* ---- students ---- */
-    addStudent() {
-      const name = prompt('Student name:');
-      if (!name) return;
-      this.db.students.push({ id: uid('s'), name, active: true, activeYears: ['2025-2026'] });
-      this.save();
-    },
-    toggleStudentActive(s) { s.active = !s.active; this.save(); },
-    deleteStudent(s) {
-      if (!confirm('Delete ' + s.name + '?')) return;
-      this.db.students = this.db.students.filter(x => x.id !== s.id);
-      this.save();
-    },
+    async addStudent() { const n = prompt('Student name:'); if (n) { await Store.addStudent(n); this.toastMsg('Student added'); } },
+    async toggleStudentActive(s) { await Store.setStudentActive(s.id, !s.active); },
+    async deleteStudent(s) { if (confirm('Delete ' + s.name + '?')) await Store.deleteStudent(s.id); },
 
     /* ---- instructors ---- */
-    addInstructor() {
-      const name = prompt('Instructor name:');
-      if (!name) return;
-      this.db.instructors.push({ id: uid('i'), name, active: true });
-      this.save();
-    },
-    toggleInstructorActive(i) { i.active = !i.active; this.save(); },
-    deleteInstructor(i) { if (confirm('Delete ' + i.name + '?')) { this.db.instructors = this.db.instructors.filter(x => x.id !== i.id); this.save(); } },
+    async addInstructor() { const n = prompt('Instructor name:'); if (n) { await Store.addInstructor(n); this.toastMsg('Instructor added'); } },
+    async toggleInstructorActive(i) { await Store.setInstructorActive(i.id, !i.active); },
+    async deleteInstructor(i) { if (confirm('Delete ' + i.name + '?')) await Store.deleteInstructor(i.id); },
 
     /* ---- aircraft ---- */
-    addAircraft() {
-      const name = prompt('Aircraft type (e.g. R44-2):');
-      if (!name) return;
-      this.db.aircraft.push({ id: uid('a'), name });
-      this.save();
-    },
-    deleteAircraft(a) { if (confirm('Delete ' + a.name + '?')) { this.db.aircraft = this.db.aircraft.filter(x => x.id !== a.id); this.save(); } },
+    async addAircraft() { const n = prompt('Aircraft type (e.g. R44-2):'); if (n) { await Store.addAircraft(n); this.toastMsg('Aircraft added'); } },
+    async deleteAircraft(a) { if (confirm('Delete ' + a.name + '?')) await Store.deleteAircraft(a.id); },
 
     /* ---- MIF tables ---- */
-    phaseFor(aircraftType) {
-      const ac = this.db.aircraft.find(a => a.name === aircraftType);
-      return ac ? ac.name : aircraftType;
-    },
-    addMifTable() {
+    async addMifTable() {
       const aircraftType = prompt('Aircraft type (must match an added aircraft):', 'R44-2');
       const phaseName = prompt('Phase name (e.g. CONTACT):', 'CONTACT');
       if (!aircraftType || !phaseName) return;
       const stagesStr = prompt('Stages (comma separated, e.g. S1, S2, S3):', 'S1, S2, S3');
       const stages = stagesStr ? stagesStr.split(',').map(s => s.trim()).filter(Boolean) : ['S1'];
-      this.db.mifTables.push({ id: uid('m'), aircraftType, phaseName, stages, maneuvers: [] });
-      this.save();
+      await Store.addMifTable(aircraftType, phaseName, stages);
+      this.toastMsg('MIF table added');
     },
-    addManeuver(t) {
-      const name = prompt('Maneuver name:');
-      if (!name) return;
+    async addManeuver(t) {
+      const name = prompt('Maneuver name:'); if (!name) return;
       const factor = parseFloat(prompt('Weight factor:', '1.0')) || 1.0;
       const stageMifs = {};
-      t.stages.forEach(st => {
-        const v = parseInt(prompt('Required MIF for ' + st + ' (0 = not graded this stage):', '70'), 10);
-        stageMifs[st] = isNaN(v) ? 70 : v;
-      });
-      t.maneuvers.push({ name, factor, stageMifs });
-      this.save();
+      t.stages.forEach(st => { const v = parseInt(prompt('Required MIF for ' + st + ' (0 = not graded this stage):', '2'), 10); stageMifs[st] = isNaN(v) ? 2 : v; });
+      await Store.addManeuver(t.id, { name, factor, stageMifs });
     },
-    deleteManeuver(t, m) { t.maneuvers = t.maneuvers.filter(x => x !== m); this.save(); },
-    deleteMifTable(t) { if (confirm('Delete table ' + t.phaseName + '?')) { this.db.mifTables = this.db.mifTables.filter(x => x.id !== t.id); this.save(); } },
+    async deleteManeuver(t, idx) { await Store.deleteManeuver(t.id, idx); },
+    async deleteMifTable(t) { if (confirm('Delete table ' + t.phaseName + '?')) await Store.deleteMifTable(t.id); },
 
     /* ---- evaluations ---- */
     openNewEval() {
       this.evalForm = blankEval();
-      this.evalForm.aircraftType = this.db.aircraft[0] ? this.db.aircraft[0].name : '';
-      this.evalForm.studentId = this.db.students[0] ? this.db.students[0].id : '';
-      this.evalForm.instructorName = this.db.instructors[0] ? this.db.instructors[0].name : '';
+      this.evalForm.aircraftType = this.aircraft[0] ? this.aircraft[0].name : '';
+      this.evalForm.studentId = this.students[0] ? this.students[0].id : '';
+      this.evalForm.instructorName = (this.user && this.user.displayName) || (this.instructors[0] ? this.instructors[0].name : '');
       this.showEvalModal = true;
       this.loadManeuversForForm();
     },
@@ -193,22 +152,19 @@ const app = createApp({
       const t = this.currentTable;
       if (t) {
         this.evalForm.maneuverGrades = t.maneuvers.map(m => ({
-          name: m.name,
-          factor: m.factor,
-          requiredMif: m.stageMifs[this.evalForm.tripNumber] != null ? m.stageMifs[this.evalForm.tripNumber] : 70,
+          name: m.name, factor: m.factor,
+          requiredMif: m.stageMifs[this.evalForm.tripNumber] != null ? m.stageMifs[this.evalForm.tripNumber] : 2,
           studentGrade: 0
         }));
-      } else {
-        this.evalForm.maneuverGrades = [];
-      }
+      } else this.evalForm.maneuverGrades = [];
     },
     onEvalContextChange() { this.loadManeuversForForm(); },
-    saveEval() {
+    async saveEval() {
       const fg = calcFinalGrade(this.evalForm.maneuverGrades);
       const st = calcMifStatus(this.evalForm.maneuverGrades);
-      const student = this.db.students.find(s => s.id === this.evalForm.studentId);
+      const student = this.students.find(s => s.id === this.evalForm.studentId);
       const ev = {
-        id: this.evalForm.id || uid('e'),
+        id: this.evalForm.id || '',
         aircraftType: this.evalForm.aircraftType,
         studentId: this.evalForm.studentId,
         studentName: student ? student.name : '',
@@ -224,48 +180,41 @@ const app = createApp({
         maneuverGrades: (this.evalForm.maneuverGrades || []).filter(m => m.studentGrade != null && m.studentGrade !== 0)
           .map(m => ({ name: m.name, factor: m.factor, requiredMif: m.requiredMif, studentGrade: m.studentGrade }))
       };
-      const idx = this.db.evaluations.findIndex(x => x.id === ev.id);
-      if (idx >= 0) this.db.evaluations[idx] = ev; else this.db.evaluations.push(ev);
-      this.save();
+      await Store.saveEvaluation(ev);
       this.showEvalModal = false;
       this.toastMsg('Evaluation saved');
     },
-    deleteEval(e) { if (confirm('Delete this evaluation?')) { this.db.evaluations = this.db.evaluations.filter(x => x.id !== e.id); this.save(); } },
-    studentName(id) { const s = this.db.students.find(x => x.id === id); return s ? s.name : '?'; },
+    async deleteEval(e) { if (confirm('Delete this evaluation?')) await Store.deleteEvaluation(e.id); },
+    studentName(id) { const s = this.students.find(x => x.id === id); return s ? s.name : '?'; },
 
     /* ---- announcements ---- */
-    addAnnouncement() {
-      const title = prompt('Announcement title:');
-      if (!title) return;
+    async addAnnouncement() {
+      const title = prompt('Announcement title:'); if (!title) return;
       const message = prompt('Message:') || '';
       const targetRole = prompt('Target (all / instructor / viewer):', 'all') || 'all';
-      this.db.announcements.unshift({
-        id: uid('an'), title, message, targetRole, senderName: this.role,
+      await Store.addAnnouncement({
+        title, message, targetRole, senderName: this.user ? (this.user.displayName || this.user.email) : this.role,
         timestamp: Math.floor(Date.now() / 1000), fileName: null, fileUrl: null
       });
-      this.save();
       this.toastMsg('Announcement posted');
     },
-    deleteAnnouncement(a) { if (confirm('Delete announcement?')) { this.db.announcements = this.db.announcements.filter(x => x.id !== a.id); this.save(); } },
-    filterAnnouncements(list) {
-      return list.filter(a => a.targetRole === 'all' || a.targetRole === this.role || this.role === 'admin');
-    },
+    async deleteAnnouncement(a) { if (confirm('Delete announcement?')) await Store.deleteAnnouncement(a.id); },
+    filterAnnouncements(list) { return list.filter(a => a.targetRole === 'all' || a.targetRole === this.role || this.role === 'admin'); },
 
     /* ---- AI feedback ---- */
     runAI() {
       if (!this.aiStudentId) { this.toastMsg('Pick a student first'); return; }
       this.aiLoading = true;
-      const student = this.db.students.find(s => s.id === this.aiStudentId);
-      const evals = this.db.evaluations.filter(e => e.studentId === this.aiStudentId);
-      setTimeout(() => { // keep UI responsive
+      const student = this.students.find(s => s.id === this.aiStudentId);
+      const evals = this.evaluations.filter(e => e.studentId === this.aiStudentId);
+      setTimeout(() => {
         const data = buildPerformance(student, evals);
         this.aiResult = generateFeedback(data);
         this.aiLoading = false;
       }, 30);
     },
     copyAI() {
-      const done = () => this.toastMsg('Copied to clipboard');
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(this.aiResult).then(done).catch(() => {});
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(this.aiResult).then(() => this.toastMsg('Copied to clipboard')).catch(() => {});
       else this.toastMsg('Copy not supported here');
     },
 
@@ -275,9 +224,8 @@ const app = createApp({
     statusColor(s) { return s === STATUS_MEETS_STANDARD ? 'good' : s === STATUS_BELOW_STANDARD ? 'bad' : 'pending'; }
   },
   mounted() {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    if (this.fbReady) Auth.onUser(u => this.onUser(u));
   }
 });
 

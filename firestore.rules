@@ -1,0 +1,54 @@
+rules_version = '2';
+
+// Student Grading Portal — Firestore security rules.
+// Mirrors the Android app's access model:
+//   - users/{uid}: a user can read/write only their own profile document.
+//   - announcements: any signed-in user can read; only admin/instructor can write.
+//   - students / instructors / aircraft / mif_tables / evaluations:
+//       read  -> any signed-in user
+//       write -> admin or instructor only (viewers are read-only)
+//   - pending users (role not yet granted) are effectively read-only app-wide.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function isStaff() {
+      return isSignedIn() && (userRole() == 'admin' || userRole() == 'instructor');
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /announcements/{id} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    match /students/{id} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+    match /instructors/{id} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+    match /aircraft/{id} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+    match /mif_tables/{id} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+    match /evaluations/{id} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+  }
+}
