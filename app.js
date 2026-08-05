@@ -377,14 +377,45 @@ const app = createApp({
     getFlightYear(sec) {
       const d = new Date((sec || Date.now() / 1000) * 1000);
       const y = d.getFullYear();
-      const m = d.getMonth(); // 0=Jan
-      const start = m >= 8 ? y : y - 1; // Sep(8)..Dec => start year; Jan..Aug => previous year
+      const m = d.getMonth(); // 0=Jan, 6=July
+      // Android YearUtils: flight year starts July 1 (e.g. Jul 2025 -> Jun 2026 = "2025-2026")
+      const start = m >= 6 ? y : y - 1;
       return start + '-' + (start + 1);
     },
     onEvalDateChange() {
       const sec = Math.floor(Date.parse(this.evalForm.date) / 1000);
       if (!isNaN(sec)) this.evalForm.flightYear = this.getFlightYear(sec);
-    }
+    },
+    // SVG line chart of a student's grade trend (mirrors Android MPAndroidChart). Returns {path, area, w, h}.
+    trendChart(sid, w = 240, h = 60) {
+      const evs = this.evaluations.filter(e => e.studentId === sid).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
+      if (evs.length < 2) return null;
+      const pts = evs.map(e => e.finalGrade || 0);
+      const min = Math.min(...pts, 60), max = Math.max(...pts, 100);
+      const span = (max - min) || 1;
+      const step = w / (pts.length - 1);
+      const xy = pts.map((v, i) => [i * step, h - ((v - min) / span) * (h - 8) - 4]);
+      const path = xy.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+      const area = path + ` L${w} ${h} L0 ${h} Z`;
+      return { path, area, w, h, last: pts[pts.length - 1] };
+    },
+    // print-friendly per-student report -> window.print() (PDF via browser)
+    async printStudent(s) {
+      if (!s) return;
+      const evals = this.evaluations.filter(e => e.studentId === s.id).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
+      const perf = buildPerformance(s, evals);
+      const analysis = generateFeedback(perf);
+      const win = window.open('', '_blank');
+      if (!win) { this.toastMsg('Allow popups to print the report'); return; }
+      const rows = evals.map(e => `<tr><td>${e.aircraftType} · ${e.phaseName} ${e.tripNumber}</td><td>${this.fmt(e.date)}</td><td>${e.finalGrade != null ? e.finalGrade.toFixed(1) : '-'}</td><td>${e.overallMifStatus || ''}</td></tr>`).join('');
+      win.document.write(`<!doctype html><html><head><title>${s.name} — Report</title>
+        <style>body{font-family:system-ui,Arial;padding:24px;color:#111}h1{margin:0}table{width:100%;border-collapse:collapse;margin-top:14px}td,th{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:13px}pre{white-space:pre-wrap;background:#f5f5f5;padding:12px;border-radius:8px}@media print{button{display:none}}</style>
+        </head><body><h1>${s.name}</h1><div>Avg ${perf.overallScore ? perf.overallScore.toFixed(1) : '-'} · Trend ${perf.trend} · Readiness ${perf.readiness} · ${evals.length} trips</div>
+        <table><thead><tr><th>Trip</th><th>Date</th><th>Final</th><th>MIF</th></tr></thead><tbody>${rows}</tbody></table>
+        <h3 style="margin-top:18px">AI Performance Analysis</h3><pre>${analysis.replace(/</g, '&lt;')}</pre>
+        <button onclick="window.print()" style="margin-top:16px;padding:10px 16px">Print / Save as PDF</button></body></html>`);
+      win.document.close();
+    },
   },
   mounted() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

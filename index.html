@@ -38,12 +38,13 @@
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:12px}
   .card h3{margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
   .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .row.nowrap{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow-x:auto}
   .muted{color:var(--muted);font-size:12px}
   .btn{background:var(--accent);color:#fff;border:none;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:600;cursor:pointer}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
   .btn.sm{padding:6px 10px;font-size:12px}
   .btn.danger{background:transparent;border:1px solid var(--red);color:var(--red)}
-  .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
+  .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
   .pill.good{background:rgba(95,208,138,.15);color:var(--green)}
   .pill.ok{background:rgba(72,149,239,.15);color:var(--blue)}
   .pill.bad{background:rgba(255,90,90,.15);color:var(--red)}
@@ -278,7 +279,7 @@
           <h3 style="color:var(--text);text-transform:none;letter-spacing:0">{{studentName(sid)}}</h3>
           <ul class="list">
             <li v-for="e in evs" :key="e.id" class="clickable" @click="openEval(e)">
-              <div class="row">
+              <div class="row nowrap">
                 <strong>{{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
                 <span class="muted">{{fmt(e.date)}} · {{e.instructorName}}</span>
                 <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
@@ -325,13 +326,17 @@
               <span class="spacer" style="flex:1"></span>
               <span class="pill" :class="gradeColor(parseFloat(a.avg))">{{a.avg}}</span>
             </div>
-            <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+            <div class="row nowrap" style="margin-top:8px;gap:8px">
               <span class="muted">Trips: {{a.trips}}</span>
               <span class="muted">Hrs: {{a.hours.toFixed(1)}}</span>
               <span class="pill" :class="a.trend==='IMPROVING'?'good':a.trend==='DECLINING'?'bad':'pending'">{{a.trend}}</span>
               <span class="pill" :class="statusColor(a.mif)">{{a.mif}}</span>
             </div>
             <div class="muted" style="margin-top:8px">Readiness: {{a.readiness}}</div>
+            <svg v-if="trendChart(a.id)" :viewBox="'0 0 '+trendChart(a.id).w+' '+trendChart(a.id).h" style="width:100%;height:54px;margin-top:8px" preserveAspectRatio="none">
+              <path :d="trendChart(a.id).area" fill="rgba(59,130,246,.15)"></path>
+              <path :d="trendChart(a.id).path" fill="none" stroke="var(--accent)" stroke-width="2"></path>
+            </svg>
             <div class="muted" style="margin-top:6px" v-if="a.weak.length">
               <span style="color:var(--bad)">Weak:</span> {{a.weak.join(', ')}}
             </div>
@@ -345,7 +350,7 @@
             <strong style="font-size:15px">{{f.name}}</strong>
             <ul class="list" style="margin-top:8px">
               <li v-for="it in f.items" :key="it.name" style="padding:6px 0">
-                <div class="row"><span>{{it.name}}</span><span class="spacer" style="flex:1"></span><span class="pill bad">{{it.count}}×</span></div>
+                <div class="row nowrap"><span>{{it.name}}</span><span class="spacer" style="flex:1"></span><span class="pill bad">{{it.count}}×</span></div>
                 <div class="muted" style="font-size:11px">required MIF {{it.required}}</div>
               </li>
             </ul>
@@ -494,7 +499,7 @@
       <h3>Evaluations</h3>
       <ul class="list">
         <li v-for="e in evalForStudent(selectedStudent.id)" :key="e.id" class="clickable" @click="openEval(e); selectedStudent=null">
-          <div class="row">
+        <div class="row nowrap">
             <strong>{{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
             <span class="muted">{{fmt(e.date)}}</span>
             <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
@@ -505,6 +510,7 @@
       </ul>
       <div class="modal-actions">
         <button class="btn" @click="runAIForStudent">Generate AI Feedback</button>
+        <button class="btn ghost" @click="printStudent(selectedStudent)">Print / PDF</button>
         <button class="btn ghost" @click="closeDetail">Close</button>
       </div>
       <div v-if="aiForStudent===selectedStudent.id && aiLoading" class="muted" style="margin-top:10px">Analyzing…</div>
