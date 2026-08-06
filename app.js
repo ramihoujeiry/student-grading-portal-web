@@ -299,11 +299,15 @@ const app = createApp({
       this.durationH = dm[0] || '01'; this.durationM = dm[1] || '00';
       this.onEvalDateChange(); // auto flight year from date
       this.showEvalModal = true;
-      this.$nextTick(() => {
-        const t = this.currentTable;
-        this.evalForm.tripNumber = (t && t.stages && t.stages[0]) || 'S1';
-        this.loadManeuversForForm();
-      });
+      // Wait until the matching MIF table is loaded (async listener), then populate maneuvers.
+      const load = () => {
+        const t = this.mifTables.find(x => x.aircraftType === this.evalForm.aircraftType && x.phaseName === this.evalForm.phaseName);
+        if (t) {
+          this.evalForm.tripNumber = (t.stages && t.stages[0]) || 'S1';
+          this.loadManeuversForForm();
+        } else setTimeout(load, 120);
+      };
+      this.$nextTick(load);
     },
     loadManeuversForForm() {
       const t = this.currentTable;
