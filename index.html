@@ -72,6 +72,9 @@
   .maneuver-name.meets{border-left-color:var(--green);background:rgba(95,208,138,.08)}
   .maneuver-name.below{border-left-color:var(--red);background:rgba(255,90,90,.08)}
   .modal-actions{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding-top:12px;margin-top:10px;display:flex;gap:10px;flex-wrap:wrap}
+  /* Final-grade preview: sticky at top of the full-screen New Evaluation modal so it stays visible while grading */
+  .modal.full .preview{position:sticky;top:0;z-index:5;background:var(--bg);border:1px solid var(--line);
+    border-radius:12px;padding:12px 14px;margin:6px 0 10px;display:flex;align-items:center;gap:16px;box-shadow:0 1px 0 var(--line)}
   @media(min-width:640px){.modal{margin:auto;border-radius:16px}}
   .modal h2{margin-top:4px}
   .grade-grid{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center}
@@ -474,7 +477,9 @@
       <label>Student</label>
       <select v-model="evalForm.studentId"><option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option></select>
       <label>Instructor</label>
-      <input v-model="evalForm.instructorName" placeholder="Instructor name" />
+      <select v-model="evalForm.instructorName">
+        <option v-for="i in instructors" :key="i.id" :value="i.name">{{i.name}}</option>
+      </select>
       <div class="row" style="gap:10px">
         <div style="flex:1">
           <label>Phase</label>
@@ -505,6 +510,16 @@
           </div>
         </div>
       </div>
+      <div class="preview" v-if="evalForm.maneuverGrades.length">
+        <div>
+          <div class="muted">Final grade</div>
+          <div class="big" :class="gradeColor(evalPreview.finalGrade||0)">{{evalPreview.finalGrade!=null?evalPreview.finalGrade.toFixed(2):'-'}}</div>
+        </div>
+        <div style="flex:1">
+          <span class="pill" :class="statusColor(evalPreview.status)">{{evalPreview.status}}</span>
+          <div class="muted" style="margin-top:4px">{{evalPreview.failCount}} maneuver(s) below required MIF</div>
+        </div>
+      </div>
       <label>Maneuver Grades</label>
       <div class="card" v-if="evalForm.maneuverGrades.length">
         <div class="grade-grid" v-for="(m,idx) in evalForm.maneuverGrades" :key="m.name" style="margin-bottom:14px">
@@ -521,16 +536,6 @@
       <div v-else class="muted">Select an aircraft + phase that has a MIF table.</div>
       <label>Trip Notes</label>
       <textarea v-model="evalForm.tripNotes" placeholder="Coach comments, safety items…"></textarea>
-      <div class="preview" v-if="evalForm.maneuverGrades.length">
-        <div>
-          <div class="muted">Final grade</div>
-          <div class="big" :class="gradeColor(evalPreview.finalGrade||0)">{{evalPreview.finalGrade!=null?evalPreview.finalGrade.toFixed(2):'-'}}</div>
-        </div>
-        <div style="flex:1">
-          <span class="pill" :class="statusColor(evalPreview.status)">{{evalPreview.status}}</span>
-          <div class="muted" style="margin-top:4px">{{evalPreview.failCount}} maneuver(s) below required MIF</div>
-        </div>
-      </div>
       <div class="modal-actions">
         <button class="btn" @click="saveEval">Save Evaluation</button>
         <button class="btn ghost" @click="showEvalModal=false">Cancel</button>

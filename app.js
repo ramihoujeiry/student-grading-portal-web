@@ -293,7 +293,9 @@ const app = createApp({
       const tables = this.mifTables.filter(t => t.aircraftType === this.evalForm.aircraftType);
       this.evalForm.phaseName = tables.length ? tables[0].phaseName : 'CONTACT';
       this.evalForm.studentId = this.students[0] ? this.students[0].id : '';
-      this.evalForm.instructorName = (this.user && this.user.displayName) || (this.instructors[0] ? this.instructors[0].name : '');
+      const me = this.user && this.user.displayName;
+      const meIn = this.instructors.find(i => i.name === me);
+      this.evalForm.instructorName = meIn ? meIn.name : (this.instructors[0] ? this.instructors[0].name : '');
       this.evalForm.duration = '01:00';
       const dm = (this.evalForm.duration || '01:00').split(':');
       this.durationH = dm[0] || '01'; this.durationM = dm[1] || '00';
