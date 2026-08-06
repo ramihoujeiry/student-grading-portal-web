@@ -452,14 +452,14 @@
             <option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option>
           </select>
           <div style="margin-top:12px" class="row">
-            <button class="btn" @click="runAI">Generate Analysis</button>
+            <button class="btn" @click="runAIForStudent">Generate Analysis</button>
             <button class="btn ghost" :disabled="!aiResult" @click="copyAI">Copy</button>
           </div>
           <div v-if="aiLoading" class="muted" style="margin-top:10px">Analyzing…</div>
           <div v-if="aiResult" class="mannote" style="margin-top:12px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:340px;overflow:auto">{{aiResult}}</div>
           <div v-if="!aiResult && !aiLoading" class="muted" style="margin-top:10px">
-            Picks a student and computes trend, consistency, weak maneuvers and a readiness verdict
-            from their evaluations — offline, deterministic, no network.
+            Picks a student and asks the live AI model for a coaching debrief (trend, consistency,
+            weak maneuvers, readiness) from their evaluations. Falls back to an offline summary if offline.
           </div>
         </div>
       </section>

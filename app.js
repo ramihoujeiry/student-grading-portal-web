@@ -362,11 +362,13 @@ const app = createApp({
 
     /* ---- AI feedback for a student profile ---- */
     async runAIForStudent() {
-      if (!this.selectedStudent) return;
-      this.aiForStudent = this.selectedStudent.id;
+      // Resolve the student from the AI tab dropdown (aiStudentId) or a opened profile.
+      const student = this.selectedStudent
+        || (this.aiStudentId ? this.students.find(s => s.id === this.aiStudentId) : null);
+      if (!student) { this.toastMsg('Pick a student first'); return; }
+      this.aiForStudent = student.id;
       this.aiLoading = true;
       this.aiResult = '';
-      const student = this.selectedStudent;
       const evals = this.evaluations.filter(e => e.studentId === student.id);
       const data = buildPerformance(student, evals);
       // Try the online model first; fall back to the offline template on any problem.
