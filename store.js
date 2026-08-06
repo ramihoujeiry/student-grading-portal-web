@@ -40,7 +40,7 @@ const COL = {
    no Firestore config/ai doc is set. For cloud use, set config/ai (admin-
    only write) and this LAN default is ignored. */
 const LAN_AI_ENABLED = true;
-const LAN_AI_ENDPOINT = 'https://choose-postcard-unit-alexander.trycloudflare.com/v1/chat/completions';
+const LAN_AI_ENDPOINT = 'https://barbie-chapter-controlled-frog.trycloudflare.com/v1/chat/completions';
 const LAN_AI_MODEL = 'tencent/hy3:free';
 
 /* ---------- auth service ------------------------------------------------- */
