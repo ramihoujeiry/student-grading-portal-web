@@ -65,6 +65,9 @@ const app = createApp({
     currentTable() {
       return this.mifTables.find(t => t.aircraftType === this.evalForm.aircraftType && t.phaseName === this.evalForm.phaseName) || null;
     },
+    // active only — inactive students/instructors must not appear in the New Evaluation pickers (mirrors Android)
+    activeStudents() { return (this.students || []).filter(s => s.active !== false); },
+    activeInstructors() { return (this.instructors || []).filter(i => i.active !== false); },
     evalPreview() {
       const mg = (this.evalForm.maneuverGrades || []).filter(m => m.studentGrade != null && m.studentGrade !== 0);
       if (!mg.length) return { finalGrade: null, status: STATUS_PENDING, failCount: 0 };
@@ -292,10 +295,10 @@ const app = createApp({
       this.evalForm.aircraftType = this.aircraft[0] ? this.aircraft[0].name : '';
       const tables = this.mifTables.filter(t => t.aircraftType === this.evalForm.aircraftType);
       this.evalForm.phaseName = tables.length ? tables[0].phaseName : 'CONTACT';
-      this.evalForm.studentId = this.students[0] ? this.students[0].id : '';
+      this.evalForm.studentId = (this.activeStudents[0] ? this.activeStudents[0].id : (this.students[0] ? this.students[0].id : ''));
       const me = this.user && this.user.displayName;
-      const meIn = this.instructors.find(i => i.name === me);
-      this.evalForm.instructorName = meIn ? meIn.name : (this.instructors[0] ? this.instructors[0].name : '');
+      const meIn = this.activeInstructors.find(i => i.name === me);
+      this.evalForm.instructorName = meIn ? meIn.name : (this.activeInstructors[0] ? this.activeInstructors[0].name : (this.instructors[0] ? this.instructors[0].name : ''));
       this.evalForm.duration = '01:00';
       const dm = (this.evalForm.duration || '01:00').split(':');
       this.durationH = dm[0] || '01'; this.durationM = dm[1] || '00';
