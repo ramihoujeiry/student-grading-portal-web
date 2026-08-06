@@ -290,6 +290,8 @@ const app = createApp({
     openNewEval() {
       this.evalForm = blankEval();
       this.evalForm.aircraftType = this.aircraft[0] ? this.aircraft[0].name : '';
+      const tables = this.mifTables.filter(t => t.aircraftType === this.evalForm.aircraftType);
+      this.evalForm.phaseName = tables.length ? tables[0].phaseName : 'CONTACT';
       this.evalForm.studentId = this.students[0] ? this.students[0].id : '';
       this.evalForm.instructorName = (this.user && this.user.displayName) || (this.instructors[0] ? this.instructors[0].name : '');
       this.evalForm.duration = '01:00';
@@ -297,7 +299,11 @@ const app = createApp({
       this.durationH = dm[0] || '01'; this.durationM = dm[1] || '00';
       this.onEvalDateChange(); // auto flight year from date
       this.showEvalModal = true;
-      this.loadManeuversForForm();
+      this.$nextTick(() => {
+        const t = this.currentTable;
+        this.evalForm.tripNumber = (t && t.stages && t.stages[0]) || 'S1';
+        this.loadManeuversForForm();
+      });
     },
     loadManeuversForForm() {
       const t = this.currentTable;
