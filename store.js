@@ -181,7 +181,7 @@ function calcMifStatus(maneuverGrades) {
   const any = (maneuverGrades || []).some(m => m.studentGrade != null && m.studentGrade !== 0);
   if (!any) return STATUS_PENDING;
   let fail = 0;
-  for (const m of maneuverGrades) if (m.studentGrade != null && m.requiredMif != null && m.studentGrade < m.requiredMif) fail++;
+  for (const m of maneuverGrades) if (m.studentGrade != null && m.studentGrade !== 0 && m.requiredMif != null && m.studentGrade < m.requiredMif) fail++;
   return fail >= 2 ? STATUS_BELOW_STANDARD : STATUS_MEETS_STANDARD;
 }
 

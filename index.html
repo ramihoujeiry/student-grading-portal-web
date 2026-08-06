@@ -162,10 +162,10 @@
 
     <nav class="tabs">
       <button class="tab-btn" :class="{active:tab==='dashboard'}" @click="setTab('dashboard')">Dashboard</button>
-      <button class="tab-btn" :class="{active:tab==='students'}" @click="setTab('students')">Students</button>
-      <button class="tab-btn" :class="{active:tab==='instructors'}" @click="setTab('instructors')">Instructors</button>
-      <button class="tab-btn" :class="{active:tab==='aircraft'}" @click="setTab('aircraft')">Aircraft</button>
-      <button class="tab-btn" :class="{active:tab==='mif'}" @click="setTab('mif')">MIF Tables</button>
+      <button class="tab-btn" :class="{active:tab==='students'}" v-if="isAdmin" @click="setTab('students')">Students</button>
+      <button class="tab-btn" :class="{active:tab==='instructors'}" v-if="isAdmin" @click="setTab('instructors')">Instructors</button>
+      <button class="tab-btn" :class="{active:tab==='aircraft'}" v-if="isAdmin" @click="setTab('aircraft')">Aircraft</button>
+      <button class="tab-btn" :class="{active:tab==='mif'}" v-if="isAdmin" @click="setTab('mif')">MIF Tables</button>
       <button class="tab-btn" :class="{active:tab==='evaluations'}" @click="setTab('evaluations')">Evaluations</button>
       <button class="tab-btn" :class="{active:tab==='announcements'}" @click="setTab('announcements')">Announcements</button>
       <button class="tab-btn" :class="{active:tab==='analytics'}" @click="setTab('analytics')">Analytics</button>
@@ -308,7 +308,7 @@
                 <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
                 <span class="pill" :class="statusColor(e.overallMifStatus)">{{e.overallMifStatus}}</span>
                 <span class="spacer" style="flex:1"></span>
-                <button class="btn sm danger" v-if="canEdit" @click.stop="deleteEval(e)">Delete</button>
+                <button class="btn sm danger" v-if="isAdmin" @click.stop="deleteEval(e)">Delete</button>
               </div>
               <div class="muted" v-if="e.tripNotes">{{e.tripNotes}}</div>
             </li>
@@ -320,7 +320,7 @@
       <!-- ANNOUNCEMENTS -->
       <section v-show="tab==='announcements'">
         <div class="topbar"><h2 style="margin:0">Announcements</h2><span class="spacer"></span>
-          <button class="btn sm" v-if="canEdit" @click="addAnnouncement">+ Post</button></div>
+          <button class="btn sm" v-if="isAdmin" @click="addAnnouncement">+ Post</button></div>
         <ul class="list">
           <li v-for="a in filterAnnouncements(announcements)" :key="a.id">
             <div class="row">
@@ -328,7 +328,7 @@
               <span class="pill" :class="a.targetRole==='all'?'ok':'pending'">{{a.targetRole}}</span>
               <span class="spacer" style="flex:1"></span>
               <span class="muted">{{fmt(a.timestamp)}}</span>
-              <button class="btn sm danger" v-if="canEdit" @click="deleteAnnouncement(a)">×</button>
+              <button class="btn sm danger" v-if="isAdmin" @click="deleteAnnouncement(a)">×</button>
             </div>
             <div style="margin-top:6px">{{a.message}}</div>
             <div class="muted" style="margin-top:4px">From: {{a.senderName}}</div>
@@ -549,7 +549,7 @@
       <div class="row">
         <h2 style="margin:0">{{selectedEval.studentName}}</h2>
         <span class="spacer" style="flex:1"></span>
-        <button class="btn sm danger" v-if="canEdit" @click="deleteEval(selectedEval); closeDetail()">Delete</button>
+        <button class="btn sm danger" v-if="isAdmin" @click="deleteEval(selectedEval); closeDetail()">Delete</button>
       </div>
       <div class="muted" style="margin:4px 0 12px">{{selectedEval.aircraftType}} · {{selectedEval.phaseName}} {{selectedEval.tripNumber}} · {{fmt(selectedEval.date)}} · {{selectedEval.instructorName}} · {{selectedEval.duration}} h</div>
       <div class="row" style="gap:10px;margin-bottom:12px">

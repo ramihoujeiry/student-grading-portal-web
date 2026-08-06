@@ -71,7 +71,7 @@ const app = createApp({
       const fg = calcFinalGrade(this.evalForm.maneuverGrades);
       const st = calcMifStatus(this.evalForm.maneuverGrades);
       let fail = 0;
-      (this.evalForm.maneuverGrades || []).forEach(m => { if (m.studentGrade != null && m.requiredMif != null && m.studentGrade < m.requiredMif) fail++; });
+      (this.evalForm.maneuverGrades || []).forEach(m => { if (m.studentGrade != null && m.studentGrade !== 0 && m.requiredMif != null && m.studentGrade < m.requiredMif) fail++; });
       return { finalGrade: fg, status: st, failCount: fail };
     },
 
