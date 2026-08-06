@@ -28,6 +28,7 @@ const app = createApp({
 
       // ui
       evalForm: blankEval(),
+      durationH: '01', durationM: '00',   // duration picker mirrors Android HH:MM
       showEvalModal: false,
       selectedEval: null,    // evaluation detail
       selectedStudent: null, // student profile
@@ -120,7 +121,7 @@ const app = createApp({
           id: s.id, name: s.name, active: s.active,
           avg: perf.overallScore ? perf.overallScore.toFixed(1) : '-',
           trend: perf.trend, trips: perf.evaluationCount,
-          hours: evals.reduce((sum, e) => sum + (parseFloat(e.duration) || 0), 0),
+          hours: evals.reduce((sum, e) => sum + this.parseHours(e.duration), 0),
           weak: perf.weakManeuvers.slice(0, 3).map(w => w.name),
           readiness: perf.readiness,
           mif: perf.overallMifStatus || '-'
@@ -163,7 +164,7 @@ const app = createApp({
       return list;
     },
     dashTotalHours() {
-      return this.dashFilteredEvals.reduce((sum, e) => sum + (parseFloat(e.duration) || 0), 0);
+      return this.dashFilteredEvals.reduce((sum, e) => sum + this.parseHours(e.duration), 0);
     },
 
     // Training Progress cohort view (mirror Android TrainingProgressViewModel)
@@ -291,7 +292,9 @@ const app = createApp({
       this.evalForm.aircraftType = this.aircraft[0] ? this.aircraft[0].name : '';
       this.evalForm.studentId = this.students[0] ? this.students[0].id : '';
       this.evalForm.instructorName = (this.user && this.user.displayName) || (this.instructors[0] ? this.instructors[0].name : '');
-      this.evalForm.duration = '1.0';
+      this.evalForm.duration = '01:00';
+      const dm = (this.evalForm.duration || '01:00').split(':');
+      this.durationH = dm[0] || '01'; this.durationM = dm[1] || '00';
       this.onEvalDateChange(); // auto flight year from date
       this.showEvalModal = true;
       this.loadManeuversForForm();
@@ -420,6 +423,8 @@ const app = createApp({
     /* ---- helpers ---- */
     fmt(sec) { return fmtDate(sec); },
     fmtDateTime(sec) { if (!sec) return '—'; const d = new Date(sec * 1000); return d.toISOString().slice(0, 10); },
+    // parse a duration string (Android "HH:MM" or legacy decimal "1.5") into decimal hours
+    parseHours(str) { if (str == null) return 0; const s = String(str); if (s.includes(':')) { const p = s.split(':'); return (parseInt(p[0], 10) || 0) + (parseInt(p[1], 10) || 0) / 60; } return parseFloat(s) || 0; },
     gradeColor(g) { return g >= 85 ? 'good' : g >= 70 ? 'ok' : 'bad'; },
     statusColor(s) { return s === STATUS_MEETS_STANDARD ? 'good' : s === STATUS_BELOW_STANDARD ? 'bad' : 'pending'; },
     // descriptive labels for the 1-4 grading scale (replaces bare numbers)
@@ -447,6 +452,7 @@ const app = createApp({
       const sec = Math.floor(Date.parse(this.evalForm.date) / 1000);
       if (!isNaN(sec)) this.evalForm.flightYear = this.getFlightYear(sec);
     },
+    onDurationChange() { this.evalForm.duration = (this.durationH || '00') + ':' + (this.durationM || '00'); },
     // SVG line chart of a student's grade trend (mirrors Android MPAndroidChart). Returns {path, area, w, h}.
     trendChart(sid, w = 240, h = 60) {
       const evs = this.evaluations.filter(e => e.studentId === sid).slice().sort((a, b) => (a.date || 0) - (b.date || 0));

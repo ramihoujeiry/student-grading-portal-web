@@ -64,6 +64,13 @@
   label{font-size:11px;color:var(--muted);display:block;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px}
   .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto}
   .modal{background:var(--bg);width:100%;max-width:620px;max-height:90vh;overflow:auto;border-radius:16px;padding:16px 16px 24px}
+  .modal.full{max-width:100%;max-height:100vh;height:100vh;border-radius:0;padding:18px 18px 28px;display:flex;flex-direction:column}
+  .modal-mask.fullscreen{position:fixed;inset:0;background:var(--bg);z-index:60;display:flex;align-items:stretch;justify-content:stretch;padding:0;overflow:auto}
+  .maneuver-name{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:15px;font-weight:700;color:var(--text);
+    padding:8px 10px;border-radius:10px;background:var(--bg2);border-left:3px solid var(--line)}
+  .maneuver-name .req{font-size:11px;font-weight:600;color:var(--muted)}
+  .maneuver-name.meets{border-left-color:var(--green);background:rgba(95,208,138,.08)}
+  .maneuver-name.below{border-left-color:var(--red);background:rgba(255,90,90,.08)}
   .modal-actions{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding-top:12px;margin-top:10px;display:flex;gap:10px;flex-wrap:wrap}
   @media(min-width:640px){.modal{margin:auto;border-radius:16px}}
   .modal h2{margin-top:4px}
@@ -457,8 +464,8 @@
   </div>
 
   <!-- EVALUATION MODAL -->
-  <div class="modal-mask" v-if="loggedIn && showEvalModal" @click.self="showEvalModal=false">
-    <div class="modal">
+  <div class="modal-mask fullscreen" v-if="loggedIn && showEvalModal" @click.self="showEvalModal=false">
+    <div class="modal full">
       <h2>New Evaluation</h2>
       <label>Aircraft</label>
       <select v-model="evalForm.aircraftType" @change="onEvalContextChange">
@@ -485,18 +492,25 @@
       <div class="row" style="gap:10px">
         <div style="flex:1"><label>Date</label><input type="date" v-model="evalForm.date" @change="onEvalDateChange" /></div>
         <div style="flex:1"><label>Flight year</label><input :value="evalForm.flightYear" readonly title="Auto from date" /></div>
-        <div style="flex:1"><label>Duration</label>
-          <select v-model="evalForm.duration">
-            <option v-for="d in DURATIONS" :key="d" :value="String(d)">{{d.toFixed(1)}} h</option>
-          </select>
+        <div style="flex:1">
+          <label>Duration (hr : min)</label>
+          <div class="row nowrap" style="gap:6px;margin-top:0">
+            <select v-model="durationH" @change="onDurationChange" style="flex:1">
+              <option v-for="h in 13" :key="h" :value="String(h-1).padStart(2,'0')">{{String(h-1).padStart(2,'0')}}</option>
+            </select>
+            <span style="font-weight:700">:</span>
+            <select v-model="durationM" @change="onDurationChange" style="flex:1">
+              <option v-for="m in ['00','05','10','15','20','25','30','35','40','45','50','55']" :key="m" :value="m">{{m}}</option>
+            </select>
+          </div>
         </div>
       </div>
       <label>Maneuver Grades</label>
       <div class="card" v-if="evalForm.maneuverGrades.length">
-        <div class="grade-grid" v-for="(m,idx) in evalForm.maneuverGrades" :key="m.name" style="margin-bottom:10px">
-          <div>
-            <div style="font-size:13px">{{m.name}}</div>
-            <div class="muted">req MIF {{m.requiredMif}} · weight {{m.factor}}</div>
+        <div class="grade-grid" v-for="(m,idx) in evalForm.maneuverGrades" :key="m.name" style="margin-bottom:14px">
+          <div class="maneuver-name" :class="{below:m.studentGrade && m.requiredMif!=null && m.studentGrade < m.requiredMif, meets:m.studentGrade && m.requiredMif!=null && m.studentGrade >= m.requiredMif}">
+            <span>{{m.name}}</span>
+            <span class="req">req MIF {{m.requiredMif}}</span>
           </div>
           <div class="grade-pick">
             <button class="gx" :class="{on:m.studentGrade===0}" @click="m.studentGrade=0">N/A</button>
