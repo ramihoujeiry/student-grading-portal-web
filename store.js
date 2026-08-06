@@ -41,7 +41,7 @@ const COL = {
    only write) and this LAN default is ignored. */
 const LAN_AI_ENABLED = true;
 const LAN_AI_ENDPOINT = 'http://192.168.1.200:8787/v1/chat/completions';
-const LAN_AI_MODEL = 'qwen/qwen3.8-max';
+const LAN_AI_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 
 /* ---------- auth service ------------------------------------------------- */
 const Auth = {
