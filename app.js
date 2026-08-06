@@ -454,6 +454,8 @@ const app = createApp({
       }
       return cls;
     },
+    // tap a number to select (highlight); tap again to clear it
+    toggleGrade(m, n) { m.studentGrade = (m.studentGrade === n) ? 0 : n; },
     // school-year from a date: Sep->Jul belongs to that start year (e.g. 2025-2026)
     getFlightYear(sec) {
       const d = new Date((sec || Date.now() / 1000) * 1000);
