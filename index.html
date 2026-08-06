@@ -571,7 +571,12 @@
         <h3>Trip Notes</h3>
         <div class="mannote" style="white-space:pre-wrap">{{selectedEval.tripNotes}}</div>
       </div>
-      <div class="modal-actions"><button class="btn ghost" @click="closeDetail">Close</button></div>
+      <div class="modal-actions">
+        <button class="btn" @click="runAISingleEval">Generate AI Feedback</button>
+        <button class="btn ghost" @click="closeDetail">Close</button>
+      </div>
+      <div v-if="aiSingleLoading" class="muted" style="margin-top:10px">Analyzing this evaluation…</div>
+      <div v-if="aiSingleResult" class="mannote" style="margin-top:10px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:320px;overflow:auto">{{aiSingleResult}}</div>
     </div>
   </div>
 
@@ -600,12 +605,9 @@
         <li v-if="!evalForStudent(selectedStudent.id).length" class="muted">No evaluations for this student.</li>
       </ul>
       <div class="modal-actions">
-        <button class="btn" @click="runAIForStudent">Generate AI Feedback</button>
         <button class="btn ghost" @click="printStudent(selectedStudent)">Print / PDF</button>
         <button class="btn ghost" @click="closeDetail">Close</button>
       </div>
-      <div v-if="aiForStudent===selectedStudent.id && aiLoading" class="muted" style="margin-top:10px">Analyzing…</div>
-      <div v-if="aiForStudent===selectedStudent.id && aiResult" class="mannote" style="margin-top:10px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:300px;overflow:auto">{{aiResult}}</div>
     </div>
   </div>
 

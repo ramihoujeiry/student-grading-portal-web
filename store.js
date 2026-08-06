@@ -316,6 +316,51 @@ function generateFeedback(data){
   return L.join('\n');
 }
 
+/* ---- Single-evaluation AI debrief (per-evaluation, not whole student) ---- */
+function buildSingleEvalData(ev){
+  const grades=(ev.maneuverGrades||[]).map(m=>({name:m.name,grade:m.studentGrade,req:(m.requiredMif>0?m.requiredMif:0),factor:m.factor}));
+  const below=grades.filter(g=>g.req>0 && g.grade<g.req).sort((a,b)=>a.grade-b.grade);
+  return {studentName:ev.studentName, aircraft:ev.aircraftType, phase:ev.phaseName, trip:ev.tripNumber,
+    date:fmtDate(ev.date), instructor:ev.instructorName, duration:ev.duration, finalGrade:ev.finalGrade,
+    mifStatus:ev.overallMifStatus, grades, below, notes:ev.tripNotes||''};
+}
+function generateSingleEvalFeedback(d){
+  const L=[]; const name=d.studentName||'the cadet';
+  L.push('AI Debrief — Single Evaluation');
+  L.push(name+' · '+d.aircraft+' · '+d.phase+' '+d.trip+' · '+d.date+' · '+d.instructor+' · '+d.duration+'h');
+  L.push('Final grade: '+(d.finalGrade!=null?d.finalGrade.toFixed(1):'-')+'   MIF status: '+d.mifStatus);
+  L.push('');
+  if(d.grades.length){
+    L.push('Maneuver grades:');
+    d.grades.forEach(g=>{const tag=g.req>0?(g.grade<g.req?'  BELOW required MIF '+g.req:'  meets MIF '+g.req):'  (no MIF set)'; L.push('- '+g.name+': '+g.grade+tag);});
+    L.push('');
+  }
+  if(d.below.length){
+    L.push('PRIORITY TO IMPROVE THIS TRIP:');
+    d.below.slice(0,5).forEach(w=>L.push('- '+w.name+': '+w.grade+' (below required MIF '+w.req+')'));
+    L.push('');
+    L.push('Next trip: demonstrate the weakest item(s) to standard, then guided practice, then solo. Do not advance until consistently at the required MIF.');
+  } else {
+    L.push('All maneuvers met or exceeded required MIF for this evaluation. Maintain the standard; introduce advanced scenarios to stretch the cadet on the next trip.');
+  }
+  if(d.notes){ L.push(''); L.push('Coach notes:'); L.push(d.notes); }
+  return L.join('\n');
+}
+function buildSingleEvalPrompt(d){
+  const sys='You are a senior flight instructor (CFI) writing a concise, candid coaching debrief for ONE evaluation (a single training trip). Use the data provided. Be specific and actionable. Do NOT invent grades or maneuvers that are not in the data. Write in plain language a human instructor would say. Use short paragraphs. End with concrete next-trip actions.';
+  const L=[];
+  L.push('Student: '+(d.studentName||'cadet'));
+  L.push('Evaluation: '+d.aircraft+' · '+d.phase+' '+d.trip+' · '+d.date+' · instructor '+d.instructor+' · duration '+d.duration+'h');
+  L.push('Final grade: '+(d.finalGrade!=null?d.finalGrade.toFixed(1):'-')+'   MIF status: '+d.mifStatus);
+  if(d.grades.length){
+    L.push('Maneuver grades (name : student grade : required MIF):');
+    d.grades.forEach(g=>L.push('- '+g.name+' : '+g.grade+' : '+(g.req>0?g.req:'n/a')));
+  }
+  if(d.notes)L.push('Instructor trip notes: '+d.notes);
+  L.push('Write a debrief focused on THIS evaluation: what went well, what to fix, and the single most important next-trip action.');
+  return {system:sys, user:L.join('\n')};
+}
+
 /* ---------- Online AI adapter (OpenAI-compatible /chat/completions) ------- */
 /* Loaded from Firestore config/ai so no key is committed to the repo.
    Expected doc shape:
@@ -378,6 +423,18 @@ function buildAIPrompt(data) {
 async function callAIModel(data, cfg) {
   if (!cfg || !cfg.endpoint) throw new Error('no AI endpoint');
   const prompt = buildAIPrompt(data);
+  return _postAIModel(prompt, cfg);
+}
+
+/* Same as callAIModel but accepts a ready-made {system,user} prompt
+   (used by the single-evaluation debrief which has its own prompt builder). */
+async function callAIModelWithPrompt(prompt, cfg) {
+  if (!cfg || !cfg.endpoint) throw new Error('no AI endpoint');
+  if (!prompt || !prompt.system || !prompt.user) throw new Error('no prompt');
+  return _postAIModel(prompt, cfg);
+}
+
+async function _postAIModel(prompt, cfg) {
   const body = {
     model: cfg.model || 'qwen/qwen3.8-max',
     messages: [

@@ -1,4 +1,4 @@
-const CACHE = 'grading-portal-v30';
+const CACHE = 'grading-portal-v32';
 const ASSETS = [
   './',
   'index.html',

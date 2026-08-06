@@ -36,7 +36,8 @@ const app = createApp({
       activeYear: '',        // school-year filter
       DURATIONS: [0.5, 0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0], // duration picker presets (h)
       toast: '',
-      aiStudentId: '', aiResult: '', aiLoading: false
+      aiStudentId: '', aiResult: '', aiLoading: false,
+      aiSingleResult: '', aiSingleLoading: false
     };
   },
   computed: {
@@ -385,6 +386,30 @@ const app = createApp({
       }
       this.aiResult = generateFeedback(data);
       this.aiLoading = false;
+    },
+
+    /* ---- AI debrief for a SINGLE evaluation (opened from the Evaluations list) ---- */
+    async runAISingleEval() {
+      const ev = this.selectedEval;
+      if (!ev) { this.toastMsg('Open an evaluation first'); return; }
+      this.aiSingleLoading = true;
+      this.aiSingleResult = '';
+      const data = buildSingleEvalData(ev);
+      try {
+        const cfg = await getAIConfig();
+        if (cfg) {
+          const prompt = buildSingleEvalPrompt(data);
+          // callAIModel expects {system,user}; reuse by temporarily swapping the prompt builder
+          const text = await callAIModelWithPrompt(prompt, cfg);
+          this.aiSingleResult = text;
+          this.aiSingleLoading = false;
+          return;
+        }
+      } catch (e) {
+        console.warn('Single-eval AI call failed, using offline template:', e);
+      }
+      this.aiSingleResult = generateSingleEvalFeedback(data);
+      this.aiSingleLoading = false;
     },
 
     /* ---- announcements ---- */
