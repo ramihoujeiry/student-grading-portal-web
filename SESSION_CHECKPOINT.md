@@ -1,17 +1,21 @@
 # Session Checkpoint — Student Grading Portal (web PWA)
 
 Saved: 2026-08-06 (session continued across compaction + out-of-band messages)
-Branch: `main` @ `2460803`
+Branch: `main` @ `455abc2`
 Deploy: https://ramihoujeiry.github.io/student-grading-portal-web/
-SW cache: `grading-portal-v17`
+SW cache: `grading-portal-v22`
 
-## AI feedback — now a REAL online model (commit 2460803)
-- Before: `generateFeedback` was 100% templated text (no model call).
-- Now: `runAIForStudent` (app.js) is async -> loads AI config from Firestore `config/ai`, calls `callAIModel` (store.js) which POSTs to an OpenAI-compatible `/v1/chat/completions` endpoint with system+user prompt built from real analytics (`buildAIPrompt`). On missing config or any error -> falls back to the template. No key in the repo.
-- `config/ai` doc shape: `{ enabled:true, endpoint:".../v1/chat/completions", model:"qwen/qwen3.8-max", apiKey:"..." }`. Read by any signed-in user; WRITTEN by admin only (firestore.rules `match /config/{doc}`).
-- firestore.rules: added `config/{doc}` admin-write rule (NOT yet deployed — no firebase deploy token available; deploy via `npx firebase-tools deploy --only firestore:rules --project grading-portal-app` after `firebase login`).
-- Pi (Hermes) findings: `pi@192.168.1.200` (ssh, pw known). Hermes gateway runs on `127.0.0.1:3000` (localhost only), custom relay (not OpenAI-compatible at `/v1/chat/completions`); LLM backend = Ollama Cloud (models: qwen3.5:397b, glm-5.1, etc.). To use the Pi as backend for the PUBLIC web app: rebind gateway to `0.0.0.0:3000` + CORS, expose via tunnel for internet, point `config/ai.endpoint` at it. On LAN only, no tunnel needed.
-## Original app (source of truth)
+## AI feedback — REAL online model, COMPLETELY FREE via Pi/Hermes (commit 455abc2)
+- `runAIForStudent` (app.js) async -> `getAIConfig()` (store.js) returns a LAN default (Firestore `config/ai` override supported but rules not deployed).
+- LAN default: endpoint `https://192.168.1.200:8787/v1/chat/completions`, model `tencent/hy3:free`.
+- The Pi (`pi@192.168.1.200`) runs `/home/pi/.hermes/ai_proxy.py` (HTTPS, self-signed cert, CORS). It shells out to `hermes chat -q ... -m tencent/hy3:free -Q --provider nous` — uses Hermes' OWN Nous Portal auth, so it is COMPLETELY FREE (no OpenRouter key needed; OpenRouter `:free` is blocked on this key anyway).
+- Why HTTPS: GitHub Pages is HTTPS; browser blocks mixed-content HTTP fetch -> proxy must be HTTPS. Self-signed cert at `/home/pi/.hermes/ai_proxy.crt`/`.key`. USER MUST trust cert once (open `https://192.168.1.200:8787/` in browser, accept warning; or `certutil -addstore ROOT ai_proxy.crt` as admin) so `fetch()` succeeds.
+- `callAIModel` tolerant of reasoning models (uses `content`, falls back to `reasoning`).
+- Verified: python from this machine reached `https://192.168.1.200:8787` and got real `tencent/hy3:free` reply (HY3_OK). App correctly falls back to template if proxy unreachable (no page errors).
+- NOTE: Playwright/Chromium in THIS sandbox could not reach the Pi LAN IP (net::ERR_FAILED) — environment limitation, not a code defect. On the user's real device (same WiFi) the browser reaches it.
+- firestore.rules `config/{doc}` admin-write rule added but NOT deployed (no firebase token). Optional cloud override path.
+- Pi proxy is a `nohup` process (pid ~31507), NOT a systemd service -> dies on Pi reboot. Add systemd unit if persistence wanted.
+
 `D:\perfect - Copy` — Android Kotlin Student Grading Portal, Firebase/Firestore.
 Role enum (Constants.kt): `ROLE_ADMIN="admin"`, `ROLE_INSTRUCTOR="instructor"`, `ROLE_VIEWER="viewer"`, `ROLE_PENDING="pending"`.
 Native nav groups:
