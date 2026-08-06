@@ -305,3 +305,81 @@ function generateFeedback(data){
   L.push('Grade against ACS (Knowledge + Risk Mgmt + Skill); remediate weak fundamentals before advancing.');
   return L.join('\n');
 }
+
+/* ---------- Online AI adapter (OpenAI-compatible /chat/completions) ------- */
+/* Loaded from Firestore config/ai so no key is committed to the repo.
+   Expected doc shape:
+     { enabled:true, endpoint:"https://.../v1/chat/completions",
+       model:"qwen/qwen3.8-max", apiKey:"sk-..." }
+   Falls back to the offline template (generateFeedback) if unset or on error. */
+async function getAIConfig() {
+  if (!fbReady) return null;
+  try {
+    const snap = await dbFs.collection('config').doc('ai').get();
+    if (!snap.exists) return null;
+    const d = snap.data() || {};
+    if (d.enabled === false) return null;
+    if (!d.endpoint) return null;
+    return { endpoint: d.endpoint, model: d.model || 'qwen/qwen3.8-max', apiKey: d.apiKey || '' };
+  } catch (e) {
+    return null;
+  }
+}
+
+/* Build a precise prompt from the computed analytics so the model has
+   real signal to work with (not just "write something nice"). */
+function buildAIPrompt(data) {
+  const sys = 'You are a senior flight instructor (CFI) writing a concise, candid coaching debrief for a student pilot. ' +
+    'Use the data provided. Be specific and actionable. Do NOT invent grades or maneuvers that are not in the data. ' +
+    'Write in plain language a human instructor would say. Use short paragraphs. End with concrete next-trip actions.';
+  const L = [];
+  L.push('Student: ' + (data.studentName || 'cadet'));
+  L.push('Trips evaluated: ' + (data.evaluationCount || 0) + '  (' + (data.firstDateLabel || '-') + ' -> ' + (data.lastDateLabel || '-') + ')');
+  L.push('Overall average grade: ' + (data.overallScore != null ? data.overallScore.toFixed(1) : '-'));
+  L.push('Trend: ' + (data.trend || '-') + (data.evaluationCount >= 2 ? ' (' + Math.abs(data.trendDelta || 0).toFixed(1) + ' pts ' + ((data.trendDelta || 0) >= 0 ? 'up' : 'down') + ')' : ''));
+  L.push('Consistency (std dev): ' + (data.volatility != null ? data.volatility.toFixed(1) : '-'));
+  if (data.overallMifStatus) L.push('MIF status: ' + data.overallMifStatus);
+  if (data.weakManeuvers && data.weakManeuvers.length) {
+    L.push('Weak maneuvers (below required MIF):');
+    data.weakManeuvers.slice(0, 5).forEach(w => {
+      L.push('  - ' + w.name + ': avg ' + w.avgGrade.toFixed(1) + ' (required ' + w.requiredMif + ') trend=' + w.trend);
+    });
+  }
+  if (data.bestManeuver && (data.practicalScores[data.bestManeuver] || 0) >= 70) L.push('Strength: ' + data.bestManeuver + ' (avg ' + data.practicalScores[data.bestManeuver].toFixed(1) + ')');
+  if (data.phaseScores && Object.keys(data.phaseScores).length) {
+    L.push('Phase averages: ' + Object.keys(data.phaseScores).sort().map(p => p + '=' + data.phaseScores[p].toFixed(1)).join(', '));
+  }
+  if (data.noteThemes && data.noteThemes.length) L.push('Recurring coach-note themes: ' + data.noteThemes.join(', '));
+  if (data.instructorNotes && data.instructorNotes.length) {
+    L.push('Recent instructor notes:');
+    data.instructorNotes.slice(-5).forEach(n => L.push('  - ' + n));
+  }
+  L.push('Readiness: ' + (data.readiness || '-'));
+  return { system: sys, user: L.join('\n') };
+}
+
+/* Call an OpenAI-compatible chat-completions endpoint. Returns model text. Throws on failure. */
+async function callAIModel(data, cfg) {
+  if (!cfg || !cfg.endpoint) throw new Error('no AI endpoint');
+  const prompt = buildAIPrompt(data);
+  const body = {
+    model: cfg.model || 'qwen/qwen3.8-max',
+    messages: [
+      { role: 'system', content: prompt.system },
+      { role: 'user', content: prompt.user }
+    ],
+    temperature: 0.4,
+    max_tokens: 900
+  };
+  const headers = { 'Content-Type': 'application/json' };
+  if (cfg.apiKey) headers['Authorization'] = 'Bearer ' + cfg.apiKey;
+  const res = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error('AI HTTP ' + res.status + ' ' + txt.slice(0, 200));
+  }
+  const json = await res.json();
+  const text = json && json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content;
+  if (!text) throw new Error('AI returned no content');
+  return text.trim();
+}

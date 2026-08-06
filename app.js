@@ -361,17 +361,28 @@ const app = createApp({
     evalForStudent(sid) { return this.evaluations.filter(e => e.studentId === sid).slice().sort((a, b) => (b.date || 0) - (a.date || 0)); },
 
     /* ---- AI feedback for a student profile ---- */
-    runAIForStudent() {
+    async runAIForStudent() {
       if (!this.selectedStudent) return;
       this.aiForStudent = this.selectedStudent.id;
       this.aiLoading = true;
+      this.aiResult = '';
       const student = this.selectedStudent;
       const evals = this.evaluations.filter(e => e.studentId === student.id);
-      setTimeout(() => {
-        const data = buildPerformance(student, evals);
-        this.aiResult = generateFeedback(data);
-        this.aiLoading = false;
-      }, 30);
+      const data = buildPerformance(student, evals);
+      // Try the online model first; fall back to the offline template on any problem.
+      try {
+        const cfg = await getAIConfig();
+        if (cfg) {
+          const text = await callAIModel(data, cfg);
+          this.aiResult = text;
+          this.aiLoading = false;
+          return;
+        }
+      } catch (e) {
+        console.warn('AI model call failed, using offline template:', e);
+      }
+      this.aiResult = generateFeedback(data);
+      this.aiLoading = false;
     },
 
     /* ---- announcements ---- */
