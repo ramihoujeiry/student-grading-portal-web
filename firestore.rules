@@ -51,5 +51,11 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isStaff();
     }
+
+    // App configuration (e.g. AI endpoint/key). Only admins may write.
+    match /config/{doc} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && userRole() == 'admin';
+    }
   }
 }

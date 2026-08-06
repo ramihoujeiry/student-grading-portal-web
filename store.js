@@ -33,6 +33,16 @@ const COL = {
   announcements: 'announcements'
 };
 
+/* ---------- AI backend (LAN default = Hermes gateway proxy on the Pi) ------ */
+/* The Pi (pi@192.168.1.200) runs ai_proxy.py exposing an OpenAI-compatible
+   /v1/chat/completions endpoint that forwards to OpenRouter using the key
+   stored in /home/pi/.hermes/.env (key never reaches the browser). Used when
+   no Firestore config/ai doc is set. For cloud use, set config/ai (admin-
+   only write) and this LAN default is ignored. */
+const LAN_AI_ENABLED = true;
+const LAN_AI_ENDPOINT = 'http://192.168.1.200:8787/v1/chat/completions';
+const LAN_AI_MODEL = 'qwen/qwen3.8-max';
+
 /* ---------- auth service ------------------------------------------------- */
 const Auth = {
   ready: fbReady,
@@ -313,17 +323,23 @@ function generateFeedback(data){
        model:"qwen/qwen3.8-max", apiKey:"sk-..." }
    Falls back to the offline template (generateFeedback) if unset or on error. */
 async function getAIConfig() {
-  if (!fbReady) return null;
-  try {
-    const snap = await dbFs.collection('config').doc('ai').get();
-    if (!snap.exists) return null;
-    const d = snap.data() || {};
-    if (d.enabled === false) return null;
-    if (!d.endpoint) return null;
-    return { endpoint: d.endpoint, model: d.model || 'qwen/qwen3.8-max', apiKey: d.apiKey || '' };
-  } catch (e) {
-    return null;
+  // 1) Cloud config (admin-set, overrides LAN default) — only if Firestore rules allow read
+  if (fbReady) {
+    try {
+      const snap = await dbFs.collection('config').doc('ai').get();
+      if (snap.exists) {
+        const d = snap.data() || {};
+        if (d.enabled !== false && d.endpoint) {
+          return { endpoint: d.endpoint, model: d.model || 'qwen/qwen3.8-max', apiKey: d.apiKey || '' };
+        }
+      }
+    } catch (e) { /* fall through to LAN default */ }
   }
+  // 2) LAN default: Hermes gateway proxy on the Pi (no key in client)
+  if (LAN_AI_ENABLED) {
+    return { endpoint: LAN_AI_ENDPOINT, model: LAN_AI_MODEL, apiKey: '' };
+  }
+  return null;
 }
 
 /* Build a precise prompt from the computed analytics so the model has
@@ -379,7 +395,12 @@ async function callAIModel(data, cfg) {
     throw new Error('AI HTTP ' + res.status + ' ' + txt.slice(0, 200));
   }
   const json = await res.json();
-  const text = json && json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content;
+  const choice = json && json.choices && json.choices[0];
+  const msg = choice && choice.message;
+  // Reasoning models (e.g. qwen3.8-max) may return the answer in `reasoning`
+  // instead of `content`; prefer content, fall back to reasoning.
+  let text = (msg && msg.content) || (msg && msg.reasoning) || '';
+  text = text.trim();
   if (!text) throw new Error('AI returned no content');
-  return text.trim();
+  return text;
 }

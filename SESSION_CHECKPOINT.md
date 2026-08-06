@@ -1,10 +1,16 @@
 # Session Checkpoint — Student Grading Portal (web PWA)
 
 Saved: 2026-08-06 (session continued across compaction + out-of-band messages)
-Branch: `main` @ `58ab0c2`
+Branch: `main` @ `2460803`
 Deploy: https://ramihoujeiry.github.io/student-grading-portal-web/
-SW cache: `grading-portal-v12`
+SW cache: `grading-portal-v17`
 
+## AI feedback — now a REAL online model (commit 2460803)
+- Before: `generateFeedback` was 100% templated text (no model call).
+- Now: `runAIForStudent` (app.js) is async -> loads AI config from Firestore `config/ai`, calls `callAIModel` (store.js) which POSTs to an OpenAI-compatible `/v1/chat/completions` endpoint with system+user prompt built from real analytics (`buildAIPrompt`). On missing config or any error -> falls back to the template. No key in the repo.
+- `config/ai` doc shape: `{ enabled:true, endpoint:".../v1/chat/completions", model:"qwen/qwen3.8-max", apiKey:"..." }`. Read by any signed-in user; WRITTEN by admin only (firestore.rules `match /config/{doc}`).
+- firestore.rules: added `config/{doc}` admin-write rule (NOT yet deployed — no firebase deploy token available; deploy via `npx firebase-tools deploy --only firestore:rules --project grading-portal-app` after `firebase login`).
+- Pi (Hermes) findings: `pi@192.168.1.200` (ssh, pw known). Hermes gateway runs on `127.0.0.1:3000` (localhost only), custom relay (not OpenAI-compatible at `/v1/chat/completions`); LLM backend = Ollama Cloud (models: qwen3.5:397b, glm-5.1, etc.). To use the Pi as backend for the PUBLIC web app: rebind gateway to `0.0.0.0:3000` + CORS, expose via tunnel for internet, point `config/ai.endpoint` at it. On LAN only, no tunnel needed.
 ## Original app (source of truth)
 `D:\perfect - Copy` — Android Kotlin Student Grading Portal, Firebase/Firestore.
 Role enum (Constants.kt): `ROLE_ADMIN="admin"`, `ROLE_INSTRUCTOR="instructor"`, `ROLE_VIEWER="viewer"`, `ROLE_PENDING="pending"`.
