@@ -71,3 +71,12 @@ Native nav groups:
 - Detail-eval modal still shows a "Weight" column (read-only). Native manages weights in MIF Tables; user only asked to drop weight from NEW-evaluation input. Left as-is.
 - No automated test suite committed — verification was ad-hoc Playwright, scripts deleted after each run.
 - Consider saving the Playwright verification approach as a reusable skill (web PWA live-parity checks against Firebase).
+
+## Tailscale Funnel migration (2026-08-08) — REPLACED Cloudflare tunnel
+- **Old stack retired:** Cloudflare quick tunnel (`ai-tunnel.service`) + `pi_rewire.sh`/`pi_rewire.timer` (rewrote `store.js` LAN_AI_ENDPOINT every 2 min) + system `cloudflared.service` (named tunnel `grading-ai`, no domain). All disabled; no more URL churn, no GitHub token in plaintext on Pi.
+- **New stack:** Tailscale Funnel. Pi `ai-proxy.service` (unchanged) serves `127.0.0.1:8788` → shells out to Hermes/Nous `tencent/hy3:free` (free, no API key in client). `tailscale funnel 8788` exposes public `https://raspberrypi.tail3a08db.ts.net` (tailnet `ramihoujeiry`). URL is **stable across Pi reboots** (the whole point of the switch).
+- **Web:** `store.js` `LAN_AI_ENDPOINT` → `https://raspberrypi.tail3a08db.ts.net/v1/chat/completions`; SW cache bumped to `grading-portal-v42`; committed `d57921b`, pushed, **Pages verified serving new URL**.
+- **Android:** `Constants.kt` `AI_LAN_ENDPOINT` → same URL; rebuilt `app-debug.apk` (`D:\perfect - Copy\app\build\outputs\apk\debug\app-debug.apk`), installed manually by user (wireless ADB pairing faulted on MIUI; fell back to manual install).
+- **Verified live from open internet:** `/healthz` → 200 `{"ok":true}`; real `tencent/hy3:free` chat reply returned via the Funnel.
+- **Caveat:** AI feedback depends on Pi powered + online. If AI ever silently drops to template text, the Pi is off / Funnel stopped (`sudo tailscale funnel list` on Pi to confirm).
+- **Re-auth note:** `tailscale up` was run once (user authenticated via `login.tailscale.com` link). If the Pi is ever removed from the tailnet, re-run `sudo tailscale up` and re-approve.
