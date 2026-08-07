@@ -484,12 +484,12 @@
     <div class="modal full">
       <h2>New Evaluation</h2>
       <label>Aircraft</label>
-      <select v-model="evalForm.aircraftType" @change="onEvalContextChange">
+      <select v-model="evalForm.aircraftType" @change="onEvalContextChange; suggestTrip">
         <option value="">— select aircraft —</option>
         <option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option>
       </select>
       <label>Student</label>
-      <select v-model="evalForm.studentId"><option value="">— select student —</option><option v-for="s in activeStudents" :key="s.id" :value="s.id">{{s.name}}</option></select>
+      <select v-model="evalForm.studentId" @change="suggestTrip"><option value="">— select student —</option><option v-for="s in activeStudents" :key="s.id" :value="s.id">{{s.name}}</option></select>
       <label>Instructor</label>
       <select v-model="evalForm.instructorName">
         <option value="">— select instructor —</option>
@@ -498,15 +498,15 @@
       <div class="row" style="gap:10px">
         <div style="flex:1">
           <label>Phase</label>
-          <select v-model="evalForm.phaseName" @change="onEvalContextChange">
+          <select v-model="evalForm.phaseName" @change="onEvalContextChange; suggestTrip">
             <option value="">— select phase —</option>
             <option v-for="t in mifTables.filter(x=>x.aircraftType===evalForm.aircraftType)" :key="t.id" :value="t.phaseName">{{t.phaseName}}</option>
           </select>
         </div>
         <div style="flex:1">
-          <label>Trip / Stage</label>
+          <label>Trip number <span class="muted" style="text-transform:none;letter-spacing:0">· Sortie number</span></label>
           <select v-model="evalForm.tripNumber" @change="onEvalContextChange">
-            <option v-for="st in (currentTable? currentTable.stages : ['S1'])" :key="st" :value="st">{{st}}</option>
+            <option v-for="st in (currentTable ? currentTable.stages : [])" :key="st" :value="st">{{st}}</option>
           </select>
         </div>
       </div>

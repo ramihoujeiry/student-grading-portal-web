@@ -331,12 +331,12 @@ const app = createApp({
       this.evalForm.duration = '01:00';
       this.onEvalDateChange(); // auto flight year from date
       this.showEvalModal = true;
-      // When the user picks an aircraft+phase, load its MIF table / maneuvers.
+      // When the user picks an aircraft+phase, load its MIF table / maneuvers and auto-suggest the next trip.
       const load = () => {
         const t = this.mifTables.find(x => x.aircraftType === this.evalForm.aircraftType && x.phaseName === this.evalForm.phaseName);
         if (t) {
-          this.evalForm.tripNumber = (t.stages && t.stages[0]) || 'S1';
           this.loadManeuversForForm();
+          this.suggestTrip();
         }
       };
       this.$nextTick(load);
@@ -355,31 +355,40 @@ const app = createApp({
     async saveEval() {
       // Mirror the original Android app's required-field check (MainActivity.prepareSave):
       // student, aircraft, phase and instructor must be selected before saving.
+      // (Trip number is auto-suggested, not a required blank field.)
       if (!this.evalForm.studentId || !this.evalForm.aircraftType || !this.evalForm.phaseName || !this.evalForm.instructorName) {
         this.toastMsg('Please fill in all required fields (student, aircraft, phase, instructor)');
         return;
       }
-      const fg = calcFinalGrade(this.evalForm.maneuverGrades);
-      const st = calcMifStatus(this.evalForm.maneuverGrades);
-      const student = this.students.find(s => s.id === this.evalForm.studentId);
-      const dateSec = Math.floor(Date.parse(this.evalForm.date) / 1000) || Math.floor(Date.now() / 1000);
-      const ev = {
-        id: this.evalForm.id || '',
-        aircraftType: this.evalForm.aircraftType,
-        studentId: this.evalForm.studentId,
-        studentName: student ? student.name : '',
-        instructorName: this.evalForm.instructorName,
-        phaseName: this.evalForm.phaseName,
-        tripNumber: this.evalForm.tripNumber,
-        date: dateSec,
-        flightYear: this.getFlightYear(dateSec), // auto from date
-        duration: this.evalForm.duration,
-        finalGrade: fg || 0,
-        overallMifStatus: st,
-        tripNotes: this.evalForm.tripNotes,
-        maneuverGrades: (this.evalForm.maneuverGrades || []).filter(m => m.studentGrade != null && m.studentGrade !== 0)
-          .map(m => ({ name: m.name, factor: m.factor, requiredMif: m.requiredMif, studentGrade: m.studentGrade }))
-      };
+      const ev = this.buildEvalFromForm();
+      // Warn if this student already has an evaluation for this exact trip (would overwrite).
+      const clash = this.existingTripCheck(ev);
+      if (clash) this.saveWithConfirm(ev, clash);
+      else await this.persistEval(ev);
+    },
+    // Next sortie auto-suggestion (Android fetchSuggestedTrip): after the student's highest
+    // S# in this aircraft+phase, suggest S(n+1); S1 if none.
+    suggestTrip() {
+      const { studentId, aircraftType, phaseName } = this.evalForm;
+      if (!studentId || !aircraftType || !phaseName) return;
+      const nums = this.evaluations
+        .filter(e => e.studentId === studentId && e.aircraftType === aircraftType && e.phaseName === phaseName)
+        .map(e => parseInt(String(e.tripNumber || '').replace(/[^0-9]/g, ''), 10))
+        .filter(n => !isNaN(n));
+      const next = (nums.length ? Math.max(...nums) : 0) + 1;
+      this.evalForm.tripNumber = 'S' + next;
+    },
+    existingTripCheck(ev) {
+      if (!ev.studentId || !ev.phaseName || !ev.tripNumber) return null;
+      return this.evaluations.find(e =>
+        e.studentId === ev.studentId && e.phaseName === ev.phaseName && e.tripNumber === ev.tripNumber);
+    },
+    saveWithConfirm(ev, clash) {
+      const ok = confirm('A trip (' + ev.phaseName + ' - ' + ev.tripNumber + ') already exists for this student' +
+        (clash && clash.date ? ' on ' + this.fmt(clash.date) : '') + '. Save anyway? This will overwrite the existing one.');
+      if (ok) this.persistEval(ev);
+    },
+    async persistEval(ev) {
       try {
         await Store.saveEvaluation(ev);
         this.showEvalModal = false;
@@ -388,6 +397,29 @@ const app = createApp({
         console.error('saveEval', err);
         this.toastMsg('Could not save evaluation: ' + (err && err.message ? err.message : 'unknown error'));
       }
+    },
+    buildEvalFromForm() {
+      const fg = calcFinalGrade(this.evalForm.maneuverGrades);
+      const st = calcMifStatus(this.evalForm.maneuverGrades);
+      const student = this.students.find(s => s.id === this.evalForm.studentId);
+      const dateSec = Math.floor(Date.parse(this.evalForm.date) / 1000) || Math.floor(Date.now() / 1000);
+      return {
+        id: this.evalForm.id || '',
+        aircraftType: this.evalForm.aircraftType,
+        studentId: this.evalForm.studentId,
+        studentName: student ? student.name : '',
+        instructorName: this.evalForm.instructorName,
+        phaseName: this.evalForm.phaseName,
+        tripNumber: this.evalForm.tripNumber,
+        date: dateSec,
+        flightYear: this.getFlightYear(dateSec),
+        duration: this.evalForm.duration,
+        finalGrade: fg || 0,
+        overallMifStatus: st,
+        tripNotes: this.evalForm.tripNotes,
+        maneuverGrades: (this.evalForm.maneuverGrades || []).filter(m => m.studentGrade != null && m.studentGrade !== 0)
+          .map(m => ({ name: m.name, factor: m.factor, requiredMif: m.requiredMif, studentGrade: m.studentGrade }))
+      };
     },
     // Build a print-ready eval object from the live New-Evaluation form (so it can be printed/previewed
     // before saving), then open the Android-style PDF view.
