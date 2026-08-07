@@ -145,8 +145,6 @@
   <!-- ===== MAIN APP ===== -->
   <div v-else>
     <header class="app">
-      <img src="icons/icon-192.png" alt="logo" style="width:30px;height:30px;border-radius:7px;margin-right:10px" />
-      <h1>Student Grading Portal</h1>
       <span class="spacer"></span>
       <label class="year-pick">Year
         <select v-model="activeYear">
@@ -636,8 +634,8 @@
 [v-cloak]{display:none}
 .clickable{cursor:pointer;transition:background .15s}
 .clickable:active{background:var(--bg2)}
-.year-pick{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;flex:0 0 auto}
-.year-pick select{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:5px 8px;font-size:12px;min-width:120px;max-width:160px}
+.year-pick{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.year-pick select{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 6px;font-size:12px}
 .notice{margin:10px 14px 0;padding:10px 12px;border-radius:10px;font-size:13px}
 .notice.pending{background:rgba(255,193,7,.15);border:1px solid rgba(255,193,7,.5);color:#ffd54f}
 .grade-row{display:grid;grid-template-columns:1fr 132px;align-items:center;gap:10px}
