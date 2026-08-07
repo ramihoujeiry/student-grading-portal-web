@@ -39,7 +39,9 @@ const app = createApp({
       DURATIONS: [0.5, 0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0], // duration picker presets (h)
       toast: '',
       aiStudentId: '', aiResult: '', aiLoading: false,
-      aiSingleResult: '', aiSingleLoading: false
+      aiSingleResult: '', aiSingleLoading: false,
+      // Ask-Data (private instructor copilot over grading data)
+      askQuery: '', askResult: '', askLoading: false
     };
   },
   computed: {
@@ -502,6 +504,63 @@ const app = createApp({
       }
       this.aiSingleResult = generateSingleEvalFeedback(data);
       this.aiSingleLoading = false;
+    },
+
+    /* ---- Ask-Data: private instructor copilot over the grading data ----
+       Builds a compact snapshot of what the logged-in user already has in
+       memory (students, evaluations, MIF tables) and asks the live AI model
+       a natural-language question about it. No Firebase Admin key needed. */
+    async askData() {
+      const q = (this.askQuery || '').trim();
+      if (!q) { this.toastMsg('Type a question first'); return; }
+      this.askLoading = true;
+      this.askResult = '';
+      try {
+        const cfg = await getAIConfig();
+        if (!cfg) throw new Error('no AI endpoint configured');
+        const snap = this.buildDataSnapshot();
+        const system = 'You are an instructor operations assistant for a flight-school grading system. ' +
+          'You are given a JSON snapshot of the current grading data (students, evaluations, MIF tables). ' +
+          'Answer the instructor\'s question using ONLY the data provided. Be specific and cite names/numbers. ' +
+          'If the data does not contain the answer, say so plainly. Keep replies concise and practical. ' +
+          'Do not invent students, grades, or maneuvers. If asked to list or rank, use tables or bullet lists.';
+        const user = 'GRADING DATA SNAPSHOT:\n' + JSON.stringify(snap) + '\n\nQUESTION: ' + q;
+        const text = await callAIModelWithPrompt({ system, user }, cfg);
+        this.askResult = text;
+      } catch (e) {
+        console.warn('askData failed:', e);
+        this.askResult = '⚠️ Could not reach the AI model (' + (e.message || e) + '). ' +
+          'Make sure the Pi AI proxy is online, or try again shortly.';
+      }
+      this.askLoading = false;
+    },
+    /* Compact, query-friendly view of the in-memory grading data. */
+    buildDataSnapshot() {
+      const evs = this.evaluations || [];
+      const byStudent = {};
+      this.students.forEach(s => { byStudent[s.id] = { name: s.name, evals: 0 }; });
+      evs.forEach(e => { if (byStudent[e.studentId]) byStudent[e.studentId].evals++; });
+      const weak = evs.filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD);
+      const meets = evs.filter(e => e.overallMifStatus === STATUS_MEETS_STANDARD);
+      const recent = evs.slice().sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, 25).map(e => ({
+        student: (byStudent[e.studentId] && byStudent[e.studentId].name) || e.studentId,
+        phase: e.phaseName, trip: e.tripNumber,
+        finalGrade: e.finalGrade, mif: e.overallMifStatus, date: fmtDate ? fmtDate(e.date) : e.date
+      }));
+      return {
+        counts: {
+          students: this.students.length,
+          instructors: this.instructors.length,
+          aircraft: this.aircraft.length,
+          evaluations: evs.length,
+          belowMIF: weak.length,
+          meetsMIF: meets.length
+        },
+        students: Object.values(byStudent),
+        aircraft: (this.aircraft || []).map(a => a.name),
+        mifPhases: (this.mifTables || []).map(t => t.phaseName).filter(Boolean),
+        recentEvaluations: recent
+      };
     },
 
     /* ---- announcements ---- */

@@ -172,6 +172,7 @@
       <button class="tab-btn" :class="{active:tab==='progress'}" @click="setTab('progress')">Training Progress</button>
       <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" @click="setTab('admin')">Users</button>
       <button class="tab-btn" :class="{active:tab==='ai'}" @click="setTab('ai')">AI Feedback</button>
+      <button class="tab-btn" :class="{active:tab==='ask'}" @click="setTab('ask')">Ask Data</button>
     </nav>
 
     <main>
@@ -474,6 +475,20 @@
             Picks a student and asks the live AI model for a coaching debrief (trend, consistency,
             weak maneuvers, readiness) from their evaluations. Falls back to an offline summary if offline.
           </div>
+        </div>
+      <!-- ASK DATA -->
+      <section v-show="tab==='ask'">
+        <div class="card">
+          <h3>Ask Your Grading Data</h3>
+          <p class="muted" style="margin:4px 2px 12px">Ask a plain-English question about students, phases, MIF status or recent evaluations. Answers come from the live AI model over the data you already have access to.</p>
+          <label>Your question</label>
+          <textarea v-model="askQuery" rows="3" placeholder="e.g. Which students are currently below MIF this phase? / Summarize last week's evaluations. / Who needs the most attention?"></textarea>
+          <div style="margin-top:12px" class="row">
+            <button class="btn" :disabled="askLoading" @click="askData">{{askLoading ? 'Thinking…' : 'Ask'}}</button>
+            <button class="btn ghost" :disabled="!askResult" @click="askQuery='';askResult=''">Clear</button>
+          </div>
+          <div v-if="askLoading" class="muted" style="margin-top:10px">Thinking…</div>
+          <div v-if="askResult" class="mannote" style="margin-top:12px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:420px;overflow:auto">{{askResult}}</div>
         </div>
       </section>
     </main>
