@@ -298,6 +298,17 @@
         <div class="topbar"><h2 style="margin:0">Evaluations · {{activeYearResolved}}</h2><span class="spacer"></span>
           <button class="btn sm ghost" @click="exportCSV">Export CSV</button>
           <button class="btn sm" v-if="canEdit" @click="openNewEval">+ New Evaluation</button></div>
+        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
+          <div style="flex:1;min-width:150px"><label>Student</label>
+            <select v-model="evStudent"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></div>
+          <div style="flex:1;min-width:140px"><label>Aircraft</label>
+            <select v-model="evAircraft"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></div>
+          <div style="flex:1;min-width:140px"><label>Phase</label>
+            <select v-model="evPhase"><option>All Phases</option><option v-for="p in phaseOptions" :key="p" :value="p">{{p}}</option></select></div>
+          <div style="flex:1;min-width:140px"><label>School Year</label>
+            <select v-model="evYear"><option>All Years</option><option v-for="yr in years" :key="yr" :value="yr">{{yr}}</option></select></div>
+          <button class="btn sm ghost" @click="evStudent='All Cadets';evAircraft='All Aircraft';evPhase='All Phases';evYear='All Years'">Clear</button>
+        </div>
         <div v-for="(evs, sid) in evalsByStudentInYear" :key="sid">
           <h3 style="color:var(--text);text-transform:none;letter-spacing:0">{{studentName(sid)}}</h3>
           <ul class="list">

@@ -25,6 +25,8 @@ const app = createApp({
       dashStart: '', dashEnd: '',
       // training progress search
       tpSearch: '', tpAircraft: 'All Aircraft',
+      // evaluations page filters
+      evStudent: 'All Cadets', evAircraft: 'All Aircraft', evPhase: 'All Phases', evYear: 'All Years',
 
       // ui
       evalForm: blankEval(),
@@ -107,9 +109,25 @@ const app = createApp({
     },
     evalsByStudentInYear() {
       const y = this.activeYearResolved;
+      // Apply the Evaluations-page filters (student / aircraft / phase / school year).
+      const evs = this.evaluations.filter(e => {
+        if (this.evYear && this.evYear !== 'All Years' && e.flightYear !== this.evYear) return false;
+        else if ((!this.evYear || this.evYear === 'All Years') && e.flightYear !== y) return false;
+        if (this.evStudent && this.evStudent !== 'All Cadets' && e.studentName !== this.evStudent) return false;
+        if (this.evAircraft && this.evAircraft !== 'All Aircraft' && e.aircraftType !== this.evAircraft) return false;
+        if (this.evPhase && this.evPhase !== 'All Phases' && e.phaseName !== this.evPhase) return false;
+        return true;
+      });
       const map = {};
-      this.evaluations.filter(e => e.flightYear === y).forEach(e => { (map[e.studentId] = map[e.studentId] || []).push(e); });
+      evs.forEach(e => { (map[e.studentId] = map[e.studentId] || []).push(e); });
       return map;
+    },
+    // Unique phase names available for the Evaluations filter dropdown.
+    phaseOptions() {
+      const set = new Set();
+      this.evaluations.forEach(e => { if (e.phaseName) set.add(e.phaseName); });
+      this.mifTables.forEach(t => { if (t.phaseName) set.add(t.phaseName); });
+      return Array.from(set).sort();
     },
     isPending() { return this.role === 'pending'; },
 
