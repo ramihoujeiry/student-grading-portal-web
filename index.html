@@ -29,11 +29,11 @@
   .role-badge.instructor{background:rgba(72,149,239,.2);color:var(--blue)}
   .role-badge.viewer{background:rgba(152,162,179,.2);color:var(--muted)}
   .btn-logout{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
-  nav.tabs{position:sticky;top:46px;z-index:25;display:flex;overflow-x:auto;background:var(--bg2);
-    border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
-  nav.tabs .tab-btn{flex:0 0 auto;background:none;border:none;color:var(--muted);
-    padding:11px 13px;font-size:12px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
-  nav.tabs .tab-btn.active{color:#fff;border-bottom-color:var(--accent)}
+  nav.tabs{position:sticky;top:46px;z-index:25;display:flex;flex-wrap:wrap;gap:6px;background:var(--bg2);
+    border-bottom:1px solid var(--line);padding:8px}
+  nav.tabs .tab-btn{flex:1 1 auto;min-width:84px;background:#222b3a;border:1px solid var(--line);color:var(--text);
+    padding:9px 10px;font-size:12px;font-weight:600;cursor:pointer;border-radius:9px;white-space:nowrap;text-align:center}
+  nav.tabs .tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
   main{padding:14px;max-width:980px;margin:0 auto 80px}
   section h2{font-size:15px;margin:4px 0 12px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:12px}

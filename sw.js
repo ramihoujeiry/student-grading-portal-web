@@ -1,12 +1,12 @@
-const CACHE = 'grading-portal-v46';
+const CACHE = 'grading-portal-v47';
 const ASSETS = [
   './',
   'index.html',
-  'app.js?v=46',
-  'store.js?v=46',
-  'seed.js?v=46',
-  'firebase-config.js?v=46',
-  'vue.global.prod.js?v=46',
+  'app.js?v=47',
+  'store.js?v=47',
+  'seed.js?v=47',
+  'firebase-config.js?v=47',
+  'vue.global.prod.js?v=47',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png'
