@@ -84,8 +84,21 @@ const Store = {
     if (!fbReady) { cb([]); return () => {}; }
     let q = dbFs.collection(collection);
     if (opts.orderBy) q = q.orderBy(opts.orderBy, opts.dir || 'asc');
+    // Firestore may store date-like fields as Timestamp objects. Normalize them to
+    // plain epoch SECONDS so the rest of the app (fmtDate multiplies by 1000) stays correct.
+    const TS_FIELDS = ['date', 'createdAt', 'updatedAt', 'timestamp', 'dateSec', 'lastFlightDate'];
+    const norm = (o) => {
+      if (o == null || typeof o !== 'object') return o;
+      const out = { ...o };
+      for (const f of TS_FIELDS) {
+        const v = out[f];
+        if (v && typeof v === 'object' && typeof v.seconds === 'number') out[f] = v.seconds;
+        else if (v && typeof v.toDate === 'function' && typeof v.toMillis === 'function') out[f] = Math.floor(v.toMillis() / 1000);
+      }
+      return out;
+    };
     const unsub = q.onSnapshot(snap => {
-      let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      let list = snap.docs.map(d => ({ id: d.id, ...norm(d.data()) }));
       if (opts.activeOnly) list = list.filter(x => x.active);
       cb(list);
     }, err => { console.error('watch', collection, err); cb([]); });
