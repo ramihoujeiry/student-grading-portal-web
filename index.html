@@ -7,6 +7,7 @@
 <title>Student Grading Portal</title>
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
 <style>
   :root{
     --bg:#0d1117; --bg2:#161b22; --card:#1c2230; --card2:#222b3a;
@@ -144,6 +145,7 @@
   <!-- ===== MAIN APP ===== -->
   <div v-else>
     <header class="app">
+      <img src="icons/icon-192.png" alt="logo" style="width:30px;height:30px;border-radius:7px;margin-right:10px;background:#3DDC84" />
       <h1>Student Grading Portal</h1>
       <span class="spacer"></span>
       <label class="year-pick">Year
@@ -550,6 +552,7 @@
       <textarea v-model="evalForm.tripNotes" placeholder="Coach comments, safety items…"></textarea>
       <div class="modal-actions">
         <button class="btn" @click="saveEval">Save Evaluation</button>
+        <button class="btn ghost" @click="printFormEval">Print PDF</button>
         <button class="btn ghost" @click="showEvalModal=false">Cancel</button>
       </div>
     </div>
@@ -561,6 +564,7 @@
       <div class="row">
         <h2 style="margin:0">{{selectedEval.studentName}}</h2>
         <span class="spacer" style="flex:1"></span>
+        <button class="btn sm ghost" @click="printEval(selectedEval)">Print PDF</button>
         <button class="btn sm danger" v-if="isAdmin" @click="deleteEval(selectedEval); closeDetail()">Delete</button>
       </div>
       <div class="muted" style="margin:4px 0 12px">{{selectedEval.aircraftType}} · {{selectedEval.phaseName}} {{selectedEval.tripNumber}} · {{fmt(selectedEval.date)}} · {{selectedEval.instructorName}} · {{selectedEval.duration}} h</div>

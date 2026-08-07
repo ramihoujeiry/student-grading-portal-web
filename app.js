@@ -358,6 +358,12 @@ const app = createApp({
     },
     onEvalContextChange() { this.loadManeuversForForm(); },
     async saveEval() {
+      // Mirror the original Android app's required-field check (MainActivity.prepareSave):
+      // student, aircraft, phase and instructor must be selected before saving.
+      if (!this.evalForm.studentId || !this.evalForm.aircraftType || !this.evalForm.phaseName || !this.evalForm.instructorName) {
+        this.toastMsg('Please fill in all required fields (student, aircraft, phase, instructor)');
+        return;
+      }
       const fg = calcFinalGrade(this.evalForm.maneuverGrades);
       const st = calcMifStatus(this.evalForm.maneuverGrades);
       const student = this.students.find(s => s.id === this.evalForm.studentId);
@@ -382,6 +388,29 @@ const app = createApp({
       await Store.saveEvaluation(ev);
       this.showEvalModal = false;
       this.toastMsg('Evaluation saved');
+    },
+    // Build a print-ready eval object from the live New-Evaluation form (so it can be printed/previewed
+    // before saving), then open the Android-style PDF view.
+    printFormEval() {
+      const fg = calcFinalGrade(this.evalForm.maneuverGrades);
+      const st = calcMifStatus(this.evalForm.maneuverGrades);
+      const student = this.students.find(s => s.id === this.evalForm.studentId);
+      const dateSec = Math.floor(Date.parse(this.evalForm.date) / 1000) || Math.floor(Date.now() / 1000);
+      const ev = {
+        studentName: student ? student.name : '',
+        aircraftType: this.evalForm.aircraftType,
+        phaseName: this.evalForm.phaseName,
+        tripNumber: this.evalForm.tripNumber,
+        date: dateSec,
+        duration: this.evalForm.duration,
+        instructorName: this.evalForm.instructorName,
+        finalGrade: fg != null ? fg : 0,
+        overallMifStatus: st,
+        tripNotes: this.evalForm.tripNotes,
+        maneuverGrades: (this.evalForm.maneuverGrades || []).filter(m => m.studentGrade != null && m.studentGrade !== 0)
+          .map(m => ({ name: m.name, factor: m.factor, requiredMif: m.requiredMif, studentGrade: m.studentGrade }))
+      };
+      this.printEval(ev);
     },
     async deleteEval(e) { if (confirm('Delete this evaluation?')) await Store.deleteEvaluation(e.id); },
     studentName(id) { const s = this.students.find(x => x.id === id); return s ? s.name : '?'; },
@@ -567,6 +596,78 @@ const app = createApp({
         <table><thead><tr><th>Trip</th><th>Date</th><th>Final</th><th>MIF</th></tr></thead><tbody>${rows}</tbody></table>
         <h3 style="margin-top:18px">AI Performance Analysis</h3><pre>${analysis.replace(/</g, '&lt;')}</pre>
         <button onclick="window.print()" style="margin-top:16px;padding:10px 16px">Print / Save as PDF</button></body></html>`);
+      win.document.close();
+    },
+    // Print a SINGLE evaluation as a PDF that mirrors the original Android Evaluation Details screen.
+    // Accepts a saved evaluation OR the live evalForm (so the New Evaluation screen can preview/print too).
+    printEval(ev) {
+      if (!ev) return;
+      const win = window.open('', '_blank');
+      if (!win) { this.toastMsg('Allow popups to print the evaluation'); return; }
+      const INDIGO = '#1A237E', LIGHT = '#E8EAF6', DIV = '#E0E0E0';
+      const esc = s => (s == null ? '' : String(s)).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const dateStr = this.fmt(ev.date);
+      const dur = ev.duration || '';
+      const grade = (ev.finalGrade != null) ? Number(ev.finalGrade).toFixed(1) : '-';
+      const status = ev.overallMifStatus || '-';
+      const trip = (ev.phaseName || '') + ' ' + (ev.tripNumber || '');
+      const notes = (ev.tripNotes && ev.tripNotes.trim()) ? esc(ev.tripNotes) : 'No notes provided.';
+      const mg = (ev.maneuverGrades || []).map(m => `
+        <div style="display:flex;align-items:center;padding:12px 16px;background:#FFFFFF;border-bottom:1px solid #EEE">
+          <div style="flex:6;color:#212121;font-size:14px">${esc(m.name)}</div>
+          <div style="flex:2;text-align:center;color:#757575;font-size:14px">${m.requiredMif != null ? m.requiredMif : ''}</div>
+          <div style="flex:2;text-align:center;font-weight:bold;font-size:14px">${m.studentGrade != null ? m.studentGrade : ''}</div>
+        </div>`).join('');
+      const rows = (ev.maneuverGrades && ev.maneuverGrades.length) ? mg
+        : `<div style="padding:12px 16px;color:#757575">No maneuver grades recorded.</div>`;
+      win.document.write(`<!doctype html><html><head><title>${esc(ev.studentName || 'Evaluation')} — Evaluation</title>
+        <meta charset="utf-8">
+        <style>
+          *{box-sizing:border-box} body{margin:0;font-family:system-ui,Arial,sans-serif;background:#F5F7FA;color:#111}
+          .bar{background:${INDIGO};color:#fff;padding:14px 18px;font-size:18px;font-weight:600}
+          .wrap{padding:16px}
+          .card{background:#fff;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.12);padding:16px;margin-bottom:16px}
+          .name{color:${INDIGO};font-size:22px;font-weight:700}
+          .trip{font-size:16px;margin-top:2px}
+          .row{display:flex;margin-top:4px}
+          .row .lbl{flex:1;font-size:14px}
+          .row .dur{font-size:14px}
+          .ins{font-size:14px;font-style:italic;margin-top:4px}
+          .hr{height:1px;background:${DIV};margin:12px 0}
+          .gstats{display:flex}
+          .gstats > div{flex:1}
+          .gstats .k{font-size:12px}
+          .gstats .v{font-size:24px;font-weight:700;color:${INDIGO}}
+          .gstats .v2{font-size:16px;font-weight:700}
+          .sec{color:${INDIGO};font-size:14px;font-weight:700;margin-bottom:8px}
+          .notes{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:16px;color:#424242;font-size:14px;margin-bottom:16px;white-space:pre-wrap}
+          .thead{display:flex;padding:8px 16px;background:${LIGHT};font-weight:700;color:${INDIGO};font-size:12px}
+          .thead > div:nth-child(1){flex:6} .thead > div:nth-child(2){flex:2;text-align:center} .thead > div:nth-child(3){flex:2;text-align:center}
+          .sheet{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden}
+          .fab{position:fixed;right:16px;bottom:16px;background:${INDIGO};color:#fff;border:none;padding:14px 20px;border-radius:30px;font-size:15px;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.3)}
+          @media print{.bar{position:static}.fab{display:none}body{background:#fff}}
+        </style></head>
+        <body>
+          <div class="bar">Evaluation Details</div>
+          <div class="wrap">
+            <div class="card">
+              <div class="name">${esc(ev.studentName || 'Student Name')}</div>
+              <div class="trip">${esc(trip)}</div>
+              <div class="row"><div class="lbl">Date: ${esc(dateStr)}</div><div class="dur">Duration: ${esc(dur)} h</div></div>
+              <div class="ins">Instructor: ${esc(ev.instructorName || '-')}</div>
+              <div class="hr"></div>
+              <div class="gstats">
+                <div><div class="k">Final Grade</div><div class="v">${grade}</div></div>
+                <div><div class="k">Status</div><div class="v2">${esc(status)}</div></div>
+              </div>
+            </div>
+            <div class="sec">INSTRUCTOR NOTES</div>
+            <div class="notes">${notes}</div>
+            <div class="thead"><div>MANEUVER</div><div>MIF</div><div>GRADE</div></div>
+            <div class="sheet">${rows}</div>
+          </div>
+          <button class="fab" onclick="window.print()">Print PDF</button>
+        </body></html>`);
       win.document.close();
     },
   },
