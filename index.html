@@ -485,18 +485,21 @@
       <h2>New Evaluation</h2>
       <label>Aircraft</label>
       <select v-model="evalForm.aircraftType" @change="onEvalContextChange">
+        <option value="">— select aircraft —</option>
         <option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option>
       </select>
       <label>Student</label>
-      <select v-model="evalForm.studentId"><option v-for="s in activeStudents" :key="s.id" :value="s.id">{{s.name}}</option></select>
+      <select v-model="evalForm.studentId"><option value="">— select student —</option><option v-for="s in activeStudents" :key="s.id" :value="s.id">{{s.name}}</option></select>
       <label>Instructor</label>
       <select v-model="evalForm.instructorName">
+        <option value="">— select instructor —</option>
         <option v-for="i in activeInstructors" :key="i.id" :value="i.name">{{i.name}}</option>
       </select>
       <div class="row" style="gap:10px">
         <div style="flex:1">
           <label>Phase</label>
           <select v-model="evalForm.phaseName" @change="onEvalContextChange">
+            <option value="">— select phase —</option>
             <option v-for="t in mifTables.filter(x=>x.aircraftType===evalForm.aircraftType)" :key="t.id" :value="t.phaseName">{{t.phaseName}}</option>
           </select>
         </div>

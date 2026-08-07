@@ -324,25 +324,20 @@ const app = createApp({
     /* ---- evaluations ---- */
     openNewEval() {
       this.evalForm = blankEval();
-      this.evalForm.aircraftType = this.aircraft[0] ? this.aircraft[0].name : '';
-      const tables = this.mifTables.filter(t => t.aircraftType === this.evalForm.aircraftType);
-      this.evalForm.phaseName = tables.length ? tables[0].phaseName : 'CONTACT';
-      this.evalForm.studentId = (this.activeStudents[0] ? this.activeStudents[0].id : (this.students[0] ? this.students[0].id : ''));
-      const me = this.user && this.user.displayName;
-      const meIn = this.activeInstructors.find(i => i.name === me);
-      this.evalForm.instructorName = meIn ? meIn.name : (this.activeInstructors[0] ? this.activeInstructors[0].name : (this.instructors[0] ? this.instructors[0].name : ''));
+      // NOTE: do NOT auto-select student/aircraft/phase/instructor. The original Android app
+      // requires the user to explicitly pick these four (MainActivity.prepareSave blocks save
+      // until all are chosen). Leaving them unselected lets the saveEval() guard enforce that.
+      this.durationH = '01'; this.durationM = '00';
       this.evalForm.duration = '01:00';
-      const dm = (this.evalForm.duration || '01:00').split(':');
-      this.durationH = dm[0] || '01'; this.durationM = dm[1] || '00';
       this.onEvalDateChange(); // auto flight year from date
       this.showEvalModal = true;
-      // Wait until the matching MIF table is loaded (async listener), then populate maneuvers.
+      // When the user picks an aircraft+phase, load its MIF table / maneuvers.
       const load = () => {
         const t = this.mifTables.find(x => x.aircraftType === this.evalForm.aircraftType && x.phaseName === this.evalForm.phaseName);
         if (t) {
           this.evalForm.tripNumber = (t.stages && t.stages[0]) || 'S1';
           this.loadManeuversForForm();
-        } else setTimeout(load, 120);
+        }
       };
       this.$nextTick(load);
     },
@@ -385,9 +380,14 @@ const app = createApp({
         maneuverGrades: (this.evalForm.maneuverGrades || []).filter(m => m.studentGrade != null && m.studentGrade !== 0)
           .map(m => ({ name: m.name, factor: m.factor, requiredMif: m.requiredMif, studentGrade: m.studentGrade }))
       };
-      await Store.saveEvaluation(ev);
-      this.showEvalModal = false;
-      this.toastMsg('Evaluation saved');
+      try {
+        await Store.saveEvaluation(ev);
+        this.showEvalModal = false;
+        this.toastMsg('Evaluation saved');
+      } catch (err) {
+        console.error('saveEval', err);
+        this.toastMsg('Could not save evaluation: ' + (err && err.message ? err.message : 'unknown error'));
+      }
     },
     // Build a print-ready eval object from the live New-Evaluation form (so it can be printed/previewed
     // before saving), then open the Android-style PDF view.
@@ -685,7 +685,7 @@ const app = createApp({
 function blankEval() {
   return {
     id: '', aircraftType: '', studentId: '', instructorName: '',
-    phaseName: 'CONTACT', tripNumber: 'S1', date: new Date().toISOString().slice(0, 10),
+    phaseName: '', tripNumber: '', date: new Date().toISOString().slice(0, 10),
     flightYear: '2025-2026', duration: '', tripNotes: '', maneuverGrades: []
   };
 }
