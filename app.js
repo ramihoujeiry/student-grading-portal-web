@@ -593,7 +593,7 @@ const app = createApp({
       const role = prompt('New role for ' + u.name + ' (viewer / instructor / admin):', u.role);
       if (role && ['viewer', 'instructor', 'admin'].includes(role)) { await Store.updateUserRole(u, role); this.toastMsg('Role updated'); }
     },
-    async deleteUser(u) { if (confirm('Delete user ' + u.name + '? This removes their access.')) { await Store.deleteUser(u); this.toastMsg('User removed'); } }
+    async deleteUser(u) { if (confirm('Delete user ' + u.name + '? This removes their access.')) { await Store.deleteUser(u); this.toastMsg('User removed'); } },
     filterAnnouncements(list) { return list.filter(a => a.targetRole === 'all' || a.targetRole === this.role || this.role === 'admin'); },
 
     /* ---- CSV export (mirrors Android CsvExporter) ---- */
