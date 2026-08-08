@@ -371,7 +371,23 @@ function buildSingleEvalPrompt(d){
   }
   if(d.notes)L.push('Instructor trip notes: '+d.notes);
   L.push('Write a debrief focused on THIS evaluation: what went well, what to fix, and the single most important next-trip action.');
-  return {system:sys, user:L.join('\n')};
+  let user=L.join('\n');
+  // Ground this single-eval debrief in real manual text for the below-standard
+  // maneuvers (same RAG layer the AI Feedback tab uses). Async so the passages
+  // actually attach before the prompt is sent.
+  const weak = (d.below && d.below.length)
+    ? d.below.map(w => ({ name: w.name, avgGrade: w.grade, requiredMif: w.req }))
+    : (d.grades || []).filter(g => g.req > 0 && g.grade < g.req)
+        .map(g => ({ name: g.name, avgGrade: g.grade, requiredMif: g.req }));
+  return (async () => {
+    try {
+      if (typeof FaaRag !== 'undefined' && FaaRag.buildFaaContext) {
+        const faa = await FaaRag.buildFaaContext({ weakManeuvers: weak });
+        if (faa) user += faa;
+      }
+    } catch (e) { /* RAG is best-effort */ }
+    return { system: sys, user };
+  })();
 }
 
 /* ---------- Online AI adapter (OpenAI-compatible /chat/completions) ------- */

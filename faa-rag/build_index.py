@@ -23,8 +23,8 @@ UH1_PDF = r"C:\Users\USER\AppData\Local\hermes\cache\documents\doc_25a6afe8dd12_
 QUERIES = {
     "Hover (translational)": ["hover", "translational lift", "effective translational lift"],
     "Hover (pedal turns)": ["antitorque", "pedal", "tail rotor", "pedal turn"],
-    "Straight & level": ["straight-and-level", "straight and level"],
-    "Turns (constant rate)": ["turns", "bank", "rate of turn", "constant rate"],
+    "Straight & level": ["straight-and-level", "straight and level", "attitude instrument flying"],
+    "Turns (constant rate)": ["turns", "bank", "rate of turn", "constant rate", "standard rate turn"],
     "Climb / Descent": ["climb", "descent"],
     "Normal landing": ["normal approach", "landing", "approach", "hovering approach"],
     "Approach to hover": ["approach to hover", "hover", "terminating"],
@@ -33,6 +33,19 @@ QUERIES = {
     "Engine start & rotor engage": ["engine start", "rotor engage", "starting", "rotor"],
     "Risk Management": ["risk management", "aeronautical decision making", "ADM", "PAVE", "risk", "hazard"],
     "Aeronautical Decision Making": ["aeronautical decision making", "decision making", "human factors"],
+    # ---- Instrument / Nav / Formation maneuvers (added so those evals cite books) ----
+    "Instrument Manoeuvres": ["instrument", "attitude instrument", "hood", "under the hood", "scan", "cross-check"],
+    "Control Touch": ["smooth", "control touch", "overcontrolling", "anticipate", "small corrections", "settled"],
+    "Interception": ["intercept", "intercepting", "course", "bearing"],
+    "Tracking": ["tracking", "track", "maintain course", "wind correction"],
+    "Holding Entry": ["holding", "hold", "procedure turn", "holding pattern", "entry"],
+    "Holding Procedure": ["holding", "hold", "outbound", "inbound", "on radial", "fix"],
+    "Time control": ["time", "time control", "time management", "clock", "eta", "leg time"],
+    "Radio calls": ["radio", "communication", "call", "phraseology", "report"],
+    "Airspace surveillance": ["airspace", "traffic", "lookout", "scan for traffic", "see and avoid", "surveillance"],
+    "VFR approach": ["approach", "vfr", "visual approach", "traffic pattern", "circuit"],
+    "Formation": ["formation", "section", "wing", "position keeping", "close trail"],
+    "Navigation": ["navigation", "nav", "pilotage", "dead reckoning", "map", "chart"],
 }
 
 BOOKS = [("FAA-H-8083-25B", FAA_PDF), ("UH-1 IPC", UH1_PDF)]

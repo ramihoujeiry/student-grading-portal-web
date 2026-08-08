@@ -53,6 +53,19 @@
     if (n.includes('land')) return 'Normal landing';
     if (n.includes('risk')) return 'Risk Management';
     if (n.includes('decision') || n.includes('adm')) return 'Aeronautical Decision Making';
+    // ---- Instrument / Nav / Formation ----
+    if (n.includes('instrument') || n.includes('hood')) return 'Instrument Manoeuvres';
+    if (n.includes('control touch') || n.includes('over-control') || n.includes('overcontrol')) return 'Control Touch';
+    if (n.includes('intercept')) return 'Interception';
+    if (n.includes('track') && !n.includes('track record')) return 'Tracking';
+    if (n.includes('holding entry') || n.includes('hold entry')) return 'Holding Entry';
+    if (n.includes('holding') || n.includes('hold procedure') || n.includes('procedure turn')) return 'Holding Procedure';
+    if (n.includes('time control') || n.includes('time-management')) return 'Time control';
+    if (n.includes('radio') || n.includes('call') || n.includes('comm')) return 'Radio calls';
+    if (n.includes('airspace') || n.includes('surveillance') || n.includes('lookout') || n.includes('traffic scan')) return 'Airspace surveillance';
+    if (n.includes('vfr') && n.includes('approach')) return 'VFR approach';
+    if (n.includes('formation') || n.includes('section') || n.includes('wing')) return 'Formation';
+    if (n.includes('navigation') || n.includes('nav ') || n.includes('pilotage')) return 'Navigation';
     return name; // fall back to exact key
   }
 

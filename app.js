@@ -499,7 +499,7 @@ const app = createApp({
       try {
         const cfg = await getAIConfig();
         if (cfg) {
-          const prompt = buildSingleEvalPrompt(data);
+          const prompt = await buildSingleEvalPrompt(data);
           // callAIModel expects {system,user}; reuse by temporarily swapping the prompt builder
           const text = await callAIModelWithPrompt(prompt, cfg);
           this.aiSingleResult = text;
