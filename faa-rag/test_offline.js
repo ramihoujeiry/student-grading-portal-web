@@ -49,10 +49,10 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'store.js'), 'utf8'),
   console.log('\n===== OFFLINE DEBRIEF (with RAG) =====\n');
   console.log(out.slice(0, 1600));
   console.log('\n...[truncated]...\n');
-  // assertions
-  const cited = /\(FAA-H-8083-25B,? p\.|\(UH-1 IPC,? p\.|\(Robinson FTG,? p\./.test(out);
-  const hasRef = /REFERENCE SOURCE MATERIAL/.test(out);
-  console.log('\n>>> contains REFERENCE block:', hasRef);
+  // assertions - new format uses GROUNDING section with clean citations
+  const hasGrounding = /GROUNDING \(from bundled FAA/.test(out);
+  const cited = /FAA-H-8083-25B p\.\d+|UH-1 IPC p\.\d+|Robinson FTG p\.\d+/.test(out);
+  console.log('\n>>> contains GROUNDING section:', hasGrounding);
   console.log('>>> contains a manual citation (FAA/UH-1/FTG p.N):', cited);
-  process.exit(cited && hasRef ? 0 : 2);
+  process.exit(cited && hasGrounding ? 0 : 2);
 })().catch(e => { console.error('ERR', e); process.exit(1); });

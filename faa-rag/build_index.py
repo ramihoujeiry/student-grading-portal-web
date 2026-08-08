@@ -86,12 +86,43 @@ def paragraphs(text):
     out = []
     for c in chunks:
         c = re.sub(r"\s+", " ", c).strip()
-        if len(c) > 60:
-            out.append(c)
+        if len(c) < 80 or len(c) > 900:
+            continue
+        # drop table-of-contents / leader-dot lines ("Time Zones.....16-3")
+        if re.search(r"\.{3,}", c):
+            continue
+        # drop page-footnote / reference lines ("Page 16-3", "Figure 2-1.", "p. 2-4")
+        if re.match(r"^(page|figure|fig\.|p\.|ch\.|chapter|\(\d)", c, re.I):
+            continue
+        # drop pure navigation-history narrative (not teaching content)
+        if re.search(r"\b(prehistoric|world war|federal aviation act of 195\d|19\d\d|macracken|first pilot license|airmail|patco|de regulation|wright brothers|19\d2|18\d\d)\b", c, re.I):
+            continue
+        # drop lines that are mostly numbers / codes / OCR garbage
+        letters = sum(ch.isalpha() for ch in c)
+        if letters / max(len(c), 1) < 0.55:
+            continue
+        out.append(c)
     return out
 
 
-def extract(book, pdf_path, index, hits_per_maneuver=8):
+# terms that, when present, signal a passage is NOT instructional maneuver content
+_NOISE_TERMS = re.compile(
+    r"\b(prehistoric|world war|federal aviation act|macracken|airmail|patco|"
+    r"deregulation|wright brothers|inaugural|postal service|war department|"
+    r"first pilot license|first airmail|history of flight|countless lives)\b", re.I)
+
+
+def _score(p, terms):
+    """Higher = more on-topic. Counts distinct matched terms, weighted."""
+    low = p.lower()
+    s = 0
+    for t in terms:
+        if re.search(r"\b" + re.escape(t) + r"\b", low):
+            s += 1 + min(len(t) / 12.0, 1.0)  # longer terms weigh a bit more
+    return s
+
+
+def extract(book, pdf_path, index, hits_per_maneuver=10):
     if not os.path.exists(pdf_path):
         print(f"  [skip] {book}: not found at {pdf_path}")
         return
@@ -104,7 +135,6 @@ def extract(book, pdf_path, index, hits_per_maneuver=8):
     pages = reader.pages
     print(f"  pages: {len(pages)}")
 
-    # pre-extract paragraphs per page once
     page_paras = []
     for i, page in enumerate(pages):
         try:
@@ -115,24 +145,29 @@ def extract(book, pdf_path, index, hits_per_maneuver=8):
 
     for maneuver, terms in QUERIES.items():
         term_re = re.compile("|".join(r"\b" + re.escape(t) + r"\b" for t in terms), re.I)
-        hits = []
+        scored = []
         for i, paras in enumerate(page_paras):
             for p in paras:
+                if _NOISE_TERMS.search(p):
+                    continue
                 if term_re.search(p):
-                    snippet = f"[{book} p.{i+1}] " + p[:650]
-                    hits.append(snippet)
-                    if len(hits) >= hits_per_maneuver:
-                        break
-            if len(hits) >= hits_per_maneuver:
-                break
-        # de-dup
-        seen = set(); uniq = []
-        for h in hits:
+                    s = _score(p, terms)
+                    if s > 0:
+                        snippet = f"[{book} p.{i+1}] " + p[:700]
+                        scored.append((s, snippet))
+        # keep the highest-scoring, de-duped passages
+        seen = set()
+        uniq = []
+        for s, h in sorted(scored, key=lambda x: -x[0]):
             core = h.split("] ", 1)[-1]
-            if core not in seen:
-                seen.add(core); uniq.append(h)
+            if core in seen:
+                continue
+            seen.add(core)
+            uniq.append(h)
+            if len(uniq) >= hits_per_maneuver:
+                break
         index.setdefault(maneuver, [])
-        index[maneuver].extend(uniq[:hits_per_maneuver])
+        index[maneuver].extend(uniq)
         print(f"  {maneuver}: +{len(uniq)} ({book})")
 
 

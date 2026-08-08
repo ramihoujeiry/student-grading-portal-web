@@ -334,9 +334,17 @@ async function generateFeedback(data){
       await FaaRag.loadIndex();
       const faa = await FaaRag.buildFaaContext(data);
       if (faa) {
-        L.push('');
-        L.push('--- WHAT THE MANUALS SAY (offline, from bundled index) ---');
-        L.push(faa.replace(/^[\s\S]*?REFERENCE SOURCE MATERIAL/, 'REFERENCE SOURCE MATERIAL'));
+        // Strip the raw REFERENCE block down to just the citeable manual
+        // anchors so the offline debrief stays readable (no raw-page dumps).
+        const cites = (faa.match(/\(([^)]*p\.\d[^\n]*?)\)/g) || [])
+          .map(s => s.replace(/[()]/g, '').trim())
+          .filter((v, i, a) => a.indexOf(v) === i)
+          .slice(0, 6);
+        if (cites.length) {
+          L.push('');
+          L.push('GROUNDING (from bundled FAA / UH-1 / Robinson FTG manuals):');
+          cites.forEach(c => L.push('  - ' + c));
+        }
       }
     }
   } catch (e) { /* offline template still useful without RAG */ }

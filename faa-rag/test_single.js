@@ -17,6 +17,9 @@ const FaaRag = sandbox.FaaRag;
 // Load real store.js (defines buildSingleEvalPrompt, getAIConfig, callAIModelWithPrompt)
 vm.runInContext(fs.readFileSync(path.join(HERE, '..', 'store.js'), 'utf8'), sandbox);
 
+// provide native fetch in the sandbox context (avoid recursion)
+sandbox.fetch = globalThis.fetch.bind(globalThis);
+
 // ihab Navigation-Formation (S68) single-eval shape, below-standard items
 const ev = {
   studentName: 'ihab abou ali', aircraft: 'R44-2', phase: 'Navigation-Formation',
