@@ -228,12 +228,12 @@ const app = createApp({
         const failures = phaseEvals.filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD).length;
         items.push({ studentId: s.id, studentName: s.name, aircraftType: aircraft, currentPhase: phase, completedTrips: completed, totalTrips: totalTrips, progressPercent: progress, avgGrade: avg, failureCount: failures, lastFlightDate: latest.date });
       });
-      return items.sort((a, b) => a.studentName.localeCompare(b.studentName));
+      return items.sort((a, b) => (a.studentName || '').localeCompare(b.studentName || ''));
     },
 
     // User management (admin only) — mirror Android UserManagementActivity
     pendingUsers() { return this.users.filter(u => (u.role || 'pending') === 'pending'); },
-    allUsers() { return this.users.slice().sort((a, b) => a.name.localeCompare(b.name)); }
+    allUsers() { return this.users.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')); }
   },
   methods: {
     setTab(t) { this.tab = t; },
