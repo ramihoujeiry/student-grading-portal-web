@@ -63,9 +63,25 @@
     if (n.includes('time control') || n.includes('time-management')) return 'Time control';
     if (n.includes('radio') || n.includes('call') || n.includes('comm')) return 'Radio calls';
     if (n.includes('airspace') || n.includes('surveillance') || n.includes('lookout') || n.includes('traffic scan')) return 'Airspace surveillance';
-    if (n.includes('vfr') && n.includes('approach')) return 'VFR approach';
-    if (n.includes('formation') || n.includes('section') || n.includes('wing')) return 'Formation';
-    if (n.includes('navigation') || n.includes('nav ') || n.includes('pilotage')) return 'Navigation';
+    if (n.includes("vfr") && n.includes("approach")) return "VFR approach";
+    if (n.includes("formation") || n.includes("section") || n.includes("wing")) return "Formation";
+    if (n.includes("navigation") || n.includes("nav ") || n.includes("pilotage")) return "Navigation";
+    // ---- Confined Area phase ----
+    if (n.includes("spot selection") || n.includes("risk assessment") || n.includes("site selection")) return "Spot selection / risk assessment";
+    if (n.includes("confined") && n.includes("approach")) return "Confined approach";
+    if (n.includes("confined") && (n.includes("departure") || n.includes("takeoff") || n.includes("depart"))) return "Confined departure";
+    if (n.includes("run-on") || n.includes("roll-on") || n.includes("running landing")) return "Run-on landing";
+    if (n.includes("steep approach") || n.includes("steep angled")) return "Steep approach";
+    // ---- General instructional technique / anything-useful ----
+    if (n.includes("instruction") || n.includes("teach") || n.includes("coach") || n.includes("demonstrat") || n.includes("lesson") || n.includes("briefing")) return "Instructional technique";
+    if (n.includes("common error") || n.includes("pilot error") || n.includes("accident") || n.includes("mistake")) return "Common errors";
+    if (n.includes("emergency") || n.includes("malfunction") || n.includes("engine failure") || n.includes("ditching")) return "Emergency procedures";
+    if (n.includes("human factor") || n.includes("fatigue") || n.includes("spatial disorientation") || n.includes("situation awareness") || n.includes("workload")) return "Human factors";
+    if (n.includes("weather") || n.includes("wind shear") || n.includes("turbulence") || n.includes("thunderstorm") || n.includes("microburst")) return "Weather / wind";
+    if (n.includes("crew resource") || n.includes(" crm")) return "Crew resource management";
+    if (n.includes("lesson plan") || n.includes("syllabus") || n.includes("standardiz") || n.includes("curriculum")) return "Lesson planning";
+    if (n.includes("aerodynamic") || n.includes("vortex ring") || n.includes("settling with power") || n.includes("retreating blade") || n.includes("dissymmetry") || n.includes("translational lift")) return "Aerodynamics (rotor)";
+    if (n.includes("safety") || n.includes("accident prevention") || n.includes("hazard prevention")) return "Safety / accident prevention";
     return name; // fall back to exact key
   }
 
@@ -101,9 +117,13 @@
       }
     });
 
-    // 2) Always include risk-management + ADM passages for the readiness/ADM section.
-    ['Risk Management', 'Aeronautical Decision Making'].forEach(k => {
-      (idx[k] || []).forEach(p => {
+    // 2) Always include general instructional-technique + safety + ADM passages
+    // so every debrief can lean on the manuals for teaching method, common
+    // errors, human factors and risk management — not only weak maneuvers.
+    ['Risk Management', 'Aeronautical Decision Making', 'Instructional technique',
+     'Common errors', 'Safety / accident prevention', 'Human factors',
+     'Crew resource management'].forEach(k => {
+      (idx[k] || []).slice(0, 4).forEach(p => {
         const { label, body } = extract(p);
         if (seen.has(body)) return;
         seen.add(body);
@@ -112,11 +132,11 @@
     });
 
     if (!blocks.length) return '';
-    return '\n\n--- REFERENCE SOURCE MATERIAL (FAA-H-8083-25B + UH-1 Instructor Pilot Course) ---\n' +
+    return '\n\n--- REFERENCE SOURCE MATERIAL (FAA-H-8083-25B + UH-1 Instructor Pilot Course + Robinson FTG) ---\n' +
       blocks.join('\n\n') +
       '\n--- END REFERENCE ---\n' +
       'Use the above source material to anchor your coaching points where relevant. ' +
-      'Cite the referenced manual when you reference a specific principle. Do not contradict FAA / UH-1 guidance.\n';
+      'Cite the referenced manual when you reference a specific principle. Do not contradict FAA / UH-1 / Robinson guidance.\n';
   }
 
   global.FaaRag = { loadIndex, buildFaaContext, normalize, status };

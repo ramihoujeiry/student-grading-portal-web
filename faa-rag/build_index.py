@@ -46,9 +46,27 @@ QUERIES = {
     "VFR approach": ["approach", "vfr", "visual approach", "traffic pattern", "circuit"],
     "Formation": ["formation", "section", "wing", "position keeping", "close trail"],
     "Navigation": ["navigation", "nav", "pilotage", "dead reckoning", "map", "chart"],
+    # ---- Confined Area phase (R44-2) ----
+    "Spot selection / risk assessment": ["site selection", "spot selection", "risk assessment", "confined area", "hazard", "survey", "recon", "landing site"],
+    "Confined approach": ["confined area", "confined approach", "confined-area approach", "approach to confined", "tight approach", "obstacle", "hovering approach"],
+    "Confined departure": ["confined departure", "confined area", "departure", "confined takeoff", "takeoff from confined", "vertical takeoff"],
+    "Run-on landing": ["run-on landing", "roll-on landing", "running landing", "touchdown", "ground taxi"],
+    "Steep approach": ["steep approach", "steep angled approach", "high approach", "precipitous", "confined approach"],
+    # ---- General instructional technique / anything-useful categories ----
+    # These let the AI cite the manuals for teaching method, errors, and theory
+    # even when a debrief is not about a single graded maneuver.
+    "Instructional technique": ["instruction", "teach", "demonstrate", "guided practice", "explanation", "brief", "coaching", "student", "learning", "proficiency", "method"],
+    "Common errors": ["common error", "frequently", "often", "mistake", "error", "fault", "pilot error", "accident", "cause"],
+    "Emergency procedures": ["emergency", "malfunction", "failure", "engine failure", "procedure", "survival", "ditching", "fire"],
+    "Human factors": ["human factors", "fatigue", "stress", "attention", "situation awareness", "SA", "workload", "cognitive", "illusion", "spatial disorientation"],
+    "Weather / wind": ["weather", "wind", "gust", "turbulence", "visibility", "ceiling", "thunderstorm", "wind shear", "microburst"],
+    "Crew resource management": ["crew resource", "CRM", "crew", "resource management", "teamwork", "communication", "briefing"],
+    "Lesson planning": ["lesson", "syllabus", "objective", "standardization", "curriculum", "stage", "evaluation", "check"],
+    "Aerodynamics (rotor)": ["rotor", "aerodynamic", "translational lift", "vortex ring", "settling with power", "retreating blade", "dissymmetry", "gyroscopic", "flap", "drag"],
+    "Safety / accident prevention": ["safety", "accident prevention", "hazard", "incident", "prevention", "risk", "mitigation"],
 }
 
-BOOKS = [("FAA-H-8083-25B", FAA_PDF), ("UH-1 IPC", UH1_PDF)]
+BOOKS = [("FAA-H-8083-25B", FAA_PDF), ("UH-1 IPC", UH1_PDF), ("Robinson FTG", os.path.join(HERE, "books", "ftg_book.pdf"))]
 
 
 # Auto-discover any extra PDFs dropped into faa-rag/books/ (future books you
