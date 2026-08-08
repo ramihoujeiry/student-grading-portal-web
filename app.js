@@ -39,6 +39,8 @@ const app = createApp({
       DURATIONS: [0.5, 0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0], // duration picker presets (h)
       toast: '',
       aiStudentId: '', aiResult: '', aiLoading: false,
+      aiRagStatus: '', // '' | 'ok' (manuals cited) | 'failed' (index unreachable)
+      ragReady: null,  // null = checking, true = index loaded, false = failed (set on mount)
       aiSingleResult: '', aiSingleLoading: false,
       // Ask-Data (private instructor copilot over grading data)
       askQuery: '', askResult: '', askLoading: false
@@ -464,8 +466,13 @@ const app = createApp({
       this.aiForStudent = student.id;
       this.aiLoading = true;
       this.aiResult = '';
+      this.aiRagStatus = '';
       const evals = this.evaluations.filter(e => e.studentId === student.id);
       const data = buildPerformance(student, evals);
+      // Warm the RAG index so status() is accurate, then call the model.
+      let ragOk = false;
+      try { if (typeof FaaRag !== 'undefined') { await FaaRag.loadIndex(); ragOk = (FaaRag.status() === 'ok'); } } catch (e) {}
+      this.aiRagStatus = ragOk ? 'ok' : 'failed';
       // Try the online model first; fall back to the offline template on any problem.
       try {
         const cfg = await getAIConfig();
@@ -763,7 +770,14 @@ const app = createApp({
     },
   },
   mounted() {
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=49').catch(() => {});
+    // Warm the RAG index on load so the AI tab can show live status immediately.
+    if (typeof FaaRag !== 'undefined') {
+      FaaRag.loadIndex().then(() => { this.ragReady = (FaaRag.status() === 'ok'); })
+        .catch(() => { this.ragReady = false; });
+    } else {
+      this.ragReady = false;
+    }
     if (this.fbReady) {
       // Seed current user immediately in case the session is already restored
       // before the onAuthStateChanged listener attaches.

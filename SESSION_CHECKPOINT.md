@@ -79,4 +79,9 @@ Native nav groups:
 - **Android:** `Constants.kt` `AI_LAN_ENDPOINT` → same URL; rebuilt `app-debug.apk` (`D:\perfect - Copy\app\build\outputs\apk\debug\app-debug.apk`), installed manually by user (wireless ADB pairing faulted on MIUI; fell back to manual install).
 - **Verified live from open internet:** `/healthz` → 200 `{"ok":true}`; real `tencent/hy3:free` chat reply returned via the Funnel.
 - **Caveat:** AI feedback depends on Pi powered + online. If AI ever silently drops to template text, the Pi is off / Funnel stopped (`sudo tailscale funnel list` on Pi to confirm).
-- **Re-auth note:** `tailscale up` was run once (user authenticated via `login.tailscale.com` link). If the Pi is ever removed from the tailnet, re-run `sudo tailscale up` and re-approve.
+- **Re-auth note:** `tailscale up` was run once (user authenticated via `login.tailscale.com` link). If the Pi is ever removed from the tailnet, re-run `sudo tailscale up` and re-approve. Tailnet machine-key expiry set to **Never** (user disabled in admin console 2026-08-08) so devices never silently drop.
+
+## Ask-Data tab (2026-08-08)
+- New "Ask Data" tab in web PWA: natural-language Q&A over the grading data, powered by the same free Funnel AI (no Firebase Admin key — uses `this.evaluations/students/mifTables` already loaded for the logged-in user).
+- `app.js`: `askData()` builds a compact `buildDataSnapshot()` (counts, per-student eval counts, recent 25 evals, MIF phases) → `callAIModelWithPrompt({system,user}, cfg)` via `getAIConfig()`. Tab markup in `index.html`; SW cache `grading-portal-v43`. Committed `6c3a...` (6c3ea41). Verified `node --check app.js` passes; Funnel health + chat confirmed live.
+- Caveat: answers reflect only data the signed-in user can read (Firestore rules still apply). Falls back to an error message if the Pi/Funnel is offline.

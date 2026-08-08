@@ -401,8 +401,11 @@ async function getAIConfig() {
 }
 
 /* Build a precise prompt from the computed analytics so the model has
-   real signal to work with (not just "write something nice"). */
-function buildAIPrompt(data) {
+   real signal to work with (not just "write something nice"). If the FAA
+   RAG index is present, real handbook passages for the cadet's weak
+   maneuvers + risk management are appended so the debrief cites FAA source
+   material instead of guessing. */
+async function buildAIPrompt(data) {
   const sys = 'You are a senior flight instructor (CFI) writing a concise, candid coaching debrief for a student pilot. ' +
     'Use the data provided. Be specific and actionable. Do NOT invent grades or maneuvers that are not in the data. ' +
     'Write in plain language a human instructor would say. Use short paragraphs. End with concrete next-trip actions.';
@@ -429,13 +432,22 @@ function buildAIPrompt(data) {
     data.instructorNotes.slice(-5).forEach(n => L.push('  - ' + n));
   }
   L.push('Readiness: ' + (data.readiness || '-'));
-  return { system: sys, user: L.join('\n') };
+  let user = L.join('\n');
+  // Append real FAA source material for the cadet's weak areas + risk mgmt,
+  // if the RAG index loaded. Keeps the model anchored to the handbook.
+  try {
+    if (typeof FaaRag !== 'undefined' && FaaRag.buildFaaContext) {
+      const faa = await FaaRag.buildFaaContext(data);
+      if (faa) user += faa;
+    }
+  } catch (e) { console.warn('FAA RAG attach skipped:', e.message); }
+  return { system: sys, user };
 }
 
 /* Call an OpenAI-compatible chat-completions endpoint. Returns model text. Throws on failure. */
 async function callAIModel(data, cfg) {
   if (!cfg || !cfg.endpoint) throw new Error('no AI endpoint');
-  const prompt = buildAIPrompt(data);
+  const prompt = await buildAIPrompt(data);
   return _postAIModel(prompt, cfg);
 }
 

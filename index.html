@@ -460,6 +460,8 @@
       <section v-show="tab==='ai'">
         <div class="card">
           <h3>AI Performance Feedback</h3>
+          <div v-if="ragReady === true" class="pill good" style="margin-bottom:10px">📚 Manuals loaded (FAA / UH-1 / Robinson FTG) — debriefs will cite them</div>
+          <div v-if="ragReady === false" class="pill pending" style="margin-bottom:10px">⚠️ Manual index not loaded. Serve the app over http:// (not file://) and ensure faa-rag/faa_index.json is present.</div>
           <label>Student</label>
           <select v-model="aiStudentId">
             <option value="">Select a student…</option>
@@ -471,6 +473,8 @@
           </div>
           <div v-if="aiLoading" class="muted" style="margin-top:10px">Analyzing…</div>
           <div v-if="aiResult" class="mannote" style="margin-top:12px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:340px;overflow:auto">{{aiResult}}</div>
+          <div v-if="aiResult && aiRagStatus==='ok'" class="pill good" style="margin-top:10px">📚 Manuals cited (FAA / UH-1 / Robinson FTG)</div>
+          <div v-if="aiResult && aiRagStatus==='failed'" class="pill pending" style="margin-top:10px">⚠️ Manual index not loaded — debrief is ungrounded. Check faa-rag/faa_index.json is served.</div>
           <div v-if="!aiResult && !aiLoading" class="muted" style="margin-top:10px">
             Picks a student and asks the live AI model for a coaching debrief (trend, consistency,
             weak maneuvers, readiness) from their evaluations. Falls back to an offline summary if offline.
@@ -668,10 +672,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="vue.global.prod.js?v=44"></script>
-<script src="firebase-config.js?v=44"></script>
-<script src="seed.js?v=44"></script>
-<script src="store.js?v=44"></script>
-<script src="app.js?v=44"></script>
+<script src="vue.global.prod.js?v=49"></script>
+<script src="firebase-config.js?v=49"></script>
+<script src="seed.js?v=49"></script>
+<script src="faa-rag/faa_index.js?v=49"></script>
+<script src="faa-rag/faaRag.js?v=49"></script>
+<script src="store.js?v=49"></script>
+<script src="app.js?v=49"></script>
 </body>
 </html>

@@ -1,16 +1,23 @@
-const CACHE = 'grading-portal-v47';
+const CACHE = 'grading-portal-v49';
 const ASSETS = [
   './',
   'index.html',
-  'app.js?v=47',
-  'store.js?v=47',
-  'seed.js?v=47',
-  'firebase-config.js?v=47',
-  'vue.global.prod.js?v=47',
+  'app.js?v=49',
+  'store.js?v=49',
+  'seed.js?v=49',
+  'firebase-config.js?v=49',
+  'vue.global.prod.js?v=49',
+  'faa-rag/faaRag.js?v=49',
+  'faa-rag/faa_index.json?v=49',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png'
 ];
+
+// Never cache the live RAG index or any API/JSON at runtime -- always fresh.
+function isNoCache(url) {
+  return /faa_index\.json|faaRag\.js|v1\/chat|api/i.test(url);
+}
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -26,6 +33,12 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   // network-first for the shell, cache-first for static assets
   if (e.request.method !== 'GET') return;
+  const url = e.request.url || '';
+  // Never serve a stale RAG index / API from cache -- go straight to network.
+  if (isNoCache(url)) {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then(r => r || caches.match('./'))));
+    return;
+  }
   e.respondWith(
     fetch(e.request).then(res => {
       const copy = res.clone();
