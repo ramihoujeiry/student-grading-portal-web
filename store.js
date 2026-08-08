@@ -173,15 +173,28 @@ const Store = {
   async deleteAnnouncement(id) { await dbFs.collection(COL.announcements).doc(id).delete(); },
 
   // users (admin only) — mirrors Android UserManagementViewModel
-  async approveUser(uid, role) {
-    await dbFs.collection(COL.users).doc(uid).update({ role, updatedAt: Date.now() / 1000 });
+  async approveUser(u, role) {
+    await dbFs.collection(COL.users).doc(u.uid).update({ role, updatedAt: Date.now() / 1000 });
+    await this._syncInstructor(u, role);
   },
-  async updateUserRole(uid, role) {
-    await dbFs.collection(COL.users).doc(uid).update({ role, updatedAt: Date.now() / 1000 });
+  async updateUserRole(u, role) {
+    await dbFs.collection(COL.users).doc(u.uid).update({ role, updatedAt: Date.now() / 1000 });
+    await this._syncInstructor(u, role);
   },
-  async deleteUser(uid) {
-    // native rejects (removes) the user doc; auth account stays until re-login, matching Android rejectUser
-    await dbFs.collection(COL.users).doc(uid).delete();
+  // Keep the instructors collection in sync with the user's role, exactly like Android.
+  // instructor/admin => ensure instructors/{uid} exists (active). viewer/pending => remove it.
+  async _syncInstructor(u, role) {
+    const ref = dbFs.collection(COL.instructors).doc(u.uid);
+    if (role === 'instructor' || role === 'admin') {
+      await ref.set({ id: u.uid, name: u.name || u.email || '', active: true, createdAt: Date.now() / 1000 });
+    } else {
+      await ref.delete().catch(() => {});
+    }
+  },
+  async deleteUser(u) {
+    // native rejects (removes) the user doc; also drop any instructors/{uid} mirror, matching Android rejectUser
+    await dbFs.collection(COL.users).doc(u.uid).delete();
+    await dbFs.collection(COL.instructors).doc(u.uid).delete().catch(() => {});
   },
 
   // first-run seeding (admin only). Mirrors the sample data for an empty project.
