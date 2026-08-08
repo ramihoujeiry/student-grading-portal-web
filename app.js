@@ -272,6 +272,10 @@ const app = createApp({
         return;
       }
       this.user = u;
+      // Self-heal: ensure a users/{uid} doc exists (e.g. registered before
+      // Firestore rules were deployed). Creates a pending doc if missing so
+      // the admin sees them in the Users tab.
+      try { await Auth.upsertUserDoc(u); } catch (e) { /* non-fatal */ }
       const role = await Auth.roleOf(u.uid);
       this.role = role;
       if (!role || role === 'pending') {

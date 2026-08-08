@@ -66,6 +66,22 @@ const Auth = {
     }
     return u;
   },
+  // Self-heal: if a signed-in user has no users/{uid} doc (e.g. they registered
+  // while Firestore rules were still locked, or the doc was deleted), create a
+  // pending one so they appear in the admin tab and the app doesn't dead-end.
+  async upsertUserDoc(u) {
+    if (!fbReady || !u) return;
+    const ref = dbFs.collection(COL.users).doc(u.uid);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      await ref.set({
+        uid: u.uid,
+        name: u.displayName || (u.email ? u.email.split('@')[0] : 'Unknown'),
+        email: u.email || '',
+        role: 'pending'
+      });
+    }
+  },
   async logout() { if (fbReady) await auth.signOut(); },
   async roleOf(uid) {
     if (!fbReady || !uid) return 'pending';
