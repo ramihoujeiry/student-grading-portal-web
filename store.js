@@ -288,7 +288,7 @@ function buildPerformance(student, evals){
     spanDays:sorted.length?Math.floor((lastDate-firstDate)/86400):0,evaluationCount:sorted.length};
 }
 
-function generateFeedback(data){
+async function generateFeedback(data){
   if(!data.evaluationCount)return 'No evaluations found for '+(data.studentName||'this student')+'.\nOpen a student profile from a completed trip to generate feedback.';
   const L=[];const name=data.studentName||'the cadet';
   L.push('AI Performance Analysis - '+name);
@@ -326,6 +326,20 @@ function generateFeedback(data){
   L.push('');
   L.push('METHOD (FAA AIH / CFI ACS / Risk Mgmt Hbk): demonstrate, then guided practice, then solo.');
   L.push('Grade against ACS (Knowledge + Risk Mgmt + Skill); remediate weak fundamentals before advancing.');
+  // --- Ground the offline debrief in the embedded RAG index (no network needed) ---
+  // When the manuals are bundled, append the real source passages so the
+  // offline path still cites FAA / UH-1 / Robinson FTG even with the AI proxy down.
+  try {
+    if (typeof FaaRag !== 'undefined' && FaaRag.buildFaaContext) {
+      await FaaRag.loadIndex();
+      const faa = await FaaRag.buildFaaContext(data);
+      if (faa) {
+        L.push('');
+        L.push('--- WHAT THE MANUALS SAY (offline, from bundled index) ---');
+        L.push(faa.replace(/^[\s\S]*?REFERENCE SOURCE MATERIAL/, 'REFERENCE SOURCE MATERIAL'));
+      }
+    }
+  } catch (e) { /* offline template still useful without RAG */ }
   return L.join('\n');
 }
 

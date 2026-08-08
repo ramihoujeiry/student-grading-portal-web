@@ -485,7 +485,7 @@ const app = createApp({
       } catch (e) {
         console.warn('AI model call failed, using offline template:', e);
       }
-      this.aiResult = generateFeedback(data);
+      this.aiResult = await generateFeedback(data);
       this.aiLoading = false;
     },
 
@@ -620,9 +620,9 @@ const app = createApp({
       this.aiLoading = true;
       const student = this.students.find(s => s.id === this.aiStudentId);
       const evals = this.evaluations.filter(e => e.studentId === this.aiStudentId);
-      setTimeout(() => {
+      setTimeout(async () => {
         const data = buildPerformance(student, evals);
-        this.aiResult = generateFeedback(data);
+        this.aiResult = await generateFeedback(data);
         this.aiLoading = false;
       }, 30);
     },
