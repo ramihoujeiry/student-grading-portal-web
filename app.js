@@ -531,9 +531,11 @@ const app = createApp({
           'You are given a JSON snapshot of the current grading data (students, evaluations, MIF tables). ' +
           'Answer the instructor\'s question using ONLY the data provided. Be specific and cite names/numbers. ' +
           'Each student entry has a `totalHours` field (decimal hours, sum of that student\'s evaluation durations). ' +
-          'Each recent evaluation has a `duration` field formatted as "HH:MM". Use these to answer flight-hour / ' +
-          'flight-time questions. If the data does not contain the answer, say so plainly. Keep replies concise and ' +
-          'practical. Do not invent students, grades, or maneuvers. If asked to list or rank, use tables or bullet lists.';
+          'Each recent evaluation has a `duration` field formatted as "HH:MM" and a `notes` field with the ' +
+          'instructor\'s free-text trip notes (coach comments, safety items, remarks). Use both to answer ' +
+          'flight-hour / flight-time and notes questions. If the data does not contain the answer, say so plainly. ' +
+          'Keep replies concise and practical. Do not invent students, grades, or maneuvers. ' +
+          'If asked to list or rank, use tables or bullet lists.';
         const user = 'GRADING DATA SNAPSHOT:\n' + JSON.stringify(snap) + '\n\nQUESTION: ' + q;
         const text = await callAIModelWithPrompt({ system, user }, cfg);
         this.askResult = text;
@@ -565,6 +567,7 @@ const app = createApp({
         student: (byStudent[e.studentId] && byStudent[e.studentId].name) || e.studentId,
         phase: e.phaseName, trip: e.tripNumber,
         duration: e.duration || null,
+        notes: e.tripNotes || '',
         finalGrade: e.finalGrade, mif: e.overallMifStatus, date: fmtDate ? fmtDate(e.date) : e.date
       }));
       return {
