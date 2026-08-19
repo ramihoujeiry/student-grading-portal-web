@@ -122,9 +122,19 @@ const Store = {
     return unsub;
   },
 
+  // Flight-year helper (mirrors Android YearUtils): flight year starts July 1.
+  // Jul 2025 -> Jun 2026 = "2025-2026". Used to tag newly added students with the
+  // correct year so they appear in the active year, not a stale default.
+  currentFlightYear() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const start = d.getMonth() >= 6 ? y : y - 1;
+    return start + '-' + (start + 1);
+  },
+
   // students
   async addStudent(name) {
-    await dbFs.collection(COL.students).add({ name, active: true, activeYears: ['2025-2026'], createdAt: Date.now() / 1000 });
+    await dbFs.collection(COL.students).add({ name, active: true, activeYears: [currentFlightYear()], createdAt: Date.now() / 1000 });
   },
   async setStudentActive(id, active) { await dbFs.collection(COL.students).doc(id).update({ active }); },
   async deleteStudent(id) { await dbFs.collection(COL.students).doc(id).delete(); },
