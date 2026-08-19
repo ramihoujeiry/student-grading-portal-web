@@ -26,6 +26,7 @@ const app = createApp({
       // training progress search (page removed; fields kept harmless)
       tpSearch: '', tpAircraft: 'All Aircraft',
       evStudent: 'All Cadets', evAircraft: 'All Aircraft', evPhase: 'All Phases', evYear: 'All Years', evSearch: '',
+      analyticsStudent: '',  // student filter on the Analytics page
 
       // ui
       evalForm: blankEval(),
@@ -156,6 +157,7 @@ const app = createApp({
       const byStudent = {};
       this.evaluations.forEach(e => { (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e); });
       this.students.forEach(s => {
+        if (this.analyticsStudent && s.id !== this.analyticsStudent) return;
         const evals = (byStudent[s.id] || []).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
         const perf = buildPerformance(s, evals);
         out.push({
@@ -665,14 +667,18 @@ const app = createApp({
     },
     onDurationChange() { this.evalForm.duration = (this.durationH || '00') + ':' + (this.durationM || '00'); },
     // SVG line chart of a student's grade trend (mirrors Android MPAndroidChart). Returns {path, area, w, h}.
+    // Uses the ACTUAL grade range with light padding (not a forced 60-100 window) so the curve is honest:
+    // a student scoring 70-80 won't look like it's spiking across the full scale, and sub-60 grades won't clip.
     trendChart(sid, w = 240, h = 60) {
       const evs = this.evaluations.filter(e => e.studentId === sid).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
-      if (evs.length < 2) return null;
+      if (!evs.length) return null;
       const pts = evs.map(e => e.finalGrade || 0);
-      const min = Math.min(...pts, 60), max = Math.max(...pts, 100);
+      let min = Math.min(...pts), max = Math.max(...pts);
+      if (min === max) { min -= 5; max += 5; }       // flat line -> give it vertical room
+      else { const pad = (max - min) * 0.15; min -= pad; max += pad; }  // pad so endpoints aren't on the edges
       const span = (max - min) || 1;
-      const step = w / (pts.length - 1);
-      const xy = pts.map((v, i) => [i * step, h - ((v - min) / span) * (h - 8) - 4]);
+      const step = pts.length > 1 ? w / (pts.length - 1) : 0;
+      const xy = pts.map((v, i) => [pts.length > 1 ? i * step : w / 2, h - ((v - min) / span) * (h - 8) - 4]);
       const path = xy.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
       const area = path + ` L${w} ${h} L0 ${h} Z`;
       return { path, area, w, h, last: pts[pts.length - 1] };
