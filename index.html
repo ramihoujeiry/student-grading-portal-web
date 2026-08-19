@@ -216,22 +216,6 @@
           <div class="stat"><div class="n">{{dashTotalHours.toFixed(1)}}</div><div class="l">Total Hours</div></div>
           <div class="stat"><div class="n">{{dashFilteredEvals.length}}</div><div class="l">Filtered</div></div>
         </div>
-        <div class="card" style="margin-top:12px">
-          <h3>Recent Evaluations</h3>
-          <ul class="list">
-            <li v-for="e in dashFilteredEvals.slice().reverse().slice(0,6)" :key="e.id" class="clickable" @click="openEval(e)">
-              <div class="row">
-                <strong>{{e.studentName}}</strong>
-                <span class="muted">· {{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</span>
-                <span class="spacer" style="flex:1"></span>
-                <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
-                <span class="pill" :class="statusColor(e.overallMifStatus)">{{e.overallMifStatus}}</span>
-              </div>
-              <div class="muted" v-if="e.tripNotes">{{e.tripNotes}}</div>
-            </li>
-            <li v-if="!dashFilteredEvals.length" class="muted">No evaluations match the filters for {{activeYearResolved}}.</li>
-          </ul>
-        </div>
       </section>
 
       <!-- STUDENTS -->
@@ -682,12 +666,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="vue.global.prod.js?v=60"></script>
-<script src="firebase-config.js?v=60"></script>
-<script src="seed.js?v=60"></script>
-<script src="faa-rag/faa_index.js?v=60"></script>
-<script src="faa-rag/faaRag.js?v=60"></script>
-<script src="store.js?v=60"></script>
-<script src="app.js?v=60"></script>
+<script src="vue.global.prod.js?v=61"></script>
+<script src="firebase-config.js?v=61"></script>
+<script src="seed.js?v=61"></script>
+<script src="faa-rag/faa_index.js?v=61"></script>
+<script src="faa-rag/faaRag.js?v=61"></script>
+<script src="store.js?v=61"></script>
+<script src="app.js?v=61"></script>
 </body>
 </html>
