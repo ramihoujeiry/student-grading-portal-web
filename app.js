@@ -530,8 +530,10 @@ const app = createApp({
         const system = 'You are an instructor operations assistant for a flight-school grading system. ' +
           'You are given a JSON snapshot of the current grading data (students, evaluations, MIF tables). ' +
           'Answer the instructor\'s question using ONLY the data provided. Be specific and cite names/numbers. ' +
-          'If the data does not contain the answer, say so plainly. Keep replies concise and practical. ' +
-          'Do not invent students, grades, or maneuvers. If asked to list or rank, use tables or bullet lists.';
+          'Each student entry has a `totalHours` field (decimal hours, sum of that student\'s evaluation durations). ' +
+          'Each recent evaluation has a `duration` field formatted as "HH:MM". Use these to answer flight-hour / ' +
+          'flight-time questions. If the data does not contain the answer, say so plainly. Keep replies concise and ' +
+          'practical. Do not invent students, grades, or maneuvers. If asked to list or rank, use tables or bullet lists.';
         const user = 'GRADING DATA SNAPSHOT:\n' + JSON.stringify(snap) + '\n\nQUESTION: ' + q;
         const text = await callAIModelWithPrompt({ system, user }, cfg);
         this.askResult = text;
@@ -545,14 +547,24 @@ const app = createApp({
     /* Compact, query-friendly view of the in-memory grading data. */
     buildDataSnapshot() {
       const evs = this.evaluations || [];
+      const parseHours = (dur) => {
+        if (!dur || typeof dur !== 'string') return 0;
+        const m = dur.match(/(\d+):(\d+)/);
+        if (!m) return 0;
+        return parseInt(m[1], 10) + parseInt(m[2], 10) / 60;
+      };
       const byStudent = {};
-      this.students.forEach(s => { byStudent[s.id] = { name: s.name, evals: 0 }; });
-      evs.forEach(e => { if (byStudent[e.studentId]) byStudent[e.studentId].evals++; });
+      this.students.forEach(s => { byStudent[s.id] = { name: s.name, evals: 0, totalHours: 0 }; });
+      evs.forEach(e => {
+        const b = byStudent[e.studentId];
+        if (b) { b.evals++; b.totalHours += parseHours(e.duration); }
+      });
       const weak = evs.filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD);
       const meets = evs.filter(e => e.overallMifStatus === STATUS_MEETS_STANDARD);
       const recent = evs.slice().sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, 25).map(e => ({
         student: (byStudent[e.studentId] && byStudent[e.studentId].name) || e.studentId,
         phase: e.phaseName, trip: e.tripNumber,
+        duration: e.duration || null,
         finalGrade: e.finalGrade, mif: e.overallMifStatus, date: fmtDate ? fmtDate(e.date) : e.date
       }));
       return {
@@ -564,7 +576,7 @@ const app = createApp({
           belowMIF: weak.length,
           meetsMIF: meets.length
         },
-        students: Object.values(byStudent),
+        students: Object.values(byStudent).map(s => ({ name: s.name, evals: s.evals, totalHours: Math.round(s.totalHours * 10) / 10 })),
         aircraft: (this.aircraft || []).map(a => a.name),
         mifPhases: (this.mifTables || []).map(t => t.phaseName).filter(Boolean),
         recentEvaluations: recent
