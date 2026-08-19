@@ -73,7 +73,9 @@
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--hud);box-shadow:0 0 0 2px rgba(57,208,196,.15)}
   textarea{resize:vertical;min-height:70px}
   /* Duration hr/min selects in New Evaluation — keep numbers fully visible */
-  select.dur{width:auto;flex:1 1 72px;min-width:72px;text-align:center;font-size:16px;font-weight:700;font-family:var(--mono);padding:10px 6px}
+  select.dur{width:auto;flex:1 1 72px;min-width:72px;text-align:center;font-size:16px;font-weight:700;font-family:var(--mono);padding:0 6px;height:42px}
+  /* Flight-year read-only display: never clips the "YYYY-YYYY" value */
+  .fy{display:flex;align-items:center;height:42px;padding:0 10px;background:rgba(8,14,20,.7);border:1px solid var(--line);border-radius:9px;color:var(--text);font-family:var(--mono);font-size:14px;white-space:nowrap;overflow:visible}
   label{font-size:11px;color:var(--hud);display:block;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px;opacity:.85}
   .modal-mask{position:fixed;inset:0;background:rgba(4,8,12,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:50;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto}
   .modal{background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);width:100%;max-width:620px;max-height:90vh;overflow:auto;border-radius:16px;padding:16px 16px 24px;
@@ -522,8 +524,8 @@
         </div>
       </div>
       <div class="row" style="gap:10px">
-        <div style="flex:1"><label>Date</label><input type="date" v-model="evalForm.date" @change="onEvalDateChange" /></div>
-        <div style="flex:1"><label>Flight year</label><input :value="evalForm.flightYear" readonly title="Auto from date" /></div>
+        <div style="flex:1"><label>Date</label><input type="date" v-model="evalForm.date" @change="onEvalDateChange" style="height:42px" /></div>
+        <div style="flex:1"><label>Flight year</label><div class="fy" title="Auto from date">{{evalForm.flightYear}}</div></div>
         <div style="flex:1">
           <label>Duration (hr : min)</label>
           <div class="row nowrap" style="gap:6px;margin-top:0">
@@ -680,12 +682,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="vue.global.prod.js?v=58"></script>
-<script src="firebase-config.js?v=58"></script>
-<script src="seed.js?v=58"></script>
-<script src="faa-rag/faa_index.js?v=58"></script>
-<script src="faa-rag/faaRag.js?v=58"></script>
-<script src="store.js?v=58"></script>
-<script src="app.js?v=58"></script>
+<script src="vue.global.prod.js?v=59"></script>
+<script src="firebase-config.js?v=59"></script>
+<script src="seed.js?v=59"></script>
+<script src="faa-rag/faa_index.js?v=59"></script>
+<script src="faa-rag/faaRag.js?v=59"></script>
+<script src="store.js?v=59"></script>
+<script src="app.js?v=59"></script>
 </body>
 </html>
