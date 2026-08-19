@@ -98,6 +98,8 @@
   .auth-mode button{flex:1;background:var(--bg2);border:1px solid var(--line);color:var(--muted);padding:9px;border-radius:9px;font-weight:600;cursor:pointer}
   .auth-mode button.active{background:var(--accent);border-color:var(--accent);color:#fff}
   .warn-box{background:rgba(255,176,32,.1);border:1px solid var(--amber);color:var(--amber);border-radius:9px;padding:10px;font-size:12px;margin-top:14px;line-height:1.5}
+  .warn-box.danger{background:rgba(255,90,90,.12);border-color:var(--red);color:var(--red)}
+  .warn-box b{font-weight:800}
 </style>
 </head>
 <body>
@@ -573,9 +575,27 @@
       <label>Trip Notes</label>
       <textarea v-model="evalForm.tripNotes" placeholder="Coach comments, safety items…"></textarea>
       <div class="modal-actions">
-        <button class="btn" @click="saveEval">Save Evaluation</button>
+        <button class="btn" :disabled="saving" @click="saveEval">{{ saving ? 'Saving…' : 'Save Evaluation' }}</button>
         <button class="btn ghost" @click="printFormEval">Print PDF</button>
         <button class="btn ghost" @click="showEvalModal=false">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERWRITE CONFIRM MODAL (replaces native confirm: Cancel-safe) -->
+  <div class="modal-mask" v-if="loggedIn && overwriteClash" @click.self="cancelOverwrite">
+    <div class="modal" style="max-width:440px">
+      <h2 style="color:var(--red);margin-top:0">⚠ Trip already graded</h2>
+      <p style="line-height:1.6">
+        Trip <b>{{overwriteClash.tripNumber}}</b> ({{overwriteClash.phaseName}}) for this student was already graded
+        on <b>{{fmt(overwriteClash.date)}}</b> — Final Grade
+        <b>{{overwriteClash.finalGrade != null ? overwriteClash.finalGrade.toFixed(1) : '—'}}</b>
+        ({{overwriteClash.overallMifStatus}}).
+      </p>
+      <p class="muted">Saving now will permanently overwrite the existing evaluation. This cannot be undone.</p>
+      <div class="modal-actions" style="position:static;border:none;padding-top:0;margin-top:14px">
+        <button class="btn ghost" @click="cancelOverwrite">Cancel</button>
+        <button class="btn danger" @click="confirmOverwrite">Overwrite anyway</button>
       </div>
     </div>
   </div>
@@ -672,12 +692,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="vue.global.prod.js?v=51"></script>
-<script src="firebase-config.js?v=51"></script>
-<script src="seed.js?v=51"></script>
-<script src="faa-rag/faa_index.js?v=51"></script>
-<script src="faa-rag/faaRag.js?v=51"></script>
-<script src="store.js?v=51"></script>
-<script src="app.js?v=51"></script>
+<script src="vue.global.prod.js?v=52"></script>
+<script src="firebase-config.js?v=52"></script>
+<script src="seed.js?v=52"></script>
+<script src="faa-rag/faa_index.js?v=52"></script>
+<script src="faa-rag/faaRag.js?v=52"></script>
+<script src="store.js?v=52"></script>
+<script src="app.js?v=52"></script>
 </body>
 </html>

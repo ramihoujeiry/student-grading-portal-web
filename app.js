@@ -32,6 +32,9 @@ const app = createApp({
       evalForm: blankEval(),
       durationH: '01', durationM: '00',   // duration picker mirrors Android HH:MM
       showEvalModal: false,
+      saving: false,         // in-flight save guard (blocks double-save on slow connection)
+      overwriteClash: null,  // existing eval the chosen trip already graded
+      overwritePending: null,// eval object staged for overwrite-confirm
       selectedEval: null,    // evaluation detail
       selectedStudent: null, // student profile
       aiForStudent: null,    // student id for AI on profile
@@ -361,6 +364,10 @@ const app = createApp({
     },
     onEvalContextChange() { this.loadManeuversForForm(); },
     async saveEval() {
+      // Block double-save: on a slow connection an instructor can tap Save several times
+      // before Firestore confirms, and each tap created a duplicate trip. This guard makes
+      // the first tap win and ignores the rest until the save resolves (or the user resets).
+      if (this.saving) return;
       // Mirror the original Android app's required-field check (MainActivity.prepareSave):
       // student, aircraft, phase and instructor must be selected before saving.
       // (Trip number is auto-suggested, not a required blank field.)
@@ -370,8 +377,9 @@ const app = createApp({
       }
       const ev = this.buildEvalFromForm();
       // Warn if this student already has an evaluation for this exact trip (would overwrite).
+      // Re-check live in case one slipped in during a previous slow save.
       const clash = this.existingTripCheck(ev);
-      if (clash) this.saveWithConfirm(ev, clash);
+      if (clash) { this.overwriteClash = clash; this.overwritePending = ev; }
       else await this.persistEval(ev);
     },
     // Next sortie auto-suggestion (Android fetchSuggestedTrip): after the student's highest
@@ -386,17 +394,27 @@ const app = createApp({
       const next = (nums.length ? Math.max(...nums) : 0) + 1;
       this.evalForm.tripNumber = 'S' + next;
     },
+    // Recompute whether the currently-selected trip would overwrite an existing eval.
+    updateTripClash() {
+      const ev = this.buildEvalFromForm();
+      this.overwriteClash = this.existingTripCheck(ev);
+    },
     existingTripCheck(ev) {
       if (!ev.studentId || !ev.phaseName || !ev.tripNumber) return null;
       return this.evaluations.find(e =>
         e.studentId === ev.studentId && e.phaseName === ev.phaseName && e.tripNumber === ev.tripNumber);
     },
-    saveWithConfirm(ev, clash) {
-      const ok = confirm('A trip (' + ev.phaseName + ' - ' + ev.tripNumber + ') already exists for this student' +
-        (clash && clash.date ? ' on ' + this.fmt(clash.date) : '') + '. Save anyway? This will overwrite the existing one.');
-      if (ok) this.persistEval(ev);
+    confirmOverwrite() {
+      const ev = this.overwritePending;
+      this.overwriteClash = null; this.overwritePending = null;
+      if (ev && !this.saving) this.persistEval(ev);
+    },
+    cancelOverwrite() {
+      this.overwriteClash = null; this.overwritePending = null;
     },
     async persistEval(ev) {
+      if (this.saving) return;        // extra safety net
+      this.saving = true;
       try {
         await Store.saveEvaluation(ev);
         this.showEvalModal = false;
@@ -404,6 +422,8 @@ const app = createApp({
       } catch (err) {
         console.error('saveEval', err);
         this.toastMsg('Could not save evaluation: ' + (err && err.message ? err.message : 'unknown error'));
+      } finally {
+        this.saving = false;       // re-enable Save (modal stays open so fixable errors can be retried)
       }
     },
     buildEvalFromForm() {
