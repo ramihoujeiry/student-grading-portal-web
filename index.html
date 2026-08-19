@@ -10,24 +10,27 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 <style>
   :root{
-    --bg:#0d1117; --bg2:#161b22; --card:#1c2230; --card2:#222b3a;
-    --line:#2a3344; --text:#e6edf3; --muted:#98a2b3; --accent:#3b82f6;
-    --accent2:#1a237e; --green:#5fd08a; --amber:#ffb020; --red:#ff5a5a; --blue:#4895ef;
+    --bg:#070b10; --bg2:#0d141d; --card:#101a26; --card2:#16222f;
+    --line:#1f2e3d; --text:#dce8f2; --muted:#7c93a8;
+    --hud:#39d0c4; --hud-dim:#1d6f68; --amber:#ffb020;
+    --green:#46e08a; --blue:#5aa9ff; --red:#ff5d5d;
+    --accent:var(--hud); --accent2:#0c151e;
+    --mono:"SFMono-Regular",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    -webkit-text-size-adjust:100%}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-text-size-adjust:100%}
+  body{background-image:radial-gradient(120% 60% at 50% -10%, rgba(57,208,196,.06), transparent 60%),repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 3px);background-attachment:fixed}
   a{color:var(--blue)}
-  header.app{position:sticky;top:0;z-index:30;background:linear-gradient(90deg,var(--accent2),#243056);
-    padding:10px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,.4)}
-  header.app h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.3px}
+  header.app{position:sticky;top:0;z-index:30;background:linear-gradient(180deg,#0c151e,#0a121a);padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:2px solid var(--hud-dim);box-shadow:0 4px 18px rgba(0,0,0,.55)}
+  header.app h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.6px;color:var(--text);text-transform:uppercase;text-shadow:0 0 10px rgba(57,208,196,.25)}
+  header.app h1::before{content:"◉ ";color:var(--hud);font-size:13px;vertical-align:1px}
   header.app .spacer{flex:1}
-  .role-badge{font-size:11px;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
-  .role-badge.pending{background:rgba(255,176,32,.2);color:var(--amber)}
-  .role-badge.admin{background:rgba(95,208,138,.2);color:var(--green)}
-  .role-badge.instructor{background:rgba(72,149,239,.2);color:var(--blue)}
-  .role-badge.viewer{background:rgba(152,162,179,.2);color:var(--muted)}
+  .role-badge{font-family:var(--mono);font-size:10px;letter-spacing:.6px;background:rgba(57,208,196,.1);padding:4px 10px;border-radius:4px;text-transform:uppercase;border:1px solid var(--hud-dim);color:var(--hud)}
+  .role-badge.pending{background:rgba(255,176,32,.12);border-color:rgba(255,176,32,.4);color:var(--amber)}
+  .role-badge.admin{background:rgba(70,224,138,.12);border-color:rgba(70,224,138,.4);color:var(--green)}
+  .role-badge.instructor{background:rgba(90,169,255,.12);border-color:rgba(90,169,255,.4);color:var(--blue)}
+  .role-badge.viewer{background:rgba(124,147,168,.12);border-color:rgba(124,147,168,.4);color:var(--muted)}
   .btn-logout{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
   nav.tabs{position:sticky;top:46px;z-index:25;display:flex;flex-wrap:wrap;gap:6px;background:var(--bg2);
     border-bottom:1px solid var(--line);padding:8px}
@@ -664,12 +667,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="vue.global.prod.js?v=55"></script>
-<script src="firebase-config.js?v=55"></script>
-<script src="seed.js?v=55"></script>
-<script src="faa-rag/faa_index.js?v=55"></script>
-<script src="faa-rag/faaRag.js?v=55"></script>
-<script src="store.js?v=55"></script>
-<script src="app.js?v=55"></script>
+<script src="vue.global.prod.js?v=56"></script>
+<script src="firebase-config.js?v=56"></script>
+<script src="seed.js?v=56"></script>
+<script src="faa-rag/faa_index.js?v=56"></script>
+<script src="faa-rag/faaRag.js?v=56"></script>
+<script src="store.js?v=56"></script>
+<script src="app.js?v=56"></script>
 </body>
 </html>
