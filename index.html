@@ -170,8 +170,6 @@
       <button class="tab-btn" :class="{active:tab==='mif'}" v-if="isAdmin" @click="setTab('mif')">MIF Tables</button>
       <button class="tab-btn" :class="{active:tab==='evaluations'}" v-if="!isViewer" @click="setTab('evaluations')">Evaluations</button>
       <button class="tab-btn" :class="{active:tab==='announcements'}" @click="setTab('announcements')">Announcements</button>
-      <button class="tab-btn" :class="{active:tab==='analytics'}" @click="setTab('analytics')">Analytics</button>
-      <button class="tab-btn" :class="{active:tab==='progress'}" @click="setTab('progress')">Training Progress</button>
       <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" @click="setTab('admin')">Users</button>
       <button class="tab-btn" :class="{active:tab==='ai'}" @click="setTab('ai')">AI Feedback</button>
       <button class="tab-btn" :class="{active:tab==='ask'}" @click="setTab('ask')">Ask Data</button>
@@ -269,7 +267,7 @@
       <!-- MIF TABLES -->
       <section v-show="tab==='mif'">
         <div class="topbar"><h2 style="margin:0">MIF Tables</h2><span class="spacer"></span>
-          <button class="btn sm" v-if="isAdmin" @click="addMifTable">+ New Table</button></div>
+          <span class="muted" style="font-size:12px">Read-only — managed from the admin app</span></div>
         <div v-for="(tables, ac) in tablesByAircraft" :key="ac">
           <h3 style="color:var(--text);text-transform:none;letter-spacing:0">{{ac}}</h3>
           <div class="card" v-for="t in tables" :key="t.id">
@@ -277,8 +275,6 @@
               <strong>{{t.phaseName}}</strong>
               <span class="muted">{{(t.stages||[]).join(' / ')}}</span>
               <span class="spacer" style="flex:1"></span>
-              <button class="btn sm ghost" v-if="isAdmin" @click="addManeuver(t)">+ Maneuver</button>
-              <button class="btn sm danger" v-if="isAdmin" @click="deleteMifTable(t)">Delete</button>
             </div>
             <table style="margin-top:10px">
               <thead><tr><th>Maneuver</th><th>Weight</th><th v-for="st in (t.stages||[])" :key="st">{{st}} MIF</th></tr></thead>
@@ -286,9 +282,8 @@
                 <tr v-for="(m,idx) in (t.maneuvers||[])" :key="m.name">
                   <td>{{m.name}}</td><td>{{m.factor}}</td>
                   <td v-for="st in (t.stages||[])" :key="st">{{m.stageMifs[st]}}</td>
-                  <td v-if="isAdmin"><button class="btn sm danger" @click="deleteManeuver(t,idx)">×</button></td>
                 </tr>
-                <tr v-if="!(t.maneuvers||[]).length"><td colspan="5" class="muted">No maneuvers.</td></tr>
+                <tr v-if="!(t.maneuvers||[]).length"><td :colspan="2 + (t.stages||[]).length" class="muted">No maneuvers.</td></tr>
               </tbody>
             </table>
           </div>
@@ -351,34 +346,6 @@
           </li>
           <li v-if="!filterAnnouncements(announcements).length" class="muted">No announcements.</li>
         </ul>
-      </section>
-
-      <!-- TRAINING PROGRESS -->
-      <section v-show="tab==='progress'">
-        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
-          <div style="flex:2;min-width:150px"><label>Search cadet</label><input v-model="tpSearch" placeholder="name…" /></div>
-          <div style="flex:1;min-width:140px"><label>Aircraft</label>
-            <select v-model="tpAircraft"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:12px">
-          <div class="card" v-for="p in trainingProgress" :key="p.studentId" style="cursor:pointer" @click="openStudent(students.find(s=>s.id===p.studentId))">
-            <div class="row" style="align-items:center">
-              <strong style="font-size:15px">{{p.studentName}}</strong>
-              <span class="spacer" style="flex:1"></span>
-              <span class="pill" :class="p.failureCount>0?'bad':'good'">{{p.failureCount>0?p.failureCount+' failed':'on track'}}</span>
-            </div>
-            <div class="muted" style="margin-top:6px">{{p.currentPhase}} — {{p.aircraftType}}</div>
-            <div class="muted" style="margin-top:4px">{{p.completedTrips}} / {{p.totalTrips}} trips · Avg {{p.avgGrade.toFixed(1)}}</div>
-            <div class="row nowrap" style="margin-top:8px;gap:8px">
-              <div style="flex:1;height:8px;background:var(--bg2);border-radius:6px;overflow:hidden">
-                <div :style="{width:p.progressPercent+'%',background:p.progressPercent>=80?'var(--blue)':p.progressPercent>=50?'#4CC9F0':'var(--bad)',height:'100%'}"></div>
-              </div>
-              <span class="muted">{{p.progressPercent}}%</span>
-            </div>
-            <div class="muted" style="margin-top:4px">Last: {{fmtDateTime(p.lastFlightDate)}}</div>
-          </div>
-        </div>
-        <div v-if="!trainingProgress.length" class="muted">No students with evaluations for {{activeYearResolved}}.</div>
       </section>
 
       <!-- ANALYTICS -->
@@ -692,12 +659,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="vue.global.prod.js?v=52"></script>
-<script src="firebase-config.js?v=52"></script>
-<script src="seed.js?v=52"></script>
-<script src="faa-rag/faa_index.js?v=52"></script>
-<script src="faa-rag/faaRag.js?v=52"></script>
-<script src="store.js?v=52"></script>
-<script src="app.js?v=52"></script>
+<script src="vue.global.prod.js?v=53"></script>
+<script src="firebase-config.js?v=53"></script>
+<script src="seed.js?v=53"></script>
+<script src="faa-rag/faa_index.js?v=53"></script>
+<script src="faa-rag/faaRag.js?v=53"></script>
+<script src="store.js?v=53"></script>
+<script src="app.js?v=53"></script>
 </body>
 </html>

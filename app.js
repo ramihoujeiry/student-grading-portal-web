@@ -23,9 +23,8 @@ const app = createApp({
       // dashboard filters (mirror Android DashboardActivity)
       dashStudent: 'All Cadets', dashAircraft: 'All Aircraft',
       dashStart: '', dashEnd: '',
-      // training progress search
+      // training progress search (page removed; fields kept harmless)
       tpSearch: '', tpAircraft: 'All Aircraft',
-      // evaluations page filters
       evStudent: 'All Cadets', evAircraft: 'All Aircraft', evPhase: 'All Phases', evYear: 'All Years', evSearch: '',
 
       // ui
@@ -207,31 +206,6 @@ const app = createApp({
     },
     dashTotalHours() {
       return this.dashFilteredEvals.reduce((sum, e) => sum + this.parseHours(e.duration), 0);
-    },
-
-    // Training Progress cohort view (mirror Android TrainingProgressViewModel)
-    trainingProgress() {
-      const y = this.activeYearResolved;
-      const evalsInYear = this.evaluations.filter(e => !e.flightYear || e.flightYear === y);
-      const items = [];
-      this.students.forEach(s => {
-        let se = evalsInYear.filter(e => e.studentId === s.id || e.studentName === s.name)
-          .slice().sort((a, b) => (b.date || 0) - (a.date || 0));
-        if (this.tpAircraft && this.tpAircraft !== 'All Aircraft') se = se.filter(e => e.aircraftType === this.tpAircraft);
-        if (this.tpSearch && !s.name.toLowerCase().includes(this.tpSearch.toLowerCase())) return;
-        if (!se.length) return;
-        const latest = se[0];
-        const aircraft = latest.aircraftType, phase = latest.phaseName;
-        const table = this.mifTables.find(t => t.aircraftType === aircraft && t.phaseName === phase);
-        const totalTrips = table ? (table.stages || []).length : 0;
-        const phaseEvals = se.filter(e => e.phaseName === phase && e.aircraftType === aircraft);
-        const completed = phaseEvals.length;
-        const progress = totalTrips ? Math.min(100, Math.round((completed / totalTrips) * 100)) : 0;
-        const avg = phaseEvals.length ? (phaseEvals.reduce((s, e) => s + (e.finalGrade || 0), 0) / phaseEvals.length) : 0;
-        const failures = phaseEvals.filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD).length;
-        items.push({ studentId: s.id, studentName: s.name, aircraftType: aircraft, currentPhase: phase, completedTrips: completed, totalTrips: totalTrips, progressPercent: progress, avgGrade: avg, failureCount: failures, lastFlightDate: latest.date });
-      });
-      return items.sort((a, b) => (a.studentName || '').localeCompare(b.studentName || ''));
     },
 
     // User management (admin only) — mirror Android UserManagementActivity
