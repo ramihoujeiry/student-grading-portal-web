@@ -180,6 +180,7 @@ const app = createApp({
       const byStudent = {};
       this.evaluations.forEach(e => { (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e); });
       this.students.forEach(s => {
+        if (this.analyticsStudent && s.id !== this.analyticsStudent) return;
         const tally = {}; // maneuver -> {count, required}
         (byStudent[s.id] || []).forEach(e => (e.maneuverGrades || []).forEach(m => {
           if (m.studentGrade != null && m.studentGrade !== 0 && m.requiredMif != null && m.studentGrade < m.requiredMif) {
