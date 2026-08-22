@@ -13,7 +13,7 @@
  * ========================================================================= */
 
 export const FIREBASE_CONFIG = {
-  apiKey: "***",
+  apiKey: "AIzaSyBwW4N8lH2wa9TwsK9LeMkdm99a92GpO5Q",
   authDomain: "grading-portal-app.firebaseapp.com",
   projectId: "grading-portal-app",
   storageBucket: "grading-portal-app.firebasestorage.app",
