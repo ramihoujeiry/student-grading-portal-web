@@ -29,7 +29,7 @@
   a{color:var(--blue)}
   /* header + tabs share one sticky container so the tabs offset never desyncs from the header height */
   .app-shell{position:sticky;top:0;z-index:30}
-  header.app{background:linear-gradient(180deg,#0c151e,#0a121a);padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:2px solid var(--hud-dim);box-shadow:0 4px 18px rgba(0,0,0,.55);padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
+  header.app{background:linear-gradient(180deg,#0c151e,#0a121a);padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:2px solid var(--hud-dim);box-shadow:0 4px 18px rgba(0,0,0,.55);padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
   header.app h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.6px;color:var(--text);text-transform:uppercase;text-shadow:0 0 10px rgba(57,208,196,.25)}
   header.app h1::before{content:"◉ ";color:var(--hud);font-size:13px;vertical-align:1px}
   header.app .spacer{flex:1}
@@ -70,6 +70,11 @@
   .stat .n{font-size:24px;font-weight:800;color:var(--hud);text-shadow:0 0 12px rgba(57,208,196,.3)}
   .stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
   table{width:100%;border-collapse:collapse;font-size:13px}
+  /* Wide tables (e.g. MIF) get a horizontal scroll region on small screens instead of
+     blowing out the page width and causing body-level horizontal scroll. */
+  @media (max-width:640px){
+    .card>table{display:block;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  }
   th,td{text-align:left;padding:9px 8px;border-bottom:1px solid rgba(57,208,196,.1)}
   th{color:var(--hud);font-size:11px;text-transform:uppercase;letter-spacing:.4px;opacity:.8}
   .list{list-style:none;margin:0;padding:0}
@@ -698,8 +703,8 @@
   background-repeat:no-repeat;background-position:right 6px center}
 .notice{margin:10px 14px 0;padding:10px 12px;border-radius:10px;font-size:13px}
 .notice.pending{background:rgba(255,193,7,.15);border:1px solid rgba(255,193,7,.5);color:#ffd54f}
-.grade-row{display:grid;grid-template-columns:1fr 132px;align-items:center;gap:10px}
-.grade-pick{display:flex;flex-direction:row;gap:4px;justify-content:flex-end;width:132px}
+.grade-row{display:grid;grid-template-columns:minmax(0,1fr) max-content;align-items:center;gap:10px}
+.grade-pick{display:flex;flex-direction:row;gap:4px;justify-content:flex-end;width:auto;max-width:100%;flex-wrap:wrap}
 .grade-pick .gx{font-size:13px;line-height:1;min-width:34px;min-height:40px;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--bg2);border:1px solid var(--line);color:var(--text);font-weight:700;cursor:pointer}
 .grade-pick .gx:hover{border-color:var(--glass-line)}
 .grade-pick .gx.on{background:var(--accent);color:#fff;border-color:var(--accent)}
