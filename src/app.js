@@ -8,7 +8,7 @@ import { FIREBASE_READY } from './firebase-config.js';
 import {
   COL,
   STATUS_MEETS_STANDARD, STATUS_BELOW_STANDARD, STATUS_PENDING,
-  Auth, Store, getRag,
+  Auth, Store, getRag, fmtDate, calcFinalGrade, calcMifStatus,
   buildPerformance, generateFeedback,
   buildSingleEvalData, generateSingleEvalFeedback, buildSingleEvalPrompt,
   getAIConfig, callAIModel, callAIModelWithPrompt, getCurrentUser
@@ -568,7 +568,7 @@ export const app = createApp({
       };
       this.printEval(ev);
     },
-    deleteEval(e) { this.openConfirm({ title: 'Delete evaluation', message: 'Delete this evaluation? This cannot be undone.', confirmText: 'Delete', onOk: async () => { await Store.deleteEvaluation(e.id); } }); },
+    deleteEval(e) { this.openConfirm({ title: 'Delete evaluation', message: 'Delete this evaluation? This cannot be undone.', confirmText: 'Delete', onOk: async () => { await Store.deleteEvaluation(e); } }); },
     studentName(id) { const s = this.students.find(x => x.id === id); return s ? s.name : '?'; },
 
     /* ---- detail views ---- */

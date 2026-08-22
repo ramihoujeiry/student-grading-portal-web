@@ -223,7 +223,11 @@ export const Store = {
     }
     return ev.id;
   },
-  async deleteEvaluation(id) { await deleteDoc(doc(dbFs, COL.evaluations, id)); },
+  async deleteEvaluation(idOrObj) {
+    const id = (idOrObj && typeof idOrObj === 'object') ? (idOrObj.id || idOrObj._id) : idOrObj;
+    if (!id) throw new Error('Cannot delete evaluation: missing document id');
+    await deleteDoc(doc(dbFs, COL.evaluations, id));
+  },
 
   // announcements
   async addAnnouncement(a) { await addDoc(collection(dbFs, COL.announcements), a); },
@@ -290,7 +294,7 @@ export const Store = {
 function omitId(o) { const { id, ...rest } = o; return rest; }
 
 /* ---------- grading math (ported 1:1 from Android) ---------------------- */
-function calcFinalGrade(maneuverGrades) {
+export function calcFinalGrade(maneuverGrades) {
   if (!maneuverGrades || maneuverGrades.length === 0) return null;
   const graded = maneuverGrades.filter(m => m.studentGrade != null && m.studentGrade !== 0);
   if (graded.length === 0) return null;
@@ -302,7 +306,7 @@ function calcFinalGrade(maneuverGrades) {
   if (w === 0) return null;
   return Math.round((tw / w) * 1000) / 1000;
 }
-function calcMifStatus(maneuverGrades) {
+export function calcMifStatus(maneuverGrades) {
   const any = (maneuverGrades || []).some(m => m.studentGrade != null && m.studentGrade !== 0);
   if (!any) return STATUS_PENDING;
   let fail = 0;
@@ -319,7 +323,7 @@ function ol(s){return s>=90?'Excellent':s>=75?'Good':s>=60?'Satisfactory':'Needs
 function tl(t){return t==='IMPROVING'?'Improving':t==='DECLINING'?'Declining':'Stable';}
 function vl(v){return v<3?'Steady':v<8?'Variable':'Inconsistent';}
 function rl(r){return r==='READY'?'Ready to progress / consolidate':r==='RECOVERING'?'Recovering - keep current plan':r==='REMEDIAL'?'Remedial focus needed':'Insufficient data for a confident verdict';}
-function fmtDate(sec){if(!sec)return '-';const d=new Date(sec*1000);return d.toISOString().slice(0,10);}
+export function fmtDate(sec){if(!sec)return '-';const d=new Date(sec*1000);return d.toISOString().slice(0,10);}
 
 function avg(a){return a.reduce((s,x)=>s+x,0)/a.length;}
 function stddev(a){const m=avg(a);return Math.sqrt(a.map(x=>(x-m)*(x-m)).reduce((s,x)=>s+x,0)/a.length);}

@@ -41,6 +41,16 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = e.request.url || '';
+  // CROSS-ORIGIN API CALLS (Firebase/Firestore/Google/proxied AI) MUST bypass
+  // the service worker entirely. The SW can't satisfy Firebase's realtime
+  // Listen channel (long-poll/XHR stream); intercepting it throws
+  // "A ServiceWorker intercepted the request and encountered an unexpected error"
+  // and breaks live data. Let the browser handle these natively.
+  if (url.includes('googleapis.com') || url.includes('googleusercontent.com') ||
+      url.includes('firebaseio.com') || url.includes('gstatic.com') ||
+      url.startsWith('http') && !url.includes(self.location.host)) {
+    return; // no respondWith -> browser does a normal network request
+  }
   // Never serve a stale RAG index / API from cache -- go straight to network.
   if (isNoCache(url)) {
     e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then(r => r || caches.match('./'))));
