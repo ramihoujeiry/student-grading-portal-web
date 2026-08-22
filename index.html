@@ -13,10 +13,11 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 <style>
   :root{
+    color-scheme:dark;
     --bg:#070b10; --bg2:#0d141d; --card:#101a26; --card2:#16222f;
     --line:#1f2e3d; --text:#dce8f2; --muted:#7c93a8;
     --hud:#39d0c4; --hud-dim:#1d6f68; --amber:#ffb020;
-    --green:#46e08a; --blue:#5aa9ff; --red:#ff5d5d;
+    --green:#46e08a; --blue:#5aa9ff; --red:#ff5d5d; --bad:#ff5d5d;
     --accent:var(--hud); --accent2:#0c151e;
     --glass:rgba(18,28,40,.55); --glass-line:rgba(57,208,196,.18);
     --mono:"SFMono-Regular",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
@@ -26,7 +27,9 @@
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-text-size-adjust:100%}
   body{background-image:radial-gradient(120% 60% at 50% -10%, rgba(57,208,196,.06), transparent 60%),repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 3px);background-attachment:fixed}
   a{color:var(--blue)}
-  header.app{position:sticky;top:0;z-index:30;background:linear-gradient(180deg,#0c151e,#0a121a);padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:2px solid var(--hud-dim);box-shadow:0 4px 18px rgba(0,0,0,.55)}
+  /* header + tabs share one sticky container so the tabs offset never desyncs from the header height */
+  .app-shell{position:sticky;top:0;z-index:30}
+  header.app{background:linear-gradient(180deg,#0c151e,#0a121a);padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:2px solid var(--hud-dim);box-shadow:0 4px 18px rgba(0,0,0,.55);padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
   header.app h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.6px;color:var(--text);text-transform:uppercase;text-shadow:0 0 10px rgba(57,208,196,.25)}
   header.app h1::before{content:"◉ ";color:var(--hud);font-size:13px;vertical-align:1px}
   header.app .spacer{flex:1}
@@ -36,13 +39,13 @@
   .role-badge.instructor{background:rgba(90,169,255,.12);border-color:rgba(90,169,255,.4);color:var(--blue)}
   .role-badge.viewer{background:rgba(124,147,168,.12);border-color:rgba(124,147,168,.4);color:var(--muted)}
   .btn-logout{background:transparent;border:1px solid var(--glass-line);color:var(--hud);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
-  nav.tabs{position:sticky;top:46px;z-index:25;display:flex;flex-wrap:wrap;gap:6px;background:rgba(10,18,26,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-    border-bottom:1px solid var(--glass-line);padding:8px}
+  nav.tabs{display:flex;flex-wrap:wrap;gap:6px;background:rgba(10,18,26,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--glass-line);padding:8px;padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}
   nav.tabs .tab-btn{flex:1 1 auto;min-width:84px;background:rgba(22,34,47,.6);border:1px solid var(--line);color:var(--muted);
     padding:9px 10px;font-size:12px;font-weight:600;cursor:pointer;border-radius:9px;white-space:nowrap;text-align:center;transition:all .15s}
   nav.tabs .tab-btn:hover{color:var(--text);border-color:var(--glass-line)}
   nav.tabs .tab-btn.active{background:linear-gradient(180deg,var(--hud),var(--hud-dim));border-color:var(--hud);color:#04181a;box-shadow:0 0 12px rgba(57,208,196,.35)}
-  main{padding:14px;max-width:980px;margin:0 auto 80px}
+  main{padding:14px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));max-width:980px;margin:0 auto calc(80px + env(safe-area-inset-bottom))}
   section h2{font-size:15px;margin:4px 0 12px}
   .card{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--glass-line);border-radius:12px;padding:13px;margin-bottom:12px;
     box-shadow:0 6px 22px rgba(0,0,0,.4),inset 0 1px 0 rgba(57,208,196,.06)}
@@ -61,7 +64,7 @@
   .pill.ok{background:rgba(90,169,255,.14);border-color:rgba(90,169,255,.4);color:var(--blue)}
   .pill.bad{background:rgba(255,93,93,.14);border-color:rgba(255,93,93,.4);color:var(--red)}
   .pill.pending{background:rgba(124,147,168,.12);border-color:rgba(124,147,168,.4);color:var(--muted)}
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px}
   .stat{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--glass-line);border-radius:12px;padding:14px;text-align:center;
     box-shadow:inset 0 0 22px rgba(57,208,196,.05)}
   .stat .n{font-size:24px;font-weight:800;color:var(--hud);text-shadow:0 0 12px rgba(57,208,196,.3)}
@@ -72,11 +75,17 @@
   .list{list-style:none;margin:0;padding:0}
   .list li{background:var(--glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--glass-line);border-radius:11px;padding:12px;margin-bottom:9px}
   input,select,textarea{width:100%;background:rgba(8,14,20,.7);border:1px solid var(--line);color:var(--text);
-    border-radius:9px;padding:9px;font-size:13px;font-family:inherit;transition:border-color .15s}
-  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--hud);box-shadow:0 0 0 2px rgba(57,208,196,.15)}
+    border-radius:9px;padding:10px 12px;font-size:16px;min-height:42px;font-family:inherit;transition:border-color .15s,box-shadow .15s}
+  select{appearance:none;-webkit-appearance:none;-moz-appearance:none;cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%237c93a8' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--hud);box-shadow:0 0 0 3px rgba(57,208,196,.18)}
+  :focus-visible{outline:2px solid var(--hud);outline-offset:2px}
+  .btn:focus-visible,.tab-btn:focus-visible,.grade-pick .gx:focus-visible,.auth-mode button:focus-visible,.clickable:focus-visible{outline:2px solid var(--hud);outline-offset:2px;border-radius:9px}
+  .btn:disabled{opacity:.5;cursor:not-allowed;filter:none;box-shadow:none}
   textarea{resize:vertical;min-height:70px}
   /* Duration hr/min selects in New Evaluation — keep numbers fully visible */
-  select.dur{width:auto;flex:1 1 72px;min-width:72px;text-align:center;font-size:16px;font-weight:700;font-family:var(--mono);padding:0 6px;height:42px}
+  select.dur{width:auto;flex:1 1 72px;min-width:72px;text-align:center;font-size:16px;font-weight:700;font-family:var(--mono);padding:0 6px;height:42px;appearance:auto;-webkit-appearance:auto;background-image:none;padding-right:6px}
   /* Flight-year read-only display: never clips the "YYYY-YYYY" value */
   .fy{display:flex;align-items:center;height:42px;padding:0 10px;background:rgba(8,14,20,.7);border:1px solid var(--line);border-radius:9px;color:var(--text);font-family:var(--mono);font-size:14px;white-space:nowrap;overflow:visible}
   label{font-size:11px;color:var(--hud);display:block;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px;opacity:.85}
@@ -95,17 +104,43 @@
   .modal.full .preview{position:sticky;top:0;z-index:5;background:var(--glass);border:1px solid var(--glass-line);
     border-radius:12px;padding:12px 14px;margin:6px 0 10px;display:flex;align-items:center;gap:16px;box-shadow:0 1px 0 var(--glass-line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
   @media(min-width:640px){.modal{margin:auto;border-radius:16px}}
+  /* Section header row: title left, action(s) pinned right (P0 — .topbar had no rule) */
+  .topbar{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap}
+  .topbar h2{margin:0}
+  .topbar > .spacer{flex:1}
+  .topbar > .btn,.topbar > select{flex:0 0 auto}
   .modal h2{margin-top:4px}
-  .grade-grid{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center}
-  .grade-pick{display:flex;gap:5px}
-  .grade-pick button{flex:1;background:rgba(22,34,47,.6);border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:8px 0;font-weight:700;cursor:pointer;transition:all .15s}
-  .grade-pick button:hover{color:var(--text);border-color:var(--glass-line)}
-  .grade-pick button.on{background:linear-gradient(180deg,var(--hud),var(--hud-dim));border-color:var(--hud);color:#04181a;box-shadow:0 0 10px rgba(57,208,196,.3)}
+  .grade-pick{flex-direction:row;gap:5px;display:flex}
+  .grade-pick .gx{font-size:13px;line-height:1;min-width:30px;min-height:40px;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--bg2);border:1px solid var(--line);color:var(--text);font-weight:700;cursor:pointer}
   .preview{display:flex;gap:14px;align-items:center;margin:12px 0;border-top:1px solid var(--glass-line);padding-top:12px}
   .preview .big{font-size:28px;font-weight:800;color:var(--hud);text-shadow:0 0 12px rgba(57,208,196,.3)}
-  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(10,18,26,.92);color:var(--text);
+  .toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:rgba(10,18,26,.92);color:var(--text);
     padding:10px 18px;border-radius:24px;font-size:13px;z-index:80;opacity:.95;box-shadow:0 4px 14px rgba(0,0,0,.5);border:1px solid var(--glass-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-  footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
+  footer{text-align:center;color:var(--muted);font-size:11px;padding:18px;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+
+  /* Respect users who prefer reduced motion (vestibular safety) */
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{transition-duration:.001ms !important;animation-duration:.001ms !important;animation-iteration-count:1 !important;scroll-behavior:auto !important}
+  }
+
+  /* Print / PDF: force a light theme so "Print PDF" yields readable output */
+  @media print{
+    :root,html,body{background:#fff!important;color:#000!important}
+    body{background-image:none!important}
+    body:has(.modal-mask) main{display:none!important}
+    .app-shell,nav.tabs,footer,.toast,.notice,.year-pick{display:none!important}
+    .modal-mask{position:static!important;background:#fff!important;display:block!important;padding:0!important;overflow:visible!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+    .modal{position:static!important;max-width:100%!important;max-height:none!important;box-shadow:none!important;border:1px solid #ccc!important;background:#fff!important;padding:16px!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+    .modal.full{height:auto!important}
+    .modal-actions{display:none!important}
+    .card,.stat,.list li{background:#fff!important;color:#000!important;border:1px solid #ccc!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;break-inside:avoid}
+    table,th,td{color:#000!important;border-color:#999!important}
+    th{opacity:1!important}
+    .pill{color:#000!important;border:1px solid #999!important;background:#f0f0f0!important}
+    .maneuver-name{background:#f4f4f4!important;color:#000!important;border-left-color:#666!important}
+    .mannote{background:#f4f4f4!important;color:#000!important;border:1px solid #ccc!important}
+    *{text-shadow:none!important}
+  }
 
   /* auth screen */
   .auth-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
@@ -167,6 +202,7 @@
 
   <!-- ===== MAIN APP ===== -->
   <div v-else>
+    <div class="app-shell">
     <header class="app">
       <span class="spacer"></span>
       <label class="year-pick">Year
@@ -196,6 +232,7 @@
       <button class="tab-btn" :class="{active:tab==='ai'}" @click="setTab('ai')">AI Feedback</button>
       <button class="tab-btn" :class="{active:tab==='ask'}" @click="setTab('ask')">Ask Data</button>
     </nav>
+    </div><!-- /.app-shell -->
 
     <main>
       <!-- DASHBOARD -->
@@ -345,7 +382,7 @@
               <span class="pill" :class="a.targetRole==='all'?'ok':'pending'">{{a.targetRole}}</span>
               <span class="spacer" style="flex:1"></span>
               <span class="muted">{{fmt(a.timestamp)}}</span>
-              <button class="btn sm danger" v-if="isAdmin" @click="deleteAnnouncement(a)">×</button>
+              <button class="btn sm danger" v-if="isAdmin" aria-label="Delete announcement" @click="deleteAnnouncement(a)">×</button>
             </div>
             <div style="margin-top:6px">{{a.message}}</div>
             <div class="muted" style="margin-top:4px">From: {{a.senderName}}</div>
@@ -647,7 +684,7 @@
     </div>
   </div>
 
-  <div class="toast" v-if="toast">{{toast}}</div>
+  <div class="toast" role="status" aria-live="polite" v-if="toast">{{toast}}</div>
   <footer v-if="loggedIn">Student Grading Portal · web PWA · Firebase</footer>
 </div>
 
@@ -656,12 +693,15 @@
 .clickable{cursor:pointer;transition:background .15s}
 .clickable:active{background:var(--bg2)}
 .year-pick{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-.year-pick select{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 6px;font-size:12px}
+.year-pick select{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 22px 4px 8px;font-size:12px;appearance:none;-webkit-appearance:none;cursor:pointer;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%23ffffff' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat:no-repeat;background-position:right 6px center}
 .notice{margin:10px 14px 0;padding:10px 12px;border-radius:10px;font-size:13px}
 .notice.pending{background:rgba(255,193,7,.15);border:1px solid rgba(255,193,7,.5);color:#ffd54f}
 .grade-row{display:grid;grid-template-columns:1fr 132px;align-items:center;gap:10px}
 .grade-pick{display:flex;flex-direction:row;gap:4px;justify-content:flex-end;width:132px}
-.grade-pick .gx{font-size:13px;line-height:1;width:30px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--bg2);border:1px solid var(--line);color:var(--text);font-weight:700;cursor:pointer}
+.grade-pick .gx{font-size:13px;line-height:1;min-width:34px;min-height:40px;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--bg2);border:1px solid var(--line);color:var(--text);font-weight:700;cursor:pointer}
+.grade-pick .gx:hover{border-color:var(--glass-line)}
 .grade-pick .gx.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .grade-pick .gx.on.meets{background:#2e7d32}
 .grade-pick .gx.on.below{background:#c62828}
