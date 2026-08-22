@@ -28,6 +28,10 @@ inside the Android app):
 1. Firebase console → **Project settings** → **Your apps** → Web app → copy the `apiKey`.
    (Or copy `current_key` from your real `google-services.json`.)
 2. Paste it into `firebase-config.js` as `apiKey: "AIzaSy...."`.
+   The key is a 39-character string that **must start with `AIzaSy`**
+   (e.g. `AIzaSy...`); the app will not connect until a real `AIzaSy...` key
+   replaces the `PASTE_...` placeholder. Do not leave the `PASTE_` placeholder
+   or the masked `«reda...»` value in place.
 3. Deploy: `git add firebase-config.js && git commit -m "config" && git push`.
 
 Also make sure:
