@@ -158,7 +158,7 @@ export const Store = {
       return out;
     };
     const unsub = onSnapshot(q, snap => {
-      let list = snap.docs.map(d => ({ id: d.id, ...norm(d.data()) }));
+      let list = snap.docs.map(d => ({ ...norm(d.data()), id: d.id }));
       if (opts.activeOnly) list = list.filter(x => x.active);
       cb(list);
     }, err => { console.error('watch', collectionName, err); cb([]); });
