@@ -1,0 +1,28 @@
+network,metric,label,n_runs,avg,p90,baseline_median,delta_vs_baseline_pct,regression,target_avg,target_p90,out_of_range
+wifi,performance-score,Perf score,6,63.7,75.0,50,27.4,ok,FAIL,FAIL,YES
+wifi,first-contentful-paint,FCP (ms),6,1606.9,1939.2855,2137.766,-24.8,ok,PASS,FAIL,no
+wifi,largest-contentful-paint,LCP (ms),6,4247.1,7288.222,9625.552,-55.9,ok,FAIL,FAIL,YES
+wifi,total-blocking-time,TBT (ms),6,779.4,1122.3755,564.3239999999987,38.1,REGRESSION,FAIL,FAIL,YES
+wifi,speed-index,Speed Index (ms),6,6754.3,7712.0,9106,-25.8,ok,FAIL,FAIL,YES
+wifi,cumulative-layout-shift,CLS,6,0,0.0,0,,ok,PASS,PASS,no
+wifi,time-to-interactive,TTI (ms),6,7335.4,8316.86,9498.775,-22.8,ok,FAIL,FAIL,YES
+wifi,max-potential-fid,maxFID (ms),6,500.2,588.4975,460.198,8.7,ok,FAIL,FAIL,YES
+wifi,server-response-time,Server resp (ms),6,180.8,230.5,254,-28.8,ok,n/a,n/a,no
+4g,performance-score,Perf score,6,47.5,56.0,34,39.7,ok,FAIL,FAIL,YES
+4g,first-contentful-paint,FCP (ms),6,1643.3,2439.2015,2148.949,-23.5,ok,PASS,PASS,no
+4g,largest-contentful-paint,LCP (ms),6,4155.7,5542.672500000001,7097.9435,-41.5,ok,FAIL,FAIL,YES
+4g,total-blocking-time,TBT (ms),6,4468.6,5024.25,5931.5,-24.7,ok,FAIL,FAIL,YES
+4g,speed-index,Speed Index (ms),6,11126.7,13539.126758589642,21186.483898341467,-47.5,ok,FAIL,FAIL,YES
+4g,cumulative-layout-shift,CLS,6,0,0.0,0,,ok,PASS,PASS,no
+4g,time-to-interactive,TTI (ms),6,6894.5,7672.851500000001,8352.109,-17.5,ok,FAIL,FAIL,YES
+4g,max-potential-fid,maxFID (ms),6,1678.8,1841.0,2048.9999999999995,-18.1,ok,FAIL,FAIL,YES
+4g,server-response-time,Server resp (ms),6,243.8,445.0,342,-28.7,ok,n/a,n/a,no
+3g,performance-score,Perf score,6,31.3,35.0,44,-28.9,REGRESSION,FAIL,FAIL,YES
+3g,first-contentful-paint,FCP (ms),6,3183.3,3662.9935000000005,2614.1220000000003,21.8,REGRESSION,PASS,PASS,YES
+3g,largest-contentful-paint,LCP (ms),6,11341.5,13219.954,3880.0110000000004,192.3,REGRESSION,FAIL,FAIL,YES
+3g,total-blocking-time,TBT (ms),6,3852.7,4912.0,4645.000000000002,-17.1,ok,FAIL,FAIL,YES
+3g,speed-index,Speed Index (ms),6,27699.4,35715.246645190135,29669.248982028093,-6.6,ok,FAIL,FAIL,YES
+3g,cumulative-layout-shift,CLS,6,0.0,0.0859375,0,,ok,PASS,PASS,no
+3g,time-to-interactive,TTI (ms),6,14003.8,14306.7195,13979.196000000002,0.2,ok,FAIL,FAIL,YES
+3g,max-potential-fid,maxFID (ms),6,1547.2,1741.0,1351,14.5,ok,FAIL,FAIL,YES
+3g,server-response-time,Server resp (ms),6,327.2,639.5,146,124.1,REGRESSION,n/a,n/a,YES

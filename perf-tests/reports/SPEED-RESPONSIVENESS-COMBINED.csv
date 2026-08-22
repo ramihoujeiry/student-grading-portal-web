@@ -1,0 +1,4 @@
+network,cwv_perf_score,cwv_FCP_ms,cwv_LCP_ms,cwv_TBT_ms,cwv_SpeedIndex_ms,cwv_CLS,cwv_TTI_ms,cwv_maxFID_ms,cwv_serverResp_ms,launch_auth_interactive_ms,launch_DCL_ms,launch_full_load_ms,launch_FCP_ms,transition_ms,api_pi_outcomes,api_pi_median_ms,api_firebase_ms,api_vue_global_ms,api_faa_index_ms,api_app_js_ms
+wifi,56,1479,5927,691,5760,0,6981,534,222,25530,22926,22952,3708,858,error/error/error,359,2263,586,777,269
+4g,42,1185,5492,4490,9465,0,6417,1756,108,40563,38668,38796,4112,808,error/error/error,843,965,1546,1434,1057
+3g,31,2777,13077,4544,19738,0,13877,1711,103,44018,41772,41869,3868,892,error/error/error,429,1445,1771,1937,807

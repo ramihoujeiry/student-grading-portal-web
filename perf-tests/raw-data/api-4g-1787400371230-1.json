@@ -1,0 +1,102 @@
+{
+  "network": "4g",
+  "run": 1,
+  "pi": {
+    "outcome": "error",
+    "error": "TypeError",
+    "totalMs": 694
+  },
+  "assets": [
+    {
+      "url": "https://ramihoujeiry.github.io/student-grading-portal-web/manifest.webmanifest",
+      "type": "link",
+      "duration": 1037.8000000044703,
+      "ttfb": 991.2000000029802,
+      "transfer": 603
+    },
+    {
+      "url": "https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js",
+      "type": "script",
+      "duration": 1812.3999999985099,
+      "ttfb": -7628.89999999851,
+      "transfer": 0
+    },
+    {
+      "url": "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js",
+      "type": "script",
+      "duration": 595.5,
+      "ttfb": -9601.89999999851,
+      "transfer": 0
+    },
+    {
+      "url": "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js",
+      "type": "script",
+      "duration": 1494.4000000059605,
+      "ttfb": -11566.79999999702,
+      "transfer": 0
+    },
+    {
+      "url": "https://ramihoujeiry.github.io/student-grading-portal-web/vue.global.prod.js?v=63",
+      "type": "script",
+      "duration": 879.5,
+      "ttfb": 284.3999999985099,
+      "transfer": 61563
+    },
+    {
+      "url": "https://ramihoujeiry.github.io/student-grading-portal-web/firebase-config.js?v=63",
+      "type": "script",
+      "duration": 299.8999999985099,
+      "ttfb": 263.6000000014901,
+      "transfer": 956
+    },
+    {
+      "url": "https://ramihoujeiry.github.io/student-grading-portal-web/seed.js?v=63",
+      "type": "script",
+      "duration": 318.30000000447035,
+      "ttfb": 249.5,
+      "transfer": 2179
+    },
+    {
+      "url": "https://ramihoujeiry.github.io/student-grading-portal-web/faa-rag/faa_index.js?v=63",
+      "type": "script",
+      "duration": 652.1000000014901,
+      "ttfb": 233.70000000298023,
+      "transfer": 53560
+    },
+    {
+      "url": "https://ramihoujeiry.github.io/student-grading-portal-web/faa-rag/faaRag.js?v=63",
+      "type": "script",
+      "duration": 361.19999999552965,
+      "ttfb": 312.8999999985099,
+      "transfer": 3229
+    },
+    {
+      "url": "https://ramihoujeiry.github.io/student-grading-portal-web/store.js?v=63",
+      "type": "script",
+      "duration": 479.80000000447035,
+      "ttfb": 268.20000000298023,
+      "transfer": 11035
+    },
+    {
+      "url": "https://ramihoujeiry.github.io/student-grading-portal-web/app.js?v=63",
+      "type": "script",
+      "duration": 554.1999999955297,
+      "ttfb": 418.69999999552965,
+      "transfer": 13549
+    },
+    {
+      "url": "https://ramihoujeiry.github.io/student-grading-portal-web/icons/icon-192.png",
+      "type": "other",
+      "duration": 1065.3999999985099,
+      "ttfb": 825.3999999985099,
+      "transfer": 31311
+    },
+    {
+      "url": "https://ramihoujeiry.github.io/student-grading-portal-web/icons/icon-192.png",
+      "type": "other",
+      "duration": 1044.1000000014901,
+      "ttfb": 832.8000000044703,
+      "transfer": 0
+    }
+  ]
+}

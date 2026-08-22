@@ -3,9 +3,18 @@
  * Auth-gated. Mirrors the Android app's role model (admin/instructor/viewer/pending).
  * ========================================================================= */
 
-const { createApp } = Vue;
+import { createApp } from 'vue';
+import { FIREBASE_READY } from './firebase-config.js';
+import {
+  COL,
+  STATUS_MEETS_STANDARD, STATUS_BELOW_STANDARD, STATUS_PENDING,
+  Auth, Store, getRag,
+  buildPerformance, generateFeedback,
+  buildSingleEvalData, generateSingleEvalFeedback, buildSingleEvalPrompt,
+  getAIConfig, callAIModel, callAIModelWithPrompt, getCurrentUser
+} from './store.js';
 
-const app = createApp({
+export const app = createApp({
   data() {
     return {
       tab: 'dashboard',
@@ -583,7 +592,7 @@ const app = createApp({
       const data = buildPerformance(student, evals);
       // Warm the RAG index so status() is accurate, then call the model.
       let ragOk = false;
-      try { if (typeof FaaRag !== 'undefined') { await FaaRag.loadIndex(); ragOk = (FaaRag.status() === 'ok'); } } catch (e) {}
+      try { const FaaRag = await getRag(); await FaaRag.loadIndex(); ragOk = (FaaRag.status() === 'ok'); } catch (e) {}
       this.aiRagStatus = ragOk ? 'ok' : 'failed';
       // Try the online model first; fall back to the offline template on any problem.
       try {
@@ -1155,17 +1164,14 @@ const app = createApp({
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=65').catch(() => {});
     // Warm the RAG index on load so the AI tab can show live status immediately.
     // Also drive the header AI badge (audit item 13): reflect live vs offline-template.
-    if (typeof FaaRag !== 'undefined') {
-      FaaRag.loadIndex().then(() => { this.ragReady = (FaaRag.status() === 'ok'); this._setAiBadge('live'); })
-        .catch(() => { this.ragReady = false; this._setAiBadge('offline'); });
-    } else {
-      this.ragReady = false;
-      this._setAiBadge('offline');
-    }
+    // RAG index is loaded lazily (dynamic import in store.getRag) only when a
+    // debrief runs. We just reflect 'checking' here so the UI doesn't block.
+    this.ragReady = null;
+    this._setAiBadge('checking');
     if (this.fbReady) {
       // Seed current user immediately in case the session is already restored
       // before the onAuthStateChanged listener attaches.
-      if (auth && auth.currentUser) this.onUser(auth.currentUser);
+      if (getCurrentUser()) this.onUser(getCurrentUser());
       Auth.onUser(u => this.onUser(u));
     }
   },
@@ -1179,6 +1185,6 @@ function blankEval() {
   };
 }
 
-app.mount('#app');
-// expose for debugging/automation
-window.__app = app;
+// NOTE: mount is performed by src/main.js after Vue + Firebase + RAG are wired.
+// Expose for debugging/automation.
+if (typeof window !== 'undefined') window.__app = app;

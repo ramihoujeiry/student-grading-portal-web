@@ -1,0 +1,59 @@
+{
+  "url": "https://ramihoujeiry.github.io/student-grading-portal-web/",
+  "generatedAt": "2026-08-22T12:50:24.466Z",
+  "runsPerNetwork": 3,
+  "maxAttempts": 9,
+  "results": [
+    {
+      "network": "4g",
+      "runCount": 3,
+      "attempts": 3,
+      "runs": [
+        {
+          "performance-score": 56,
+          "first-contentful-paint": 2177.318,
+          "largest-contentful-paint": 2530.818,
+          "total-blocking-time": 4965.5,
+          "speed-index": 9486.752175941283,
+          "cumulative-layout-shift": 0,
+          "time-to-interactive": 7973.468000000001,
+          "max-potential-fid": 1861,
+          "server-response-time": 155
+        },
+        {
+          "performance-score": 42,
+          "first-contentful-paint": 1185.127,
+          "largest-contentful-paint": 5491.754000000001,
+          "total-blocking-time": 4215,
+          "speed-index": 8114.455105062153,
+          "cumulative-layout-shift": 0,
+          "time-to-interactive": 6217.827000000001,
+          "max-potential-fid": 1756,
+          "server-response-time": 108
+        },
+        {
+          "performance-score": 41,
+          "first-contentful-paint": 1070.179,
+          "largest-contentful-paint": 5593.591,
+          "total-blocking-time": 4490,
+          "speed-index": 9465.463527228701,
+          "cumulative-layout-shift": 0,
+          "time-to-interactive": 6417.379000000001,
+          "max-potential-fid": 1644,
+          "server-response-time": 108
+        }
+      ],
+      "median": {
+        "performance-score": 42,
+        "first-contentful-paint": 1185.127,
+        "largest-contentful-paint": 5491.754000000001,
+        "total-blocking-time": 4490,
+        "speed-index": 9465.463527228701,
+        "cumulative-layout-shift": 0,
+        "time-to-interactive": 6417.379000000001,
+        "max-potential-fid": 1756,
+        "server-response-time": 108
+      }
+    }
+  ]
+}

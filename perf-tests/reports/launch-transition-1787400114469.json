@@ -1,0 +1,136 @@
+{
+  "url": "https://ramihoujeiry.github.io/student-grading-portal-web/",
+  "generatedAt": "2026-08-22T12:01:54.450Z",
+  "test": "launch-transition",
+  "results": [
+    {
+      "network": "wifi",
+      "runCount": 3,
+      "runs": [
+        {
+          "network": "wifi",
+          "run": 1,
+          "launch_auth_interactive_ms": 32199,
+          "dom_content_loaded_ms": 30687.20000000298,
+          "full_load_ms": 30801.89999999851,
+          "first_contentful_paint_ms": 3708,
+          "transition_signin_to_register_ms": 668,
+          "transition_available": true
+        },
+        {
+          "network": "wifi",
+          "run": 2,
+          "launch_auth_interactive_ms": 19979,
+          "dom_content_loaded_ms": 18109.89999999851,
+          "full_load_ms": 18338.29999999702,
+          "first_contentful_paint_ms": 3740,
+          "transition_signin_to_register_ms": 858,
+          "transition_available": true
+        },
+        {
+          "network": "wifi",
+          "run": 3,
+          "launch_auth_interactive_ms": 25530,
+          "dom_content_loaded_ms": 22926.19999999553,
+          "full_load_ms": 22951.89999999851,
+          "first_contentful_paint_ms": 3468,
+          "transition_signin_to_register_ms": 882,
+          "transition_available": true
+        }
+      ],
+      "median": {
+        "launch_auth_interactive_ms": 25530,
+        "dom_content_loaded_ms": 22926.19999999553,
+        "full_load_ms": 22951.89999999851,
+        "first_contentful_paint_ms": 3708,
+        "transition_signin_to_register_ms": 858
+      }
+    },
+    {
+      "network": "4g",
+      "runCount": 3,
+      "runs": [
+        {
+          "network": "4g",
+          "run": 1,
+          "launch_auth_interactive_ms": 40563,
+          "dom_content_loaded_ms": 38768.10000000149,
+          "full_load_ms": 38967.39999999851,
+          "first_contentful_paint_ms": 5720,
+          "transition_signin_to_register_ms": 1276,
+          "transition_available": true
+        },
+        {
+          "network": "4g",
+          "run": 2,
+          "launch_auth_interactive_ms": 34231,
+          "dom_content_loaded_ms": 32099.10000000149,
+          "full_load_ms": 32108.5,
+          "first_contentful_paint_ms": 4112,
+          "transition_signin_to_register_ms": 808,
+          "transition_available": true
+        },
+        {
+          "network": "4g",
+          "run": 3,
+          "launch_auth_interactive_ms": 41331,
+          "dom_content_loaded_ms": 38667.69999999553,
+          "full_load_ms": 38796.5,
+          "first_contentful_paint_ms": 3612,
+          "transition_signin_to_register_ms": 738,
+          "transition_available": true
+        }
+      ],
+      "median": {
+        "launch_auth_interactive_ms": 40563,
+        "dom_content_loaded_ms": 38667.69999999553,
+        "full_load_ms": 38796.5,
+        "first_contentful_paint_ms": 4112,
+        "transition_signin_to_register_ms": 808
+      }
+    },
+    {
+      "network": "3g",
+      "runCount": 3,
+      "runs": [
+        {
+          "network": "3g",
+          "run": 1,
+          "launch_auth_interactive_ms": 44018,
+          "dom_content_loaded_ms": 41771.5,
+          "full_load_ms": 41868.60000000149,
+          "first_contentful_paint_ms": 3868,
+          "transition_signin_to_register_ms": 879,
+          "transition_available": true
+        },
+        {
+          "network": "3g",
+          "run": 2,
+          "launch_auth_interactive_ms": 39090,
+          "dom_content_loaded_ms": 36540.30000000447,
+          "full_load_ms": 36801.89999999851,
+          "first_contentful_paint_ms": 4356,
+          "transition_signin_to_register_ms": 892,
+          "transition_available": true
+        },
+        {
+          "network": "3g",
+          "run": 3,
+          "launch_auth_interactive_ms": 44157,
+          "dom_content_loaded_ms": 42640.10000000149,
+          "full_load_ms": 42837.60000000149,
+          "first_contentful_paint_ms": 3392,
+          "transition_signin_to_register_ms": 1590,
+          "transition_available": true
+        }
+      ],
+      "median": {
+        "launch_auth_interactive_ms": 44018,
+        "dom_content_loaded_ms": 41771.5,
+        "full_load_ms": 41868.60000000149,
+        "first_contentful_paint_ms": 3868,
+        "transition_signin_to_register_ms": 892
+      }
+    }
+  ]
+}

@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#1a237e" />
 <title>Student Grading Portal</title>
-<!-- Security: lock down script/style/connection origins. gstatic is allowed for the Firebase compat CDN;
-     'unsafe-eval' is required by Vue's no-build runtime template compiler (new Function). Inline handlers are blocked. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://www.gstatic.com 'unsafe-eval'; connect-src 'self' https://raspberrypi.tail3a08db.ts.net https://*.firebaseio.com https://*.firebasestorage.googleapis.com https://*.googleapis.com; manifest-src 'self'; worker-src 'self'" />
+<!-- Security: lock down script/connection origins. App is a bundled ESM SPA (no inline handlers, no cross-origin runtime).
+     'unsafe-eval' is required by Vue's runtime template compiler for the in-DOM template. All scripts are same-origin (bundled). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'; connect-src 'self' https://raspberrypi.tail3a08db.ts.net https://*.firebaseio.com https://*.firebasestorage.googleapis.com https://*.googleapis.com; manifest-src 'self'; worker-src 'self'" />
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.png" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -906,15 +906,6 @@ html.light-theme .maneuver-name.below{background:rgba(210,59,59,.12)}
 .import-ok{background:rgba(70,224,138,.1);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:8px;font-size:12px;margin-top:8px}
 textarea.csv-input{width:100%;min-height:160px;font-family:var(--mono);font-size:12px}
 </style>
-<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js" integrity="sha384-3dQMr5IYbX54CRsE04108MMs7jeEV/IWSMASoZPvju7G87xGB1a2oHweoRc6Fc4z" crossorigin="anonymous"></script>
-<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js" integrity="sha384-5I6kB//hXDU3+uF6P5whMNsiMpLfjPrRMnO628LkoLTV1F4roavOGYGkaES3TPAa" crossorigin="anonymous"></script>
-<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js" integrity="sha384-x/Sc6BbQTFJ8Xok/nKTwZ6hrjKCAPuoiUBD0gRRS0yNLtHZiq2MpDvGVEGBUQefs" crossorigin="anonymous"></script>
-<script src="vue.global.prod.js?v=63" integrity="sha384-arPHRzOKPl8g3Rbe/cQBWYPnq4HcxfPFSFWD3qvI/hc2XQf+4GkVqkOlWgjN5mD3" crossorigin="anonymous"></script>
-<script src="firebase-config.js?v=65"></script>
-<script src="seed.js?v=65"></script>
-<script src="faa-rag/faa_index.js?v=65"></script>
-<script src="faa-rag/faaRag.js?v=65"></script>
-<script src="store.js?v=65"></script>
-<script src="app.js?v=65"></script>
+<script type="module" src="./main.js"></script>
 </body>
 </html>

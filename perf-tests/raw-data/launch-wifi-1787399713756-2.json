@@ -1,0 +1,10 @@
+{
+  "network": "wifi",
+  "run": 2,
+  "launch_auth_interactive_ms": 19979,
+  "dom_content_loaded_ms": 18109.89999999851,
+  "full_load_ms": 18338.29999999702,
+  "first_contentful_paint_ms": 3740,
+  "transition_signin_to_register_ms": 858,
+  "transition_available": true
+}

@@ -1,0 +1,155 @@
+{
+  "test": "core-web-vitals-lighthouse",
+  "networks": {
+    "wifi": {
+      "runCount": 3,
+      "attempts": 3,
+      "median": {
+        "performance-score": 56,
+        "first-contentful-paint": 1478.732,
+        "largest-contentful-paint": 5926.981,
+        "total-blocking-time": 691.1890000000008,
+        "speed-index": 5760,
+        "cumulative-layout-shift": 0,
+        "time-to-interactive": 6981.206,
+        "max-potential-fid": 534.134,
+        "server-response-time": 222
+      },
+      "rawRuns": [
+        {
+          "performance-score": 69,
+          "first-contentful-paint": 1261.72,
+          "largest-contentful-paint": 1926.455,
+          "total-blocking-time": 1410.5720000000003,
+          "speed-index": 5760,
+          "cumulative-layout-shift": 0,
+          "time-to-interactive": 7365.098,
+          "max-potential-fid": 592.926,
+          "server-response-time": 222
+        },
+        {
+          "performance-score": 53,
+          "first-contentful-paint": 2257.454,
+          "largest-contentful-paint": 7149.39,
+          "total-blocking-time": 577.127,
+          "speed-index": 6874,
+          "cumulative-layout-shift": 0,
+          "time-to-interactive": 6981.206,
+          "max-potential-fid": 514.043,
+          "server-response-time": 239
+        },
+        {
+          "performance-score": 56,
+          "first-contentful-paint": 1478.732,
+          "largest-contentful-paint": 5926.981,
+          "total-blocking-time": 691.1890000000008,
+          "speed-index": 5665,
+          "cumulative-layout-shift": 0,
+          "time-to-interactive": 5787.73,
+          "max-potential-fid": 534.134,
+          "server-response-time": 158
+        }
+      ]
+    },
+    "4g": {
+      "runCount": 3,
+      "attempts": 3,
+      "median": {
+        "performance-score": 42,
+        "first-contentful-paint": 1185.127,
+        "largest-contentful-paint": 5491.754000000001,
+        "total-blocking-time": 4490,
+        "speed-index": 9465.463527228701,
+        "cumulative-layout-shift": 0,
+        "time-to-interactive": 6417.379000000001,
+        "max-potential-fid": 1756,
+        "server-response-time": 108
+      },
+      "rawRuns": [
+        {
+          "performance-score": 56,
+          "first-contentful-paint": 2177.318,
+          "largest-contentful-paint": 2530.818,
+          "total-blocking-time": 4965.5,
+          "speed-index": 9486.752175941283,
+          "cumulative-layout-shift": 0,
+          "time-to-interactive": 7973.468000000001,
+          "max-potential-fid": 1861,
+          "server-response-time": 155
+        },
+        {
+          "performance-score": 42,
+          "first-contentful-paint": 1185.127,
+          "largest-contentful-paint": 5491.754000000001,
+          "total-blocking-time": 4215,
+          "speed-index": 8114.455105062153,
+          "cumulative-layout-shift": 0,
+          "time-to-interactive": 6217.827000000001,
+          "max-potential-fid": 1756,
+          "server-response-time": 108
+        },
+        {
+          "performance-score": 41,
+          "first-contentful-paint": 1070.179,
+          "largest-contentful-paint": 5593.591,
+          "total-blocking-time": 4490,
+          "speed-index": 9465.463527228701,
+          "cumulative-layout-shift": 0,
+          "time-to-interactive": 6417.379000000001,
+          "max-potential-fid": 1644,
+          "server-response-time": 108
+        }
+      ]
+    },
+    "3g": {
+      "runCount": 3,
+      "attempts": 3,
+      "median": {
+        "performance-score": 31,
+        "first-contentful-paint": 2776.6309999999994,
+        "largest-contentful-paint": 13077.100999999999,
+        "total-blocking-time": 4544,
+        "speed-index": 19737.887567047852,
+        "cumulative-layout-shift": 0,
+        "time-to-interactive": 13877.101000000002,
+        "max-potential-fid": 1711,
+        "server-response-time": 103
+      },
+      "rawRuns": [
+        {
+          "performance-score": 28,
+          "first-contentful-paint": 3552.2200000000003,
+          "largest-contentful-paint": 13077.100999999999,
+          "total-blocking-time": 5279.999999999999,
+          "speed-index": 22812.018455649802,
+          "cumulative-layout-shift": 0,
+          "time-to-interactive": 13877.101000000002,
+          "max-potential-fid": 1771,
+          "server-response-time": 101
+        },
+        {
+          "performance-score": 31,
+          "first-contentful-paint": 2776.6309999999994,
+          "largest-contentful-paint": 11988.116999999998,
+          "total-blocking-time": 3938,
+          "speed-index": 19067.338695098064,
+          "cumulative-layout-shift": 0,
+          "time-to-interactive": 13608.116999999998,
+          "max-potential-fid": 1682,
+          "server-response-time": 103
+        },
+        {
+          "performance-score": 32,
+          "first-contentful-paint": 2491.5570000000002,
+          "largest-contentful-paint": 13095.087,
+          "total-blocking-time": 4544,
+          "speed-index": 19737.887567047852,
+          "cumulative-layout-shift": 0,
+          "time-to-interactive": 13915.087000000003,
+          "max-potential-fid": 1711,
+          "server-response-time": 219
+        }
+      ]
+    }
+  }
+}

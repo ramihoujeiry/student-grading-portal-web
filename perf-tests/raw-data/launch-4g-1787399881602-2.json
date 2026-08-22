@@ -1,0 +1,10 @@
+{
+  "network": "4g",
+  "run": 2,
+  "launch_auth_interactive_ms": 34231,
+  "dom_content_loaded_ms": 32099.10000000149,
+  "full_load_ms": 32108.5,
+  "first_contentful_paint_ms": 4112,
+  "transition_signin_to_register_ms": 808,
+  "transition_available": true
+}

@@ -9,25 +9,49 @@
  *   - real-time listeners keep the UI in sync
  *   - grading math + AI feedback (ported from the Android app) are preserved
  *
- * Grading math / AI feedback functions are kept from the previous local build.
+ * PERF REMEDIATION (t_c6ab4fc3): converted from the Firebase *compat* SDK
+ * (3 cross-origin gstatic.com scripts) to the ESM *modular* SDK, bundled
+ * locally by Vite. The RAG index is no longer loaded eagerly — it is imported
+ * via dynamic import() only when AI Feedback / debrief runs (see getRag()).
+ *
+ * Exported symbols (consumed by app.js / main.js):
+ *   FIREBASE_CONFIG, FIREBASE_READY, Auth, Store, COL,
+ *   STATUS_MEETS_STANDARD, STATUS_BELOW_STANDARD, STATUS_PENDING, GRADE_SCORE,
+ *   LAN_AI_ENABLED, LAN_AI_ENDPOINT, LAN_AI_MODEL,
+ *   getAIConfig, callAIModel, callAIModelWithPrompt,
+ *   buildPerformance, generateFeedback,
+ *   buildSingleEvalData, generateSingleEvalFeedback, buildSingleEvalPrompt,
+ *   getRag (lazy-loads the FAA RAG layer), getRagIndex (raw index, lazy)
  * ========================================================================= */
+
+import { initializeApp } from 'firebase/app';
+import {
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signOut, onAuthStateChanged, sendEmailVerification
+} from 'firebase/auth';
+import {
+  getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
+  deleteDoc, onSnapshot, query, orderBy, limit, where, writeBatch, serverTimestamp
+} from 'firebase/firestore';
+import { FIREBASE_CONFIG, FIREBASE_READY } from './firebase-config.js';
+import { SEED } from './seed.js';
 
 /* ---------- Firebase bootstrap (gated on a real config) ------------------ */
 let auth = null, dbFs = null, fbReady = false;
-if (typeof FIREBASE_CONFIG !== 'undefined' && FIREBASE_READY) {
-  firebase.initializeApp(FIREBASE_CONFIG);
-  auth = firebase.auth();
-  dbFs = firebase.firestore();
+if (FIREBASE_READY) {
+  const app = initializeApp(FIREBASE_CONFIG);
+  auth = getAuth(app);
+  dbFs = getFirestore(app);
   fbReady = true;
 }
 
 /* ---------- constants (mirror Android Constants.kt) --------------------- */
-const STATUS_MEETS_STANDARD = 'MEETS STANDARD';
-const STATUS_BELOW_STANDARD = 'BELOW STANDARD';
-const STATUS_PENDING = 'PENDING';
-const GRADE_SCORE = { 0: 0, 1: 65, 2: 75, 3: 85, 4: 95 };
+export const STATUS_MEETS_STANDARD = 'MEETS STANDARD';
+export const STATUS_BELOW_STANDARD = 'BELOW STANDARD';
+export const STATUS_PENDING = 'PENDING';
+export const GRADE_SCORE = { 0: 0, 1: 65, 2: 75, 3: 85, 4: 95 };
 
-const COL = {
+export const COL = {
   users: 'users', students: 'students', instructors: 'instructors',
   aircraft: 'aircraft', mifTables: 'mif_tables', evaluations: 'evaluations',
   announcements: 'announcements'
@@ -39,28 +63,41 @@ const COL = {
    stored in /home/pi/.hermes/.env (key never reaches the browser). Used when
    no Firestore config/ai doc is set. For cloud use, set config/ai (admin-
    only write) and this LAN default is ignored. */
-const LAN_AI_ENABLED = true;
-const LAN_AI_ENDPOINT = 'https://raspberrypi.tail3a08db.ts.net/v1/chat/completions';
-const LAN_AI_MODEL = 'tencent/hy3:free';
+export const LAN_AI_ENABLED = true;
+export const LAN_AI_ENDPOINT = 'https://raspberrypi.tail3a08db.ts.net/v1/chat/completions';
+export const LAN_AI_MODEL = 'tencent/hy3:free';
+
+/* ---------- lazy RAG access ---------------------------------------------- */
+/* The FAA / UH-1 / Robinson FTG index is big (~220KB) and only needed when a
+   debrief actually runs. We load it on demand through dynamic import() so it
+   is never on the cold landing path. */
+let _ragPromise = null;
+async function getRag() {
+  if (!_ragPromise) {
+    _ragPromise = import('./faa-rag/faaRag.js').then(m => m.FaaRag);
+  }
+  return _ragPromise;
+}
+export { getRag };
 
 /* ---------- auth service ------------------------------------------------- */
-const Auth = {
+export const Auth = {
   ready: fbReady,
-  onUser(cb) { if (!fbReady) return () => {}; return auth.onAuthStateChanged(cb); },
+  onUser(cb) { if (!fbReady) return () => {}; return onAuthStateChanged(auth, cb); },
 
   async login(email, password) {
-    const u = await auth.signInWithEmailAndPassword(email, password);
+    const u = await signInWithEmailAndPassword(auth, email, password);
     if (u.user && !u.user.emailVerified) {
-      await auth.signOut();
+      await signOut(auth);
       throw new Error('Please verify your email before logging in. Check your inbox.');
     }
     return u;
   },
   async register(email, password, fullName) {
-    const u = await auth.createUserWithEmailAndPassword(email, password);
+    const u = await createUserWithEmailAndPassword(auth, email, password);
     if (u.user) {
-      await u.user.sendEmailVerification();
-      await dbFs.collection(COL.users).doc(u.user.uid).set({
+      await sendEmailVerification(u.user);
+      await setDoc(doc(dbFs, COL.users, u.user.uid), {
         uid: u.user.uid, name: fullName, email: email, role: 'pending'
       });
     }
@@ -71,10 +108,10 @@ const Auth = {
   // pending one so they appear in the admin tab and the app doesn't dead-end.
   async upsertUserDoc(u) {
     if (!fbReady || !u) return;
-    const ref = dbFs.collection(COL.users).doc(u.uid);
-    const snap = await ref.get();
-    if (!snap.exists) {
-      await ref.set({
+    const ref = doc(dbFs, COL.users, u.uid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      await setDoc(ref, {
         uid: u.uid,
         name: u.displayName || (u.email ? u.email.split('@')[0] : 'Unknown'),
         email: u.email || '',
@@ -82,24 +119,31 @@ const Auth = {
       });
     }
   },
-  async logout() { if (fbReady) await auth.signOut(); },
+  async logout() { if (fbReady) await signOut(auth); },
   async roleOf(uid) {
     if (!fbReady || !uid) return 'pending';
-    const doc = await dbFs.collection(COL.users).doc(uid).get();
-    return (doc.exists && doc.data().role) || 'pending';
+    const d = await getDoc(doc(dbFs, COL.users, uid));
+    return (d.exists() && d.data().role) || 'pending';
   }
 };
 
+/* Exposed for app.js (which needs the current Firebase user synchronously in
+   mounted()). The modular SDK keeps `auth` instance module-private, so we hand
+   back the current user via a getter. */
+export function getCurrentUser() {
+  return auth ? auth.currentUser : null;
+}
+
 /* ---------- data service (CRUD + listeners) ----------------------------- */
-const Store = {
+export const Store = {
   ready: fbReady,
   _unsubs: [],
 
   // generic realtime collection -> callback(list)
-  watch(collection, cb, opts = {}) {
+  watch(collectionName, cb, opts = {}) {
     if (!fbReady) { cb([]); return () => {}; }
-    let q = dbFs.collection(collection);
-    if (opts.orderBy) q = q.orderBy(opts.orderBy, opts.dir || 'asc');
+    let q = query(collection(dbFs, collectionName));
+    if (opts.orderBy) q = query(q, orderBy(opts.orderBy, opts.dir || 'asc'));
     // Firestore may store date-like fields as Timestamp objects. Normalize them to
     // plain epoch SECONDS so the rest of the app (fmtDate multiplies by 1000) stays correct.
     const TS_FIELDS = ['date', 'createdAt', 'updatedAt', 'timestamp', 'dateSec', 'lastFlightDate'];
@@ -113,11 +157,11 @@ const Store = {
       }
       return out;
     };
-    const unsub = q.onSnapshot(snap => {
+    const unsub = onSnapshot(q, snap => {
       let list = snap.docs.map(d => ({ id: d.id, ...norm(d.data()) }));
       if (opts.activeOnly) list = list.filter(x => x.active);
       cb(list);
-    }, err => { console.error('watch', collection, err); cb([]); });
+    }, err => { console.error('watch', collectionName, err); cb([]); });
     this._unsubs.push(unsub);
     return unsub;
   },
@@ -134,92 +178,95 @@ const Store = {
 
   // students
   async addStudent(name) {
-    await dbFs.collection(COL.students).add({ name, active: true, activeYears: [currentFlightYear()], createdAt: Date.now() / 1000 });
+    await addDoc(collection(dbFs, COL.students), { name, active: true, activeYears: [this.currentFlightYear()], createdAt: Date.now() / 1000 });
   },
-  async setStudentActive(id, active) { await dbFs.collection(COL.students).doc(id).update({ active }); },
-  async deleteStudent(id) { await dbFs.collection(COL.students).doc(id).delete(); },
+  async setStudentActive(id, active) { await updateDoc(doc(dbFs, COL.students, id), { active }); },
+  async deleteStudent(id) { await deleteDoc(doc(dbFs, COL.students, id)); },
 
   // instructors
-  async addInstructor(name) { await dbFs.collection(COL.instructors).add({ name, active: true, createdAt: Date.now() / 1000 }); },
-  async setInstructorActive(id, active) { await dbFs.collection(COL.instructors).doc(id).update({ active }); },
-  async deleteInstructor(id) { await dbFs.collection(COL.instructors).doc(id).delete(); },
+  async addInstructor(name) { await addDoc(collection(dbFs, COL.instructors), { name, active: true, createdAt: Date.now() / 1000 }); },
+  async setInstructorActive(id, active) { await updateDoc(doc(dbFs, COL.instructors, id), { active }); },
+  async deleteInstructor(id) { await deleteDoc(doc(dbFs, COL.instructors, id)); },
 
   // aircraft
-  async addAircraft(name) { await dbFs.collection(COL.aircraft).add({ name }); },
-  async deleteAircraft(id) { await dbFs.collection(COL.aircraft).doc(id).delete(); },
+  async addAircraft(name) { await addDoc(collection(dbFs, COL.aircraft), { name }); },
+  async deleteAircraft(id) { await deleteDoc(doc(dbFs, COL.aircraft, id)); },
 
   // mif tables (doc id = aircraftType + '_' + phaseName, like Android)
   async addMifTable(aircraftType, phaseName, stages) {
     const id = aircraftType + '_' + phaseName;
-    await dbFs.collection(COL.mifTables).doc(id).set({ aircraftType, phaseName, stages, maneuvers: [], updatedAt: Date.now() / 1000 });
+    await setDoc(doc(dbFs, COL.mifTables, id), { aircraftType, phaseName, stages, maneuvers: [], updatedAt: Date.now() / 1000 });
   },
   async addManeuver(tableId, maneuver) {
-    const ref = dbFs.collection(COL.mifTables).doc(tableId);
-    const doc = await ref.get();
-    const maneuvers = (doc.exists && doc.data().maneuvers) || [];
+    const ref = doc(dbFs, COL.mifTables, tableId);
+    const d = await getDoc(ref);
+    const maneuvers = (d.exists() && d.data().maneuvers) || [];
     maneuvers.push(maneuver);
-    await ref.update({ maneuvers });
+    await updateDoc(ref, { maneuvers });
   },
   async deleteManeuver(tableId, idx) {
-    const ref = dbFs.collection(COL.mifTables).doc(tableId);
-    const doc = await ref.get();
-    const maneuvers = (doc.exists && doc.data().maneuvers) || [];
+    const ref = doc(dbFs, COL.mifTables, tableId);
+    const d = await getDoc(ref);
+    const maneuvers = (d.exists() && d.data().maneuvers) || [];
     maneuvers.splice(idx, 1);
-    await ref.update({ maneuvers });
+    await updateDoc(ref, { maneuvers });
   },
-  async deleteMifTable(tableId) { await dbFs.collection(COL.mifTables).doc(tableId).delete(); },
+  async deleteMifTable(tableId) { await deleteDoc(doc(dbFs, COL.mifTables, tableId)); },
 
   // evaluations
   async saveEvaluation(ev) {
-    if (!ev.id) ev.id = dbFs.collection(COL.evaluations).doc().id;
-    const clean = { ...ev, instructorUid: (auth.currentUser && auth.currentUser.uid) || '' };
-    await dbFs.collection(COL.evaluations).doc(ev.id).set(clean);
+    if (!ev.id) {
+      const ref = await addDoc(collection(dbFs, COL.evaluations), { ...ev, instructorUid: (auth.currentUser && auth.currentUser.uid) || '', createdAt: Date.now() / 1000 });
+      ev.id = ref.id;
+    } else {
+      await setDoc(doc(dbFs, COL.evaluations, ev.id), { ...ev, instructorUid: (auth.currentUser && auth.currentUser.uid) || '' });
+    }
     return ev.id;
   },
-  async deleteEvaluation(id) { await dbFs.collection(COL.evaluations).doc(id).delete(); },
+  async deleteEvaluation(id) { await deleteDoc(doc(dbFs, COL.evaluations, id)); },
 
   // announcements
-  async addAnnouncement(a) { await dbFs.collection(COL.announcements).add(a); },
-  async deleteAnnouncement(id) { await dbFs.collection(COL.announcements).doc(id).delete(); },
+  async addAnnouncement(a) { await addDoc(collection(dbFs, COL.announcements), a); },
+  async deleteAnnouncement(id) { await deleteDoc(doc(dbFs, COL.announcements, id)); },
 
   // users (admin only) — mirrors Android UserManagementViewModel
   async approveUser(u, role) {
-    await dbFs.collection(COL.users).doc(u.uid).update({ role, updatedAt: Date.now() / 1000 });
+    await updateDoc(doc(dbFs, COL.users, u.uid), { role, updatedAt: Date.now() / 1000 });
     await this._syncInstructor(u, role);
   },
   async updateUserRole(u, role) {
-    await dbFs.collection(COL.users).doc(u.uid).update({ role, updatedAt: Date.now() / 1000 });
+    await updateDoc(doc(dbFs, COL.users, u.uid), { role, updatedAt: Date.now() / 1000 });
     await this._syncInstructor(u, role);
   },
   // Keep the instructors collection in sync with the user's role, exactly like Android.
   // instructor/admin => ensure instructors/{uid} exists (active). viewer/pending => remove it.
   async _syncInstructor(u, role) {
-    const ref = dbFs.collection(COL.instructors).doc(u.uid);
+    const ref = doc(dbFs, COL.instructors, u.uid);
     if (role === 'instructor' || role === 'admin') {
-      await ref.set({ id: u.uid, name: u.name || u.email || '', active: true, createdAt: Date.now() / 1000 });
+      await setDoc(ref, { id: u.uid, name: u.name || u.email || '', active: true, createdAt: Date.now() / 1000 });
     } else {
-      await ref.delete().catch(() => {});
+      await deleteDoc(ref).catch(() => {});
     }
   },
   async deleteUser(u) {
     // native rejects (removes) the user doc; also drop any instructors/{uid} mirror, matching Android rejectUser
-    await dbFs.collection(COL.users).doc(u.uid).delete();
-    await dbFs.collection(COL.instructors).doc(u.uid).delete().catch(() => {});
+    await deleteDoc(doc(dbFs, COL.users, u.uid));
+    await deleteDoc(doc(dbFs, COL.instructors, u.uid)).catch(() => {});
   },
 
   // first-run seeding (admin only). Mirrors the sample data for an empty project.
   async seedIfEmpty(user) {
     if (!fbReady) return;
-    const snap = await dbFs.collection(COL.students).limit(1).get();
+    const snap = await getDocs(query(collection(dbFs, COL.students), limit(1)));
     if (!snap.empty) return;
-    const batch = dbFs.batch();
+    const batch = writeBatch(dbFs);
     const seed = JSON.parse(JSON.stringify(SEED));
-    seed.students.forEach(s => batch.set(dbFs.collection(COL.students).doc(s.id), omitId(s)));
-    seed.instructors.forEach(i => batch.set(dbFs.collection(COL.instructors).doc(i.id), omitId(i)));
-    seed.aircraft.forEach(a => batch.set(dbFs.collection(COL.aircraft).doc(a.id), omitId(a)));
-    seed.mifTables.forEach(t => batch.set(dbFs.collection(COL.mifTables).doc(t.aircraftType + '_' + t.phaseName), omitId(t)));
-    seed.evaluations.forEach(e => batch.set(dbFs.collection(COL.evaluations).doc(e.id), omitId(e)));
-    seed.announcements.forEach(an => batch.set(dbFs.collection(COL.announcements).doc(an.id), omitId(an)));
+    seed.students.forEach(s => batch.set(doc(dbFs, COL.students, s.id), omitId(s)));
+    seed.instructors.forEach(i => batch.set(doc(dbFs, COL.instructors, i.id), omitId(i)));
+    seed.aircraft.forEach(a => batch.set(doc(dbFs, COL.aircraft, a.id), omitId(a)));
+    seed.mifTables.forEach(t => batch.set(doc(dbFs, COL.mifTables, t.aircraftType + '_' + t.phaseName), omitId(t)));
+    seed.evaluations.forEach(e => batch.set(doc(dbFs, COL.evaluations, e.id), omitId(e)));
+    seed.announcements.forEach(an => batch.set(doc(dbFs, COL.announcements, an.id), omitId(an)));
     await batch.commit();
   },
 
@@ -230,10 +277,10 @@ const Store = {
   // import, since the CSV export doesn't include per-maneuver detail).
   async bulkSaveEvaluations(evals) {
     if (!evals || !evals.length) return 0;
-    const batch = dbFs.batch();
+    const batch = writeBatch(dbFs);
     evals.forEach(ev => {
-      const id = ev.id || dbFs.collection(COL.evaluations).doc().id;
-      batch.set(dbFs.collection(COL.evaluations).doc(id), { ...ev, id });
+      const id = ev.id || doc(collection(dbFs, COL.evaluations)).id;
+      batch.set(doc(dbFs, COL.evaluations, id), { ...ev, id });
     });
     await batch.commit();
     return evals.length;
@@ -381,17 +428,13 @@ async function generateFeedback(data){
   L.push('');
   L.push('METHOD (FAA AIH / CFI ACS / Risk Mgmt Hbk): demonstrate, then guided practice, then solo.');
   L.push('Grade against ACS (Knowledge + Risk Mgmt + Skill); remediate weak fundamentals before advancing.');
-  // --- Ground the offline debrief in the embedded RAG index (no network needed) ---
-  // When the manuals are bundled, append the real source passages so the
-  // offline path still cites FAA / UH-1 / Robinson FTG even with the AI proxy down.
+  // --- Ground the offline debrief in the embedded RAG index (lazy-loaded). ---
   try {
-    if (typeof FaaRag !== 'undefined' && FaaRag.buildFaaContext) {
-      await FaaRag.loadIndex();
+    const FaaRag = await getRag();
+    if (FaaRag && FaaRag.buildFaaContext) {
       const faa = await FaaRag.buildFaaContext(data);
       if (faa) {
-        // Strip the raw REFERENCE block down to just the citeable manual
-        // anchors so the offline debrief stays readable (no raw-page dumps).
-        const cites = (faa.match(/\(([^)]*p\.\d[^\n]*?)\)/g) || [])
+        const cites = (faa.match(/\(([^)]*p\.\d[^)]*?)\)/g) || [])
           .map(s => s.replace(/[()]/g, '').trim())
           .filter((v, i, a) => a.indexOf(v) === i)
           .slice(0, 6);
@@ -458,7 +501,8 @@ function buildSingleEvalPrompt(d){
         .map(g => ({ name: g.name, avgGrade: g.grade, requiredMif: g.req }));
   return (async () => {
     try {
-      if (typeof FaaRag !== 'undefined' && FaaRag.buildFaaContext) {
+      const FaaRag = await getRag();
+      if (FaaRag && FaaRag.buildFaaContext) {
         const faa = await FaaRag.buildFaaContext({ weakManeuvers: weak });
         if (faa) user += faa;
       }
@@ -471,13 +515,13 @@ function buildSingleEvalPrompt(d){
 /* Loaded from Firestore config/ai so no key is committed to the repo.
    Expected doc shape:
      { enabled:true, endpoint:"https://.../v1/chat/completions",
-       model:"qwen/qwen3.8-max", apiKey:"sk-..." }
+       model:"qwen/qwen3.8-max", apiKey:*** }
    Falls back to the offline template (generateFeedback) if unset or on error. */
 async function getAIConfig() {
   // 1) Cloud config (admin-set, overrides LAN default) — only if Firestore rules allow read
   if (fbReady) {
     try {
-      const snap = await dbFs.collection('config').doc('ai').get();
+      const snap = await getDoc(doc(dbFs, 'config', 'ai'));
       if (snap.exists) {
         const d = snap.data() || {};
         if (d.enabled !== false && d.endpoint) {
@@ -529,11 +573,12 @@ async function buildAIPrompt(data) {
   // Append real FAA source material for the cadet's weak areas + risk mgmt,
   // if the RAG index loaded. Keeps the model anchored to the handbook.
   try {
-    if (typeof FaaRag !== 'undefined' && FaaRag.buildFaaContext) {
+    const FaaRag = await getRag();
+    if (FaaRag && FaaRag.buildFaaContext) {
       const faa = await FaaRag.buildFaaContext(data);
       if (faa) user += faa;
     }
-  } catch (e) { console.warn('FAA RAG attach skipped:', e.message); }
+  } catch (e) { console.warn('FAA RAG attach skipped:', e && e.message); }
   return { system: sys, user };
 }
 
@@ -579,3 +624,11 @@ async function _postAIModel(prompt, cfg) {
   if (!text) throw new Error('AI returned no content');
   return text;
 }
+
+/* ---------- named exports consumed by app.js / main.js ------------------ */
+/* NOTE: Auth, Store, COL are already exported above via `export const`. */
+export {
+  buildPerformance, generateFeedback,
+  buildSingleEvalData, generateSingleEvalFeedback, buildSingleEvalPrompt,
+  getAIConfig, callAIModel, callAIModelWithPrompt
+};

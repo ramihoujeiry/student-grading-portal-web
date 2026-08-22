@@ -1,0 +1,10 @@
+{
+  "network": "3g",
+  "run": 1,
+  "launch_auth_interactive_ms": 44018,
+  "dom_content_loaded_ms": 41771.5,
+  "full_load_ms": 41868.60000000149,
+  "first_contentful_paint_ms": 3868,
+  "transition_signin_to_register_ms": 879,
+  "transition_available": true
+}

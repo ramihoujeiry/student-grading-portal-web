@@ -8,3 +8,7 @@ _srv.log
 nul
 
 vue.global.dev.js
+
+# Vite build output
+dist/
+node_modules/
