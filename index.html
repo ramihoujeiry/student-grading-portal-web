@@ -5,15 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#1a237e" />
 <title>Student Grading Portal</title>
+<!-- Security: lock down script/connection origins. App is a bundled ESM SPA (no inline handlers, no cross-origin runtime).
+     'unsafe-eval' is required by Vue's runtime template compiler for the in-DOM template. All scripts are same-origin (bundled). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'; connect-src 'self' https://raspberrypi.tail3a08db.ts.net https://*.firebaseio.com https://*.firebasestorage.googleapis.com https://*.googleapis.com; manifest-src 'self'; worker-src 'self'" />
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.png" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 <style>
   :root{
+    color-scheme:dark;
     --bg:#070b10; --bg2:#0d141d; --card:#101a26; --card2:#16222f;
     --line:#1f2e3d; --text:#dce8f2; --muted:#7c93a8;
     --hud:#39d0c4; --hud-dim:#1d6f68; --amber:#ffb020;
-    --green:#46e08a; --blue:#5aa9ff; --red:#ff5d5d;
+    --green:#46e08a; --blue:#5aa9ff; --red:#ff5d5d; --bad:#ff5d5d;
     --accent:var(--hud); --accent2:#0c151e;
     --glass:rgba(18,28,40,.55); --glass-line:rgba(57,208,196,.18);
     --mono:"SFMono-Regular",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
@@ -23,7 +27,9 @@
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-text-size-adjust:100%}
   body{background-image:radial-gradient(120% 60% at 50% -10%, rgba(57,208,196,.06), transparent 60%),repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 3px);background-attachment:fixed}
   a{color:var(--blue)}
-  header.app{position:sticky;top:0;z-index:30;background:linear-gradient(180deg,#0c151e,#0a121a);padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:2px solid var(--hud-dim);box-shadow:0 4px 18px rgba(0,0,0,.55)}
+  /* header + tabs share one sticky container so the tabs offset never desyncs from the header height */
+  .app-shell{position:sticky;top:0;z-index:30}
+  header.app{background:linear-gradient(180deg,#0c151e,#0a121a);padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:2px solid var(--hud-dim);box-shadow:0 4px 18px rgba(0,0,0,.55);padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
   header.app h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.6px;color:var(--text);text-transform:uppercase;text-shadow:0 0 10px rgba(57,208,196,.25)}
   header.app h1::before{content:"◉ ";color:var(--hud);font-size:13px;vertical-align:1px}
   header.app .spacer{flex:1}
@@ -33,13 +39,13 @@
   .role-badge.instructor{background:rgba(90,169,255,.12);border-color:rgba(90,169,255,.4);color:var(--blue)}
   .role-badge.viewer{background:rgba(124,147,168,.12);border-color:rgba(124,147,168,.4);color:var(--muted)}
   .btn-logout{background:transparent;border:1px solid var(--glass-line);color:var(--hud);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
-  nav.tabs{position:sticky;top:46px;z-index:25;display:flex;flex-wrap:wrap;gap:6px;background:rgba(10,18,26,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-    border-bottom:1px solid var(--glass-line);padding:8px}
+  nav.tabs{display:flex;flex-wrap:wrap;gap:6px;background:rgba(10,18,26,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--glass-line);padding:8px;padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}
   nav.tabs .tab-btn{flex:1 1 auto;min-width:84px;background:rgba(22,34,47,.6);border:1px solid var(--line);color:var(--muted);
     padding:9px 10px;font-size:12px;font-weight:600;cursor:pointer;border-radius:9px;white-space:nowrap;text-align:center;transition:all .15s}
   nav.tabs .tab-btn:hover{color:var(--text);border-color:var(--glass-line)}
   nav.tabs .tab-btn.active{background:linear-gradient(180deg,var(--hud),var(--hud-dim));border-color:var(--hud);color:#04181a;box-shadow:0 0 12px rgba(57,208,196,.35)}
-  main{padding:14px;max-width:980px;margin:0 auto 80px}
+  main{padding:14px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));max-width:980px;margin:0 auto calc(80px + env(safe-area-inset-bottom))}
   section h2{font-size:15px;margin:4px 0 12px}
   .card{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--glass-line);border-radius:12px;padding:13px;margin-bottom:12px;
     box-shadow:0 6px 22px rgba(0,0,0,.4),inset 0 1px 0 rgba(57,208,196,.06)}
@@ -58,22 +64,38 @@
   .pill.ok{background:rgba(90,169,255,.14);border-color:rgba(90,169,255,.4);color:var(--blue)}
   .pill.bad{background:rgba(255,93,93,.14);border-color:rgba(255,93,93,.4);color:var(--red)}
   .pill.pending{background:rgba(124,147,168,.12);border-color:rgba(124,147,168,.4);color:var(--muted)}
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  /* Long informational pills (e.g. AI "manuals loaded") may exceed narrow
+     viewports — let them wrap instead of forcing page-level horizontal scroll. */
+  .pill.wrap{white-space:normal;max-width:100%;word-break:break-word;overflow-wrap:anywhere}
+  /* Visually hidden but present for screen readers / axe (page-has-heading-one). */
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px}
   .stat{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--glass-line);border-radius:12px;padding:14px;text-align:center;
     box-shadow:inset 0 0 22px rgba(57,208,196,.05)}
   .stat .n{font-size:24px;font-weight:800;color:var(--hud);text-shadow:0 0 12px rgba(57,208,196,.3)}
   .stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
   table{width:100%;border-collapse:collapse;font-size:13px}
+  /* Wide tables (e.g. MIF) get a horizontal scroll region on small screens instead of
+     blowing out the page width and causing body-level horizontal scroll. */
+  @media (max-width:640px){
+    .card>table{display:block;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  }
   th,td{text-align:left;padding:9px 8px;border-bottom:1px solid rgba(57,208,196,.1)}
   th{color:var(--hud);font-size:11px;text-transform:uppercase;letter-spacing:.4px;opacity:.8}
   .list{list-style:none;margin:0;padding:0}
   .list li{background:var(--glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--glass-line);border-radius:11px;padding:12px;margin-bottom:9px}
   input,select,textarea{width:100%;background:rgba(8,14,20,.7);border:1px solid var(--line);color:var(--text);
-    border-radius:9px;padding:9px;font-size:13px;font-family:inherit;transition:border-color .15s}
-  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--hud);box-shadow:0 0 0 2px rgba(57,208,196,.15)}
+    border-radius:9px;padding:10px 12px;font-size:16px;min-height:42px;font-family:inherit;transition:border-color .15s,box-shadow .15s}
+  select{appearance:none;-webkit-appearance:none;-moz-appearance:none;cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%237c93a8' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--hud);box-shadow:0 0 0 3px rgba(57,208,196,.18)}
+  :focus-visible{outline:2px solid var(--hud);outline-offset:2px}
+  .btn:focus-visible,.tab-btn:focus-visible,.grade-pick .gx:focus-visible,.auth-mode button:focus-visible,.clickable:focus-visible{outline:2px solid var(--hud);outline-offset:2px;border-radius:9px}
+  .btn:disabled{opacity:.5;cursor:not-allowed;filter:none;box-shadow:none}
   textarea{resize:vertical;min-height:70px}
   /* Duration hr/min selects in New Evaluation — keep numbers fully visible */
-  select.dur{width:auto;flex:1 1 72px;min-width:72px;text-align:center;font-size:16px;font-weight:700;font-family:var(--mono);padding:0 6px;height:42px}
+  select.dur{width:auto;flex:1 1 72px;min-width:72px;text-align:center;font-size:16px;font-weight:700;font-family:var(--mono);padding:0 6px;height:42px;appearance:auto;-webkit-appearance:auto;background-image:none;padding-right:6px}
   /* Flight-year read-only display: never clips the "YYYY-YYYY" value */
   .fy{display:flex;align-items:center;height:42px;padding:0 10px;background:rgba(8,14,20,.7);border:1px solid var(--line);border-radius:9px;color:var(--text);font-family:var(--mono);font-size:14px;white-space:nowrap;overflow:visible}
   label{font-size:11px;color:var(--hud);display:block;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px;opacity:.85}
@@ -92,17 +114,43 @@
   .modal.full .preview{position:sticky;top:0;z-index:5;background:var(--glass);border:1px solid var(--glass-line);
     border-radius:12px;padding:12px 14px;margin:6px 0 10px;display:flex;align-items:center;gap:16px;box-shadow:0 1px 0 var(--glass-line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
   @media(min-width:640px){.modal{margin:auto;border-radius:16px}}
+  /* Section header row: title left, action(s) pinned right (P0 — .topbar had no rule) */
+  .topbar{display:flex;align-items:center;gap:10px;margin:6px 0 12px;flex-wrap:wrap}
+  .topbar h2{margin:0}
+  .topbar > .spacer{flex:1}
+  .topbar > .btn,.topbar > select{flex:0 0 auto}
   .modal h2{margin-top:4px}
-  .grade-grid{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center}
-  .grade-pick{display:flex;gap:5px}
-  .grade-pick button{flex:1;background:rgba(22,34,47,.6);border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:8px 0;font-weight:700;cursor:pointer;transition:all .15s}
-  .grade-pick button:hover{color:var(--text);border-color:var(--glass-line)}
-  .grade-pick button.on{background:linear-gradient(180deg,var(--hud),var(--hud-dim));border-color:var(--hud);color:#04181a;box-shadow:0 0 10px rgba(57,208,196,.3)}
+  .grade-pick{flex-direction:row;gap:5px;display:flex}
+  .grade-pick .gx{font-size:13px;line-height:1;min-width:30px;min-height:40px;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--bg2);border:1px solid var(--line);color:var(--text);font-weight:700;cursor:pointer}
   .preview{display:flex;gap:14px;align-items:center;margin:12px 0;border-top:1px solid var(--glass-line);padding-top:12px}
   .preview .big{font-size:28px;font-weight:800;color:var(--hud);text-shadow:0 0 12px rgba(57,208,196,.3)}
-  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(10,18,26,.92);color:var(--text);
+  .toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:rgba(10,18,26,.92);color:var(--text);
     padding:10px 18px;border-radius:24px;font-size:13px;z-index:80;opacity:.95;box-shadow:0 4px 14px rgba(0,0,0,.5);border:1px solid var(--glass-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-  footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
+  footer{text-align:center;color:var(--muted);font-size:11px;padding:18px;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+
+  /* Respect users who prefer reduced motion (vestibular safety) */
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{transition-duration:.001ms !important;animation-duration:.001ms !important;animation-iteration-count:1 !important;scroll-behavior:auto !important}
+  }
+
+  /* Print / PDF: force a light theme so "Print PDF" yields readable output */
+  @media print{
+    :root,html,body{background:#fff!important;color:#000!important}
+    body{background-image:none!important}
+    body:has(.modal-mask) main{display:none!important}
+    .app-shell,nav.tabs,footer,.toast,.notice,.year-pick{display:none!important}
+    .modal-mask{position:static!important;background:#fff!important;display:block!important;padding:0!important;overflow:visible!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+    .modal{position:static!important;max-width:100%!important;max-height:none!important;box-shadow:none!important;border:1px solid #ccc!important;background:#fff!important;padding:16px!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+    .modal.full{height:auto!important}
+    .modal-actions{display:none!important}
+    .card,.stat,.list li{background:#fff!important;color:#000!important;border:1px solid #ccc!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;break-inside:avoid}
+    table,th,td{color:#000!important;border-color:#999!important}
+    th{opacity:1!important}
+    .pill{color:#000!important;border:1px solid #999!important;background:#f0f0f0!important}
+    .maneuver-name{background:#f4f4f4!important;color:#000!important;border-left-color:#666!important}
+    .mannote{background:#f4f4f4!important;color:#000!important;border:1px solid #ccc!important}
+    *{text-shadow:none!important}
+  }
 
   /* auth screen */
   .auth-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
@@ -119,6 +167,9 @@
   .warn-box.danger{background:rgba(255,93,93,.12);border-color:var(--red);color:var(--red)}
   .warn-box b{font-weight:800}
 </style>
+  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-CxhBt1A_.js"></script>
+  <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-vue-CxFK-cW8.js">
+  <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-firebase-CAVvKspe.js">
 </head>
 <body>
 <div id="app" v-cloak>
@@ -164,16 +215,26 @@
 
   <!-- ===== MAIN APP ===== -->
   <div v-else>
+    <div class="app-shell">
     <header class="app">
       <span class="spacer"></span>
+      <h1 class="sr-only">Student Grading Portal</h1>
+      <span class="ai-badge" :class="aiBadge" :title="aiBadge==='live' ? 'AI: live (Pi model online)' : aiBadge==='offline' ? 'AI: offline template (Pi unreachable)' : 'Checking AI status…'">
+        <span class="dot"></span>
+        <span>{{aiBadge==='live' ? 'AI LIVE' : aiBadge==='offline' ? 'AI OFFLINE' : 'AI…'}}</span>
+      </span>
+      <button class="btn-logout" @click="toggleTheme" :title="theme==='dark' ? 'Switch to light theme' : 'Switch to dark theme'" :aria-label="theme==='dark' ? 'Switch to light theme' : 'Switch to dark theme'">
+        {{theme==='dark' ? '☀' : '☾'}}
+      </button>
+      <button class="btn-logout" @click="openFeedback" title="Send feedback to the app owner" aria-label="Send feedback to the app owner">Feedback</button>
       <label class="year-pick">Year
-        <select v-model="activeYear">
+        <select v-model="activeYear" aria-label="School year">
           <option v-for="y in years" :key="y" :value="y">{{y}}</option>
           <option v-if="!years.length" value="">—</option>
         </select>
       </label>
       <span class="role-badge" :class="role">{{role}}</span>
-      <button class="btn-logout" @click="doLogout">Sign out</button>
+      <button class="btn-logout" @click="doLogout" aria-label="Sign out">Sign out</button>
     </header>
 
     <div class="notice pending" v-if="isPending">
@@ -193,17 +254,20 @@
       <button class="tab-btn" :class="{active:tab==='ai'}" @click="setTab('ai')">AI Feedback</button>
       <button class="tab-btn" :class="{active:tab==='ask'}" @click="setTab('ask')">Ask Data</button>
     </nav>
+    </div><!-- /.app-shell -->
 
     <main>
       <!-- DASHBOARD -->
       <section v-show="tab==='dashboard'">
         <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
-          <div style="flex:1;min-width:130px"><label>Student</label>
-            <select v-model="dashStudent"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></div>
-          <div style="flex:1;min-width:130px"><label>Aircraft</label>
-            <select v-model="dashAircraft"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></div>
-          <div style="flex:1;min-width:120px"><label>From</label><input type="date" v-model="dashStart" /></div>
-          <div style="flex:1;min-width:120px"><label>To</label><input type="date" v-model="dashEnd" /></div>
+          <div style="flex:1;min-width:130px"><label>Student
+            <select v-model="dashStudent" aria-label="Dashboard student filter"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></label></div>
+          <div style="flex:1;min-width:130px"><label>Aircraft
+            <select v-model="dashAircraft" aria-label="Dashboard aircraft filter"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></label></div>
+          <div style="flex:1;min-width:120px"><label>From
+            <input type="date" v-model="dashStart" /></label></div>
+          <div style="flex:1;min-width:120px"><label>To
+            <input type="date" v-model="dashEnd" /></label></div>
           <button class="btn sm ghost" @click="dashStudent='All Cadets';dashAircraft='All Aircraft';dashStart='';dashEnd=''">Reset</button>
         </div>
         <div class="stats" style="margin-top:12px">
@@ -216,6 +280,42 @@
           <div class="stat"><div class="n">{{dashTotalHours.toFixed(1)}}</div><div class="l">Total Hours</div></div>
           <div class="stat"><div class="n">{{dashFilteredEvals.length}}</div><div class="l">Filtered</div></div>
         </div>
+        <!-- Quick Grade widget (audit-derived): one tap opens a new evaluation for the
+             selected student+aircraft+phase with the next trip pre-suggested. -->
+        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+          <div style="flex:2;min-width:150px"><label>Quick grade — student
+            <select v-model="evalForm.studentId" @change="suggestTrip" aria-label="Quick grade — student"><option value="">— select student —</option><option v-for="s in activeStudents" :key="s.id" :value="s.id">{{s.name}}</option></select></label></div>
+          <div style="flex:1.4;min-width:140px"><label>Aircraft
+            <select v-model="evalForm.aircraftType" @change="onEvalContextChange; suggestTrip" aria-label="Quick grade — aircraft"><option value="">— select —</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></label></div>
+          <div style="flex:1.4;min-width:140px"><label>Phase
+            <select v-model="evalForm.phaseName" @change="onEvalContextChange; suggestTrip" aria-label="Quick grade — phase"><option value="">— select —</option><option v-for="t in mifTables.filter(x=>x.aircraftType===evalForm.aircraftType)" :key="t.id" :value="t.phaseName">{{t.phaseName}}</option></select></label></div>
+          <button class="btn sm" :disabled="!canEdit || !evalForm.studentId || !evalForm.aircraftType || !evalForm.phaseName" @click="openNewEval">+ Grade</button>
+        </div>
+        <div v-if="dashCoveredYears.length" class="muted" style="margin-top:8px">
+          School years with data: {{dashCoveredYears.join(' · ')}}
+        </div>
+
+        <!-- Class Readiness board (dashboard widget, reuses buildPerformance) -->
+        <h3 style="margin:18px 2px 8px">Class Readiness</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">
+          <div class="card clickable" v-for="c in classReadiness" :key="c.id" @click="openStudent(students.find(s=>s.id===c.id))" style="padding:12px">
+            <div class="row nowrap"><strong style="font-size:14px">{{c.name}}</strong><span class="spacer" style="flex:1"></span>
+              <span class="pill" :class="{'good':c.readiness==='READY','ok':c.readiness==='RECOVERING','bad':c.readiness==='REMEDIAL','pending':c.readiness==='INSUFFICIENT_DATA'}">{{readinessLabel(c.readiness)}}</span></div>
+            <div class="row nowrap muted" style="margin-top:6px;font-size:12px">
+              <span>Avg {{c.avg}}</span><span style="flex:1"></span>
+              <span class="pill" :class="c.trend==='IMPROVING'?'good':c.trend==='DECLINING'?'bad':'pending'">{{c.trend}}</span>
+              <span style="margin-left:8px">{{c.weak}} weak</span>
+            </div>
+          </div>
+        </div>
+        <div v-if="!classReadiness.length" class="muted">No evaluations yet this year.</div>
+
+        <!-- Recent activity (lightweight local analytics, audit item 9) -->
+        <h3 style="margin:18px 2px 8px">Recent Activity (this app)</h3>
+        <div v-if="recentActivity().length" style="display:flex;flex-wrap:wrap;gap:8px">
+          <span class="pill ok" v-for="a in recentActivity()" :key="a.label">{{a.label}}: {{a.n}}</span>
+        </div>
+        <div v-else class="muted">No recorded activity yet — usage stats build up locally as you grade.</div>
       </section>
 
       <!-- STUDENTS -->
@@ -298,18 +398,20 @@
       <section v-show="tab==='evaluations'">
         <div class="topbar"><h2 style="margin:0">Evaluations · {{activeYearResolved}}</h2><span class="spacer"></span>
           <button class="btn sm ghost" @click="exportCSV">Export CSV</button>
+          <button class="btn sm ghost" @click="printEvalList">Print PDF</button>
+          <button class="btn sm ghost" v-if="isAdmin" @click="openImport">Import CSV</button>
           <button class="btn sm" v-if="canEdit" @click="openNewEval">+ New Evaluation</button></div>
         <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
           <div style="flex:2 1 240px;min-width:200px"><label>Search evaluations</label>
             <input v-model="evSearch" placeholder="date, student, phase, instructor, aircraft…" style="width:100%" /></div>
-          <div style="flex:1;min-width:150px"><label>Student</label>
-            <select v-model="evStudent"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></div>
-          <div style="flex:1;min-width:140px"><label>Aircraft</label>
-            <select v-model="evAircraft"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></div>
-          <div style="flex:1;min-width:140px"><label>Phase</label>
-            <select v-model="evPhase"><option>All Phases</option><option v-for="p in phaseOptions" :key="p" :value="p">{{p}}</option></select></div>
-          <div style="flex:1;min-width:140px"><label>School Year</label>
-            <select v-model="evYear"><option>All Years</option><option v-for="yr in years" :key="yr" :value="yr">{{yr}}</option></select></div>
+          <div style="flex:1;min-width:150px"><label>Student
+            <select v-model="evStudent" aria-label="Evaluations student filter"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></label></div>
+          <div style="flex:1;min-width:140px"><label>Aircraft
+            <select v-model="evAircraft" aria-label="Evaluations aircraft filter"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></label></div>
+          <div style="flex:1;min-width:140px"><label>Phase
+            <select v-model="evPhase" aria-label="Evaluations phase filter"><option>All Phases</option><option v-for="p in phaseOptions" :key="p" :value="p">{{p}}</option></select></label></div>
+          <div style="flex:1;min-width:140px"><label>School Year
+            <select v-model="evYear" aria-label="Evaluations school-year filter"><option>All Years</option><option v-for="yr in years" :key="yr" :value="yr">{{yr}}</option></select></label></div>
           <button class="btn sm ghost" @click="evStudent='All Cadets';evAircraft='All Aircraft';evPhase='All Phases';evYear='All Years';evSearch=''">Clear</button>
         </div>
         <div v-for="(evs, sid) in evalsByStudentInYear" :key="sid">
@@ -342,7 +444,7 @@
               <span class="pill" :class="a.targetRole==='all'?'ok':'pending'">{{a.targetRole}}</span>
               <span class="spacer" style="flex:1"></span>
               <span class="muted">{{fmt(a.timestamp)}}</span>
-              <button class="btn sm danger" v-if="isAdmin" @click="deleteAnnouncement(a)">×</button>
+              <button class="btn sm danger" v-if="isAdmin" aria-label="Delete announcement" @click="deleteAnnouncement(a)">×</button>
             </div>
             <div style="margin-top:6px">{{a.message}}</div>
             <div class="muted" style="margin-top:4px">From: {{a.senderName}}</div>
@@ -354,7 +456,7 @@
       <!-- ANALYTICS -->
       <section v-show="tab==='analytics'">
         <div class="topbar"><h2 style="margin:0">Progress Analytics</h2><span class="spacer"></span>
-          <select v-model="analyticsStudent" style="max-width:200px">
+          <select v-model="analyticsStudent" aria-label="Analytics student filter" style="max-width:200px">
             <option value="">All Students</option>
             <option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option>
           </select>
@@ -387,12 +489,25 @@
 
         <h3 style="margin:22px 2px 10px">Failed Items (maneuvers below required MIF)</h3>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
-          <div class="card" v-for="f in failedItems" :key="f.id" style="cursor:pointer" @click="openStudent(students.find(s=>s.id===f.id))">
-            <strong style="font-size:15px">{{f.name}}</strong>
+          <div class="card" v-for="f in failedItems" :key="f.id">
+            <div class="row nowrap" style="cursor:pointer" @click="openStudent(students.find(s=>s.id===f.id))">
+              <strong style="font-size:15px">{{f.name}}</strong>
+              <span class="spacer" style="flex:1"></span>
+              <span class="muted" style="font-size:11px">tap name → profile</span>
+            </div>
             <ul class="list" style="margin-top:8px">
-              <li v-for="it in f.items" :key="it.name" style="padding:6px 0">
+              <li v-for="it in f.items" :key="it.name" style="padding:6px 0;cursor:pointer" @click="toggleWeak(f.id+'::'+it.name)">
                 <div class="row nowrap"><span>{{it.name}}</span><span class="spacer" style="flex:1"></span><span class="pill bad">{{it.count}}×</span></div>
-                <div class="muted" style="font-size:11px">required MIF {{it.required}}</div>
+                <div class="muted" style="font-size:11px">required MIF {{it.required}} · avg {{maneuverAvg(f.id, it.name)}} · tap to expand trend</div>
+                <div v-if="weakExpanded[f.id+'::'+it.name]">
+                  <div v-if="maneuverTrendChart(f.id, it.name)" style="margin-top:8px">
+                    <svg :viewBox="'0 0 '+maneuverTrendChart(f.id, it.name).w+' '+maneuverTrendChart(f.id, it.name).h" style="width:100%;height:50px" preserveAspectRatio="none">
+                      <path :d="maneuverTrendChart(f.id, it.name).area" fill="rgba(255,93,93,.15)"></path>
+                      <path :d="maneuverTrendChart(f.id, it.name).path" fill="none" stroke="var(--red)" stroke-width="2"></path>
+                    </svg>
+                  </div>
+                  <div v-else class="muted" style="font-size:11px;margin-top:6px">Only one graded sortie for this maneuver — need 2+ to show a trend.</div>
+                </div>
               </li>
             </ul>
           </div>
@@ -436,13 +551,13 @@
       <section v-show="tab==='ai'">
         <div class="card">
           <h3>AI Performance Feedback</h3>
-          <div v-if="ragReady === true" class="pill good" style="margin-bottom:10px">📚 Manuals loaded (FAA / UH-1 / Robinson FTG) — debriefs will cite them</div>
+          <div v-if="ragReady === true" class="pill good wrap" style="margin-bottom:10px">📚 Manuals loaded (FAA / UH-1 / Robinson FTG) — debriefs will cite them</div>
           <div v-if="ragReady === false" class="pill pending" style="margin-bottom:10px">⚠️ Manual index not loaded. Serve the app over http:// (not file://) and ensure faa-rag/faa_index.json is present.</div>
-          <label>Student</label>
-          <select v-model="aiStudentId">
+          <label>Student
+            <select v-model="aiStudentId" aria-label="AI feedback student">
             <option value="">Select a student…</option>
             <option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option>
-          </select>
+          </select></label>
           <div style="margin-top:12px" class="row">
             <button class="btn" @click="runAIForStudent">Generate Analysis</button>
             <button class="btn ghost" :disabled="!aiResult" @click="copyAI">Copy</button>
@@ -480,31 +595,31 @@
   <div class="modal-mask fullscreen" v-if="loggedIn && showEvalModal" @click.self="showEvalModal=false">
     <div class="modal full">
       <h2>New Evaluation</h2>
-      <label>Aircraft</label>
-      <select v-model="evalForm.aircraftType" @change="onEvalContextChange; suggestTrip">
+      <label>Aircraft
+      <select v-model="evalForm.aircraftType" @change="onEvalContextChange; suggestTrip" aria-label="Evaluation aircraft">
         <option value="">— select aircraft —</option>
         <option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option>
-      </select>
-      <label>Student</label>
-      <select v-model="evalForm.studentId" @change="suggestTrip"><option value="">— select student —</option><option v-for="s in activeStudents" :key="s.id" :value="s.id">{{s.name}}</option></select>
-      <label>Instructor</label>
-      <select v-model="evalForm.instructorName">
+      </select></label>
+      <label>Student
+      <select v-model="evalForm.studentId" @change="suggestTrip" aria-label="Evaluation student"><option value="">— select student —</option><option v-for="s in activeStudents" :key="s.id" :value="s.id">{{s.name}}</option></select></label>
+      <label>Instructor
+      <select v-model="evalForm.instructorName" aria-label="Evaluation instructor">
         <option value="">— select instructor —</option>
         <option v-for="i in activeInstructors" :key="i.id" :value="i.name">{{i.name}}</option>
-      </select>
+      </select></label>
       <div class="row" style="gap:10px">
         <div style="flex:1">
-          <label>Phase</label>
-          <select v-model="evalForm.phaseName" @change="onEvalContextChange; suggestTrip">
+          <label>Phase
+          <select v-model="evalForm.phaseName" @change="onEvalContextChange; suggestTrip" aria-label="Evaluation phase">
             <option value="">— select phase —</option>
             <option v-for="t in mifTables.filter(x=>x.aircraftType===evalForm.aircraftType)" :key="t.id" :value="t.phaseName">{{t.phaseName}}</option>
-          </select>
+          </select></label>
         </div>
         <div style="flex:1">
-          <label>Trip number <span class="muted" style="text-transform:none;letter-spacing:0">· Sortie number</span></label>
-          <select v-model="evalForm.tripNumber" @change="onEvalContextChange">
+          <label>Trip number <span class="muted" style="text-transform:none;letter-spacing:0">· Sortie number</span>
+          <select v-model="evalForm.tripNumber" @change="onEvalContextChange" aria-label="Evaluation trip number">
             <option v-for="st in (currentTable ? currentTable.stages : [])" :key="st" :value="st">{{st}}</option>
-          </select>
+          </select></label>
         </div>
       </div>
       <div class="row" style="gap:10px">
@@ -513,11 +628,11 @@
         <div style="flex:1">
           <label>Duration (hr : min)</label>
           <div class="row nowrap" style="gap:6px;margin-top:0">
-            <select v-model="durationH" @change="onDurationChange" class="dur" style="flex:1">
+            <select v-model="durationH" @change="onDurationChange" class="dur" style="flex:1" aria-label="Duration hours">
               <option v-for="h in 13" :key="h" :value="String(h-1).padStart(2,'0')">{{String(h-1).padStart(2,'0')}}</option>
             </select>
             <span style="font-weight:700">:</span>
-            <select v-model="durationM" @change="onDurationChange" class="dur" style="flex:1">
+            <select v-model="durationM" @change="onDurationChange" class="dur" style="flex:1" aria-label="Duration minutes">
               <option v-for="m in ['00','05','10','15','20','25','30','35','40','45','50','55']" :key="m" :value="m">{{m}}</option>
             </select>
           </div>
@@ -534,6 +649,14 @@
         </div>
       </div>
       <label>Maneuver Grades</label>
+      <div class="bulk-bar" v-if="evalForm.maneuverGrades.length">
+        <span class="lbl">Fill all:</span>
+        <div class="bulk-pick">
+          <button v-for="n in [1,2,3,4]" :key="n" :class="{on: bulkGrade===n}" @click="applyBulkGrade(n)">{{n}}</button>
+        </div>
+        <button class="btn sm ghost" @click="clearBulkGrade">Clear</button>
+        <button class="btn sm ghost" @click="copyLastTrip">⧉ Copy last trip</button>
+      </div>
       <div class="card" v-if="evalForm.maneuverGrades.length">
         <div class="grade-row" v-for="(m,idx) in evalForm.maneuverGrades" :key="m.name" style="margin-bottom:12px">
           <div class="maneuver-name" :class="{below:m.studentGrade && m.requiredMif!=null && m.studentGrade < m.requiredMif, meets:m.studentGrade && m.requiredMif!=null && m.studentGrade >= m.requiredMif}">
@@ -570,6 +693,92 @@
       <div class="modal-actions" style="position:static;border:none;padding-top:0;margin-top:14px">
         <button class="btn ghost" @click="cancelOverwrite">Cancel</button>
         <button class="btn danger" @click="confirmOverwrite">Overwrite anyway</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORT CSV MODAL (audit item 11) -->
+  <div class="modal-mask" v-if="loggedIn && importCsv.open" @click.self="closeImport">
+    <div class="modal" style="max-width:680px">
+      <h2 style="margin-top:0">Import evaluations from CSV</h2>
+      <p class="muted" style="margin:4px 2px 10px">Paste the CSV produced by <b>Export CSV</b> (or match its header). Rows are validated against known students/aircraft; matching student+phase+trip rows overwrite the existing evaluation. Unknown students/aircraft are skipped with a warning.</p>
+      <label>CSV data</label>
+      <textarea class="csv-input" v-model="importCsv.text" @input="parseImportCsv" placeholder="Student,Aircraft,Phase,Trip,Date,Instructor,Duration(h),FinalGrade,MIF Status,FlightYear,TripNotes&#10;Jane Doe,R44-2,CONTACT,S3,2026-08-01,Capt. Smith,1.2,82,BELOW STANDARD,2026-2027,"></textarea>
+      <div v-if="importCsv.error" class="import-err">{{importCsv.error}}</div>
+      <div v-if="importCsv.parsed && importCsv.parsed.total" class="import-ok">
+        {{importCsv.parsed.total}} row(s) ready to import
+        <span v-if="importCsv.parsed.dupes"> · {{importCsv.parsed.dupes}} will overwrite existing</span>
+        <span v-if="importCsv.parsed.errors.length"> · {{importCsv.parsed.errors.length}} warning(s)</span>
+      </div>
+      <div v-if="importCsv.parsed && importCsv.parsed.errors.length" class="import-err" style="max-height:120px;overflow:auto">
+        <div v-for="(e,i) in importCsv.parsed.errors" :key="i">{{e}}</div>
+      </div>
+      <div v-if="importCsv.parsed && importCsv.parsed.total" class="import-preview">
+        <table>
+          <thead><tr><th>Student</th><th>Aircraft</th><th>Phase</th><th>Trip</th><th>Date</th><th>Final</th><th>MIF</th></tr></thead>
+          <tbody>
+            <tr v-for="(e,i) in importCsv.parsed.evals" :key="i">
+              <td>{{e.studentName}}</td><td>{{e.aircraftType}}</td><td>{{e.phaseName}}</td><td>{{e.tripNumber}}</td>
+              <td>{{fmt(e.date)}}</td><td>{{e.finalGrade}}</td><td>{{e.overallMifStatus}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-actions" style="position:static;border:none;padding-top:0;margin-top:14px">
+        <button class="btn ghost" @click="closeImport">Cancel</button>
+        <button class="btn" :disabled="!importCsv.parsed || !importCsv.parsed.total" @click="confirmImport">Import {{importCsv.parsed ? importCsv.parsed.total : 0}}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEEDBACK CHANNEL (audit item 9) — in-app, anonymous, stored locally -->
+  <div class="modal-mask" v-if="loggedIn && feedback.open" @click.self="closeFeedback">
+    <div class="modal" style="max-width:480px">
+      <h2 style="margin-top:0">Send feedback</h2>
+      <p class="muted" style="margin:0 0 10px;line-height:1.5">Spotted a bug or have an idea? Send it to the app owner. Stored on this device only (no account link) for now.</p>
+      <label>Your role
+      <select v-model="feedback.role" aria-label="Feedback role">
+        <option value="admin">Admin</option>
+        <option value="instructor">Instructor</option>
+        <option value="viewer">Viewer</option>
+        <option value="unknown">Prefer not to say</option>
+      </select></label>
+      <label style="margin-top:10px">Message</label>
+      <textarea v-model="feedback.text" rows="5" placeholder="What's working, what's not, what you'd like next…" :disabled="feedback.busy || feedback.done"></textarea>
+      <div v-if="feedback.error" class="import-err">{{feedback.error}}</div>
+      <div v-if="feedback.done" class="import-ok">Thanks — feedback saved on this device.</div>
+      <div class="modal-actions" style="position:static;border:none;padding-top:0;margin-top:14px">
+        <button class="btn ghost" @click="closeFeedback" :disabled="feedback.busy">Close</button>
+        <button class="btn" :disabled="feedback.busy || feedback.done" @click="submitFeedback">
+          <span v-if="feedback.busy">Sending…</span><span v-else>Send</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GENERIC DIALOG (replaces native prompt()/confirm()) — audit item 2 -->
+  <div class="modal-mask" v-if="loggedIn && dlg.open" @click.self="dlgCancel">
+    <div class="modal" style="max-width:480px">
+      <h2 style="margin-top:0">{{dlg.title}}</h2>
+      <p v-if="dlg.message" class="muted" style="margin:0 0 10px;line-height:1.5">{{dlg.message}}</p>
+      <!-- single text input -->
+      <div v-if="dlg.mode==='input'">
+        <label>{{dlg.label}}</label>
+        <input type="text" v-model="dlg.value" @keyup.enter="!dlg.busy && dlgConfirm()" :disabled="dlg.busy" />
+      </div>
+      <!-- multi-field form (add student/aircraft/MIF table/maneuver/announcement/role) -->
+      <div v-if="dlg.mode==='form'">
+        <div v-for="f in (dlg.fields||[])" :key="f.key" style="margin-bottom:10px">
+          <label>{{f.label}}</label>
+          <textarea v-if="f.type==='textarea'" v-model="f.value" rows="4" :disabled="dlg.busy"></textarea>
+          <input v-else :type="f.type==='number' ? 'number' : 'text'" v-model="f.value" :disabled="dlg.busy" />
+        </div>
+      </div>
+      <div class="modal-actions" style="position:static;border:none;padding-top:0;margin-top:14px">
+        <button class="btn ghost" @click="dlgCancel" :disabled="dlg.busy">Cancel</button>
+        <button class="btn" :disabled="dlg.busy" @click="dlgConfirm">
+          <span v-if="dlg.busy">Working…</span><span v-else>{{dlg.confirmText || 'OK'}}</span>
+        </button>
       </div>
     </div>
   </div>
@@ -644,7 +853,7 @@
     </div>
   </div>
 
-  <div class="toast" v-if="toast">{{toast}}</div>
+  <div class="toast" role="status" aria-live="polite" v-if="toast">{{toast}}</div>
   <footer v-if="loggedIn">Student Grading Portal · web PWA · Firebase</footer>
 </div>
 
@@ -653,25 +862,52 @@
 .clickable{cursor:pointer;transition:background .15s}
 .clickable:active{background:var(--bg2)}
 .year-pick{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-.year-pick select{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 6px;font-size:12px}
+.year-pick select{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 22px 4px 8px;font-size:12px;appearance:none;-webkit-appearance:none;cursor:pointer;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%23ffffff' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat:no-repeat;background-position:right 6px center}
 .notice{margin:10px 14px 0;padding:10px 12px;border-radius:10px;font-size:13px}
 .notice.pending{background:rgba(255,193,7,.15);border:1px solid rgba(255,193,7,.5);color:#ffd54f}
-.grade-row{display:grid;grid-template-columns:1fr 132px;align-items:center;gap:10px}
-.grade-pick{display:flex;flex-direction:row;gap:4px;justify-content:flex-end;width:132px}
-.grade-pick .gx{font-size:13px;line-height:1;width:30px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--bg2);border:1px solid var(--line);color:var(--text);font-weight:700;cursor:pointer}
+.grade-row{display:grid;grid-template-columns:minmax(0,1fr) max-content;align-items:center;gap:10px}
+.grade-pick{display:flex;flex-direction:row;gap:4px;justify-content:flex-end;width:auto;max-width:100%;flex-wrap:wrap}
+.grade-pick .gx{font-size:13px;line-height:1;min-width:34px;min-height:40px;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--bg2);border:1px solid var(--line);color:var(--text);font-weight:700;cursor:pointer}
+.grade-pick .gx:hover{border-color:var(--glass-line)}
 .grade-pick .gx.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .grade-pick .gx.on.meets{background:#2e7d32}
 .grade-pick .gx.on.below{background:#c62828}
-</style>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="vue.global.prod.js?v=63"></script>
-<script src="firebase-config.js?v=63"></script>
-<script src="seed.js?v=63"></script>
-<script src="faa-rag/faa_index.js?v=63"></script>
-<script src="faa-rag/faaRag.js?v=63"></script>
-<script src="store.js?v=63"></script>
-<script src="app.js?v=63"></script>
+/* Light theme (user preference) — high-contrast, sunlight-readable for ramp use */
+html.light-theme{ --bg:#eef2f6; --bg2:#e3e9f0; --card:#ffffff; --card2:#f3f6fa;
+  --line:#cdd8e3; --text:#13212e; --muted:#5a6b7b;
+  --glass:rgba(255,255,255,.82); --glass-line:rgba(20,40,60,.16);
+  --hud:#0f8f86; --hud-dim:#0b5f59; --amber:#b87400; --green:#1f9d57; --blue:#1f6fd6; --red:#d23b3b; }
+html.light-theme body{background-image:radial-gradient(120% 60% at 50% -10%, rgba(15,143,134,.05), transparent 60%)}
+html.light-theme .maneuver-name{background:rgba(20,40,60,.05)}
+html.light-theme .maneuver-name.meets{background:rgba(31,157,87,.12)}
+html.light-theme .maneuver-name.below{background:rgba(210,59,59,.12)}
+/* AI status badge (audit item 13) in the header */
+.ai-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;letter-spacing:.4px;
+  padding:4px 9px;border-radius:20px;border:1px solid var(--glass-line);cursor:default}
+.ai-badge .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.ai-badge.live{color:var(--green);border-color:rgba(70,224,138,.4);background:rgba(70,224,138,.1)}
+.ai-badge.live .dot{background:var(--green);box-shadow:0 0 8px var(--green)}
+.ai-badge.offline{color:var(--amber);border-color:rgba(255,176,32,.4);background:rgba(255,176,32,.1)}
+.ai-badge.offline .dot{background:var(--amber)}
+.ai-badge.checking{color:var(--muted)}
+.ai-badge.checking .dot{background:var(--muted);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+/* Bulk-grade bar in New Evaluation (audit item 5) */
+.bulk-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 10px}
+.bulk-bar .lbl{font-size:11px;color:var(--hud);text-transform:uppercase;letter-spacing:.4px}
+.bulk-pick{display:flex;gap:4px}
+.bulk-pick button{flex:1;min-width:34px;background:rgba(22,34,47,.6);border:1px solid var(--line);color:var(--muted);
+  border-radius:8px;padding:7px 0;font-weight:700;cursor:pointer;transition:all .15s}
+.bulk-pick button:hover{color:var(--text);border-color:var(--glass-line)}
+.bulk-pick button.on{background:linear-gradient(180deg,var(--hud),var(--hud-dim));border-color:var(--hud);color:#04181a}
+/* Import CSV modal (audit item 11) */
+.import-preview{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:9px;margin-top:8px}
+.import-preview table{font-size:11px}
+.import-err{background:rgba(255,93,93,.1);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:8px;font-size:12px;margin-top:8px}
+.import-ok{background:rgba(70,224,138,.1);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:8px;font-size:12px;margin-top:8px}
+textarea.csv-input{width:100%;min-height:160px;font-family:var(--mono);font-size:12px}
+</style>
 </body>
 </html>
