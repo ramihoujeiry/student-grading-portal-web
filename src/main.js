@@ -14,6 +14,12 @@ import { app } from './app.js';
 // Mount into the in-DOM template (#app) defined in index.html.
 app.mount('#app');
 
+// Expose the mounted component instance for debugging/automation (same intent
+// as window.__app in app.js; prod Vue builds don't keep _instance reachable).
+window.__vm = app._container && app._container._vnode
+  ? app._container._vnode.component?.proxy ?? null
+  : null;
+
 // Register the service worker for offline/PWA support (path is relative to the
 // deployed base, so it resolves correctly under /student-grading-portal-web/).
 if ('serviceWorker' in navigator) {

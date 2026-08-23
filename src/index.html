@@ -48,10 +48,9 @@
   nav.tabs .tab-sep{flex:0 0 1px;align-self:stretch;width:1px;background:var(--glass-line);margin:2px 2px}
   /* On narrow phones the tab row scrolls horizontally instead of wrapping into a tall block. */
   @media (max-width:560px){
-    nav.tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-    nav.tabs::-webkit-scrollbar{display:none}
-    nav.tabs .tab-btn{flex:0 0 auto}
-    nav.tabs .tab-sep{flex:0 0 1px;width:1px}
+    nav.tabs{flex-wrap:wrap}
+    nav.tabs .tab-btn{flex:1 1 auto;min-width:72px}
+    nav.tabs .tab-sep{display:none}
   }
   /* Keyboard skip-link: hidden until focused, then jumps to main content (a11y). */
   .skip-link{position:absolute;left:8px;top:-48px;z-index:200;background:var(--hud);color:#04181a;font-weight:700;
