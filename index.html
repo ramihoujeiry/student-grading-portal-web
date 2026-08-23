@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#1a237e" />
 <title>Student Grading Portal</title>
-<!-- Security: lock down script/style/connection origins. gstatic is allowed for the Firebase compat CDN;
-     'unsafe-eval' is required by Vue's no-build runtime template compiler (new Function). Inline handlers are blocked. -->
+<!-- Security: lock down script/connection origins. App is a bundled ESM SPA (no inline handlers, no cross-origin runtime).
+     'unsafe-eval' is required by Vue's runtime template compiler for the in-DOM template. Scripts are same-origin (bundled)
+     except https://www.gstatic.com, which is allowed for the Firebase compat CDN if it is ever loaded. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://www.gstatic.com 'unsafe-eval'; connect-src 'self' https://raspberrypi.tail3a08db.ts.net https://*.firebaseio.com https://*.firebasestorage.googleapis.com https://*.googleapis.com; manifest-src 'self'; worker-src 'self'" />
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.png" />
@@ -43,6 +44,19 @@
     border-bottom:1px solid var(--glass-line);padding:8px;padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}
   nav.tabs .tab-btn{flex:1 1 auto;min-width:84px;background:rgba(22,34,47,.6);border:1px solid var(--line);color:var(--muted);
     padding:9px 10px;font-size:12px;font-weight:600;cursor:pointer;border-radius:9px;white-space:nowrap;text-align:center;transition:all .15s}
+  /* Visual group separators between nav clusters (admin | data | AI) on wider screens. */
+  nav.tabs .tab-sep{flex:0 0 1px;align-self:stretch;width:1px;background:var(--glass-line);margin:2px 2px}
+  /* On narrow phones the tab row scrolls horizontally instead of wrapping into a tall block. */
+  @media (max-width:560px){
+    nav.tabs{flex-wrap:wrap}
+    nav.tabs .tab-btn{flex:1 1 auto;min-width:72px}
+    nav.tabs .tab-sep{display:none}
+  }
+  /* Keyboard skip-link: hidden until focused, then jumps to main content (a11y). */
+  .skip-link{position:absolute;left:8px;top:-48px;z-index:200;background:var(--hud);color:#04181a;font-weight:700;
+    padding:8px 12px;border-radius:8px;transition:top .15s;text-decoration:none}
+  .skip-link:focus{top:8px}
+  main:focus{outline:none}
   nav.tabs .tab-btn:hover{color:var(--text);border-color:var(--glass-line)}
   nav.tabs .tab-btn.active{background:linear-gradient(180deg,var(--hud),var(--hud-dim));border-color:var(--hud);color:#04181a;box-shadow:0 0 12px rgba(57,208,196,.35)}
   main{padding:14px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));max-width:980px;margin:0 auto calc(80px + env(safe-area-inset-bottom))}
@@ -125,7 +139,12 @@
   .preview{display:flex;gap:14px;align-items:center;margin:12px 0;border-top:1px solid var(--glass-line);padding-top:12px}
   .preview .big{font-size:28px;font-weight:800;color:var(--hud);text-shadow:0 0 12px rgba(57,208,196,.3)}
   .toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:rgba(10,18,26,.92);color:var(--text);
-    padding:10px 18px;border-radius:24px;font-size:13px;z-index:80;opacity:.95;box-shadow:0 4px 14px rgba(0,0,0,.5);border:1px solid var(--glass-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    padding:10px 18px;border-radius:24px;font-size:13px;z-index:80;opacity:.95;box-shadow:0 4px 14px rgba(0,0,0,.5);border:1px solid var(--glass-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    max-width:calc(92vw - 24px);text-align:center}
+  /* Error toasts are visually distinct from success/info toasts (color is never the
+     only signal — see status pills) and persist longer so a save failure isn't missed. */
+  .toast.error{border-color:var(--red);color:#ffd9d9;background:rgba(40,12,12,.94);box-shadow:0 4px 14px rgba(120,20,20,.5)}
+  .toast.success{border-color:var(--green);color:#d7ffe9}
   footer{text-align:center;color:var(--muted);font-size:11px;padding:18px;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
 
   /* Respect users who prefer reduced motion (vestibular safety) */
@@ -166,7 +185,28 @@
   .warn-box{background:rgba(255,176,32,.1);border:1px solid var(--amber);color:var(--amber);border-radius:9px;padding:10px;font-size:12px;margin-top:14px;line-height:1.5}
   .warn-box.danger{background:rgba(255,93,93,.12);border-color:var(--red);color:var(--red)}
   .warn-box b{font-weight:800}
+
+  /* Segmented control (Settings: theme + density toggles) */
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg-btn{background:rgba(22,34,47,.6);border:none;color:var(--muted);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+  .seg-btn:hover{color:var(--text)}
+  .seg-btn.on{background:linear-gradient(180deg,var(--hud),var(--hud-dim));color:#04181a}
+  /* Feedback icon button in the tab bar */
+  .btn-logout.ghost.icon{border:none;background:transparent;color:var(--hud);font-size:15px;padding:6px 10px}
+  /* Compact density: tighten card/list spacing for small phone screens at the ramp */
+  html.compact .card{padding:9px;margin-bottom:8px}
+  html.compact .list li{padding:9px;margin-bottom:6px}
+  html.compact main{padding-top:8px}
+  html.compact .stats{gap:7px}
+  html.compact .stat{padding:9px}
+  html.compact .topbar{margin:2px 0 8px;gap:8px}
+  /* Class-maneuver-difficulty meter bar */
+  .meter{height:8px;background:rgba(8,14,20,.7);border-radius:5px;overflow:hidden;margin-top:10px}
+  .meter-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--amber) 55%,var(--red));border-radius:5px;transition:width .25s}
 </style>
+  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-5FQl3qlg.js"></script>
+  <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-vue-CxFK-cW8.js">
+  <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-firebase-CAVvKspe.js">
 </head>
 <body>
 <div id="app" v-cloak>
@@ -191,11 +231,11 @@
       <div v-if="fbReady">
         <div v-if="authError" class="auth-err">{{authError}}</div>
         <label>Email</label>
-        <input type="email" v-model="authEmail" placeholder="you@squadron"  aria-label="Email"/>
+        <input type="email" v-model="authEmail" placeholder="you@squadron" />
         <label v-if="authMode==='register'">Full name</label>
-        <input v-if="authMode==='register'" v-model="authName" placeholder="Rank. Name"  aria-label="Full name"/>
+        <input v-if="authMode==='register'" v-model="authName" placeholder="Rank. Name" />
         <label>Password</label>
-        <input type="password" v-model="authPass" placeholder="••••••••" @keyup.enter="authMode==='login'?doLogin():doRegister()"  aria-label="Password"/>
+        <input type="password" v-model="authPass" placeholder="••••••••" @keyup.enter="authMode==='login'?doLogin():doRegister()" />
 
         <button class="btn" style="width:100%;margin-top:14px" :disabled="authBusy" v-if="authMode==='login'" @click="doLogin">
           {{authBusy?'Signing in…':'Sign in'}}
@@ -230,22 +270,28 @@
       Your account is awaiting role approval. You can view data, but editing is locked until an admin sets your role.
     </div>
 
-    <nav class="tabs">
-      <button class="tab-btn" :class="{active:tab==='dashboard'}" @click="setTab('dashboard')">Dashboard</button>
-      <button class="tab-btn" :class="{active:tab==='students'}" v-if="isAdmin" @click="setTab('students')">Students</button>
-      <button class="tab-btn" :class="{active:tab==='instructors'}" v-if="isAdmin" @click="setTab('instructors')">Instructors</button>
-      <button class="tab-btn" :class="{active:tab==='aircraft'}" v-if="isAdmin" @click="setTab('aircraft')">Aircraft</button>
-      <button class="tab-btn" :class="{active:tab==='mif'}" v-if="isAdmin" @click="setTab('mif')">MIF Tables</button>
-      <button class="tab-btn" :class="{active:tab==='evaluations'}" v-if="!isViewer" @click="setTab('evaluations')">Evaluations</button>
-      <button class="tab-btn" :class="{active:tab==='announcements'}" @click="setTab('announcements')">Announcements</button>
-      <button class="tab-btn" :class="{active:tab==='analytics'}" @click="setTab('analytics')">Analytics</button>
-      <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" @click="setTab('admin')">Users</button>
-      <button class="tab-btn" :class="{active:tab==='ai'}" @click="setTab('ai')">AI Feedback</button>
-      <button class="tab-btn" :class="{active:tab==='ask'}" @click="setTab('ask')">Ask Data</button>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <nav class="tabs" aria-label="Primary">
+      <button class="tab-btn" :class="{active:tab==='dashboard'}" :aria-current="tab==='dashboard'?'page':null" @click="setTab('dashboard')">Dashboard</button>
+      <button class="tab-btn" :class="{active:tab==='students'}" v-if="isAdmin" :aria-current="tab==='students'?'page':null" @click="setTab('students')">Students</button>
+      <button class="tab-btn" :class="{active:tab==='instructors'}" v-if="isAdmin" :aria-current="tab==='instructors'?'page':null" @click="setTab('instructors')">Instructors</button>
+      <button class="tab-btn" :class="{active:tab==='aircraft'}" v-if="isAdmin" :aria-current="tab==='aircraft'?'page':null" @click="setTab('aircraft')">Aircraft</button>
+      <button class="tab-btn" :class="{active:tab==='mif'}" v-if="isAdmin" :aria-current="tab==='mif'?'page':null" @click="setTab('mif')">MIF Tables</button>
+      <span class="tab-sep" v-if="isAdmin" aria-hidden="true"></span>
+      <button class="tab-btn" :class="{active:tab==='evaluations'}" v-if="!isViewer" :aria-current="tab==='evaluations'?'page':null" @click="setTab('evaluations')">Evaluations</button>
+      <button class="tab-btn" :class="{active:tab==='announcements'}" :aria-current="tab==='announcements'?'page':null" @click="setTab('announcements')">Announcements</button>
+      <button class="tab-btn" :class="{active:tab==='analytics'}" :aria-current="tab==='analytics'?'page':null" @click="setTab('analytics')">Analytics</button>
+      <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" :aria-current="tab==='admin'?'page':null" @click="setTab('admin')">Users</button>
+      <span class="tab-sep" aria-hidden="true"></span>
+      <button class="tab-btn" :class="{active:tab==='ai'}" :aria-current="tab==='ai'?'page':null" @click="setTab('ai')">AI Feedback</button>
+      <button class="tab-btn" :class="{active:tab==='ask'}" :aria-current="tab==='ask'?'page':null" @click="setTab('ask')">Ask Data</button>
+      <span class="tab-sep" aria-hidden="true"></span>
+      <button class="tab-btn" :class="{active:tab==='settings'}" :aria-current="tab==='settings'?'page':null" @click="setTab('settings')">Settings</button>
+      <button class="btn-logout ghost icon" title="Send feedback" aria-label="Send feedback" @click="openFeedback">✉</button>
     </nav>
     </div><!-- /.app-shell -->
 
-    <main>
+    <main id="main-content" tabindex="-1">
       <!-- DASHBOARD -->
       <section v-show="tab==='dashboard'">
         <div class="stats" style="margin-top:12px">
@@ -259,6 +305,50 @@
           <div class="stat"><div class="n">{{dashFilteredEvals.length}}</div><div class="l">Filtered</div></div>
         </div>
 
+        <!-- Dashboard filters (scope the stats, readiness board and recent feed) -->
+        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:12px">
+          <div style="flex:2 1 200px;min-width:160px"><label>Student</label>
+            <select v-model="dashStudent" aria-label="Dashboard student filter"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></div>
+          <div style="flex:1 1 160px;min-width:140px"><label>Aircraft</label>
+            <select v-model="dashAircraft" aria-label="Dashboard aircraft filter"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></div>
+          <div style="flex:1 1 130px;min-width:120px"><label>From</label><input type="date" v-model="dashStart" aria-label="Dashboard from date" /></div>
+          <div style="flex:1 1 130px;min-width:120px"><label>To</label><input type="date" v-model="dashEnd" aria-label="Dashboard to date" /></div>
+          <button class="btn sm ghost" @click="dashStudent='All Cadets';dashAircraft='All Aircraft';dashStart='';dashEnd=''">Clear</button>
+        </div>
+
+        <!-- Class Readiness board: per-student verdict using the same engine as AI Feedback -->
+        <div class="topbar"><h2 style="margin:0">Class Readiness</h2><span class="spacer"></span>
+          <span class="muted" style="font-size:12px">{{dashFilteredEvals.length}} eval(s) in view</span></div>
+        <div v-if="classReadiness.length" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+          <div class="card clickable" v-for="r in classReadiness" :key="r.id" @click="openStudent(students.find(s=>s.id===r.id))">
+            <div class="row" style="align-items:center">
+              <strong style="font-size:15px">{{r.name}}</strong>
+              <span class="spacer" style="flex:1"></span>
+              <span class="pill" :class="r.readiness==='READY'?'good':r.readiness==='REMEDIAL'?'bad':r.readiness==='RECOVERING'?'ok':'pending'">{{readinessLabel(r.readiness)}}</span>
+            </div>
+            <div class="row nowrap" style="margin-top:8px;gap:8px">
+              <span class="muted">Avg {{r.avg}}</span>
+              <span class="pill" :class="r.trend==='IMPROVING'?'good':r.trend==='DECLINING'?'bad':'pending'">{{r.trend}}</span>
+              <span class="muted" v-if="r.weak">{{r.weak}} weak</span>
+            </div>
+          </div>
+        </div>
+        <div v-else class="muted">No evaluations in {{activeYearResolved}} yet.</div>
+
+        <!-- Recent evaluations feed (newest-first) -->
+        <div class="topbar"><h2 style="margin:0">Recent Evaluations</h2><span class="spacer"></span>
+          <button class="btn sm ghost" v-if="!isViewer" @click="setTab('evaluations')">View all</button></div>
+        <ul class="list">
+          <li v-for="e in dashRecent" :key="e.id" class="clickable" @click="openEval(e)">
+            <div class="row nowrap">
+              <strong>{{e.studentName}} · {{e.aircraftType}} {{e.phaseName}} {{e.tripNumber}}</strong>
+              <span class="muted">{{fmt(e.date)}}</span>
+              <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
+              <span class="pill" :class="statusColor(e.overallMifStatus)">{{statusLabel(e.overallMifStatus)}}</span>
+            </div>
+          </li>
+          <li v-if="!dashRecent.length" class="muted">No evaluations match the current filters.</li>
+        </ul>
       </section>
 
       <!-- STUDENTS -->
@@ -346,7 +436,7 @@
           <button class="btn sm" v-if="canEdit" @click="openNewEval">+ New Evaluation</button></div>
         <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
           <div style="flex:2 1 240px;min-width:200px"><label>Search evaluations</label>
-            <input v-model="evSearch" placeholder="date, student, phase, instructor, aircraft…" style="width:100%"  aria-label="Search evaluations"/></div>
+            <input v-model="evSearch" placeholder="date, student, phase, instructor, aircraft…" style="width:100%" /></div>
           <div style="flex:1;min-width:150px"><label>Student
             <select v-model="evStudent" aria-label="Evaluations student filter"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></label></div>
           <div style="flex:1;min-width:140px"><label>Aircraft
@@ -365,7 +455,7 @@
                 <strong>{{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
                 <span class="muted">{{fmt(e.date)}} · {{e.instructorName}}</span>
                 <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
-                <span class="pill" :class="statusColor(e.overallMifStatus)">{{e.overallMifStatus}}</span>
+                <span class="pill" :class="statusColor(e.overallMifStatus)">{{statusLabel(e.overallMifStatus)}}</span>
                 <span class="spacer" style="flex:1"></span>
                 <button class="btn sm danger" v-if="isAdmin" @click.stop="deleteEval(e)">Delete</button>
               </div>
@@ -430,6 +520,25 @@
         </div>
         <div v-if="!perStudentAnalytics.length" class="muted">No students with evaluations for {{activeYearResolved}}.</div>
 
+        <h3 style="margin:22px 2px 10px">Class Maneuver Difficulty</h3>
+        <p class="muted" style="margin:0 2px 12px">Where the cohort as a whole scores below required MIF — useful for syllabus emphasis. Aggregated from all evaluations in {{activeYearResolved}}.</p>
+        <div v-if="classManeuverDifficulty.length" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+          <div class="card" v-for="m in classManeuverDifficulty" :key="m.name">
+            <div class="row nowrap" style="align-items:center">
+              <strong style="font-size:14px">{{m.name}}</strong>
+              <span class="spacer" style="flex:1"></span>
+              <span class="pill" :class="m.belowPct>=40?'bad':m.belowPct>=20?'ok':'good'">{{m.belowPct}}% below MIF</span>
+            </div>
+            <div class="row nowrap" style="margin-top:8px;gap:10px">
+              <span class="muted">avg {{m.avg}}</span>
+              <span class="muted">req {{m.req}}</span>
+              <span class="muted">{{m.n}} graded</span>
+            </div>
+            <div class="meter" :aria-label="m.belowPct+' percent below required MIF'" role="img"><div class="meter-fill" :style="{width: m.belowPct + '%'}"></div></div>
+          </div>
+        </div>
+        <div v-else class="muted">No maneuver grades recorded in {{activeYearResolved}}.</div>
+
         <h3 style="margin:22px 2px 10px">Failed Items (maneuvers below required MIF)</h3>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
           <div class="card" v-for="f in failedItems" :key="f.id">
@@ -490,6 +599,55 @@
         </ul>
       </section>
 
+      <!-- SETTINGS -->
+      <section v-show="tab==='settings'">
+        <div class="topbar"><h2 style="margin:0">Settings</h2></div>
+
+        <div class="card">
+          <h3>Appearance</h3>
+          <div class="row" style="gap:12px;flex-wrap:wrap">
+            <div class="seg" role="group" aria-label="Theme">
+              <button class="seg-btn" :class="{on:theme==='dark'}" @click="theme='dark'">Dark</button>
+              <button class="seg-btn" :class="{on:theme==='light'}" @click="theme='light'">Light</button>
+            </div>
+            <span class="muted">Theme — light mode is sunlight-readable for ramp use.</span>
+          </div>
+          <div class="row" style="gap:12px;flex-wrap:wrap;margin-top:12px">
+            <div class="seg" role="group" aria-label="Density">
+              <button class="seg-btn" :class="{on:uiDensity==='comfortable'}" @click="uiDensity='comfortable'">Comfortable</button>
+              <button class="seg-btn" :class="{on:uiDensity==='compact'}" @click="uiDensity='compact'">Compact</button>
+            </div>
+            <span class="muted">Density — compact fits more on small phone screens.</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Data &amp; Backup</h3>
+          <p class="muted" style="margin:0 0 12px">Export the whole dataset (students, instructors, aircraft, MIF tables, evaluations, announcements) as a JSON file for safekeeping or offline re-seed. Restore overwrites the current records — user accounts are never touched.</p>
+          <div class="row" style="gap:10px;flex-wrap:wrap">
+            <button class="btn sm" @click="backupExport">Export backup (JSON)</button>
+            <label class="btn sm ghost" style="margin:0">Import backup<input type="file" accept="application/json,.json" class="sr-only" @change="backupImportFile" :disabled="backup.busy" /></label>
+          </div>
+          <div v-if="backup.msg" class="import-ok" style="margin-top:10px">{{backup.msg}}</div>
+          <div v-if="backup.error" class="import-err" style="margin-top:10px">{{backup.error}}</div>
+        </div>
+
+        <div class="card">
+          <h3>Local data</h3>
+          <p class="muted" style="margin:0 0 12px">Usage analytics and feedback are stored on this device only. Clear them if you share this device.</p>
+          <button class="btn sm danger" @click="clearLocalData">Clear local analytics &amp; feedback</button>
+        </div>
+
+        <div class="card" v-if="isAdmin">
+          <h3>Admin</h3>
+          <div class="row" style="gap:12px;flex-wrap:wrap">
+            <span class="pill" :class="role==='admin'?'good':'pending'">Role: {{role.toUpperCase()}}</span>
+            <button class="btn sm ghost" @click="setTab('admin')">User management</button>
+            <button class="btn sm ghost" @click="setTab('mif')">MIF tables</button>
+          </div>
+        </div>
+      </section>
+
       <!-- AI FEEDBACK -->
       <section v-show="tab==='ai'">
         <div class="card">
@@ -522,7 +680,7 @@
           <h3>Ask Your Grading Data</h3>
           <p class="muted" style="margin:4px 2px 12px">Ask a plain-English question about students, phases, MIF status or recent evaluations. Answers come from the live AI model over the data you already have access to.</p>
           <label>Your question</label>
-          <textarea v-model="askQuery" rows="3" placeholder="e.g. Which students are currently below MIF this phase? / Summarize last week's evaluations. / Who needs the most attention?" aria-label="Your question"></textarea>
+          <textarea v-model="askQuery" rows="3" placeholder="e.g. Which students are currently below MIF this phase? / Summarize last week's evaluations. / Who needs the most attention?"></textarea>
           <div style="margin-top:12px" class="row">
             <button class="btn" :disabled="askLoading" @click="askData">{{askLoading ? 'Thinking…' : 'Ask'}}</button>
             <button class="btn ghost" :disabled="!askResult" @click="askQuery='';askResult=''">Clear</button>
@@ -536,7 +694,7 @@
 
   <!-- EVALUATION MODAL -->
   <div class="modal-mask fullscreen" v-if="loggedIn && showEvalModal" @click.self="showEvalModal=false">
-    <div class="modal full" role="dialog" aria-modal="true">
+    <div class="modal full">
       <h2>New Evaluation</h2>
       <label>Aircraft
       <select v-model="evalForm.aircraftType" @change="onEvalContextChange; suggestTrip" aria-label="Evaluation aircraft">
@@ -592,14 +750,6 @@
         </div>
       </div>
       <label>Maneuver Grades</label>
-      <div class="bulk-bar" v-if="evalForm.maneuverGrades.length">
-        <span class="lbl">Fill all:</span>
-        <div class="bulk-pick">
-          <button v-for="n in [1,2,3,4]" :key="n" :class="{on: bulkGrade===n}" @click="applyBulkGrade(n)">{{n}}</button>
-        </div>
-        <button class="btn sm ghost" @click="clearBulkGrade">Clear</button>
-        <button class="btn sm ghost" @click="copyLastTrip">⧉ Copy last trip</button>
-      </div>
       <div class="card" v-if="evalForm.maneuverGrades.length">
         <div class="grade-row" v-for="(m,idx) in evalForm.maneuverGrades" :key="m.name" style="margin-bottom:12px">
           <div class="maneuver-name" :class="{below:m.studentGrade && m.requiredMif!=null && m.studentGrade < m.requiredMif, meets:m.studentGrade && m.requiredMif!=null && m.studentGrade >= m.requiredMif}">
@@ -613,7 +763,7 @@
       </div>
       <div v-else class="muted">Select an aircraft + phase that has a MIF table.</div>
       <label>Trip Notes</label>
-      <textarea v-model="evalForm.tripNotes" placeholder="Coach comments, safety items…" aria-label="Trip Notes"></textarea>
+      <textarea v-model="evalForm.tripNotes" placeholder="Coach comments, safety items…"></textarea>
       <div class="modal-actions">
         <button class="btn" :disabled="saving" @click="saveEval">{{ saving ? 'Saving…' : 'Save Evaluation' }}</button>
         <button class="btn ghost" @click="printFormEval">Print PDF</button>
@@ -624,7 +774,7 @@
 
   <!-- OVERWRITE CONFIRM MODAL (replaces native confirm: Cancel-safe) -->
   <div class="modal-mask" v-if="loggedIn && overwriteClash" @click.self="cancelOverwrite">
-    <div class="modal" role="dialog" aria-modal="true" style="max-width:440px">
+    <div class="modal" style="max-width:440px">
       <h2 style="color:var(--red);margin-top:0">⚠ Trip already graded</h2>
       <p style="line-height:1.6">
         Trip <b>{{overwriteClash.tripNumber}}</b> ({{overwriteClash.phaseName}}) for this student was already graded
@@ -642,11 +792,11 @@
 
   <!-- IMPORT CSV MODAL (audit item 11) -->
   <div class="modal-mask" v-if="loggedIn && importCsv.open" @click.self="closeImport">
-    <div class="modal" role="dialog" aria-modal="true" style="max-width:680px">
+    <div class="modal" style="max-width:680px">
       <h2 style="margin-top:0">Import evaluations from CSV</h2>
       <p class="muted" style="margin:4px 2px 10px">Paste the CSV produced by <b>Export CSV</b> (or match its header). Rows are validated against known students/aircraft; matching student+phase+trip rows overwrite the existing evaluation. Unknown students/aircraft are skipped with a warning.</p>
       <label>CSV data</label>
-      <textarea class="csv-input" v-model="importCsv.text" @input="parseImportCsv" placeholder="Student,Aircraft,Phase,Trip,Date,Instructor,Duration(h),FinalGrade,MIF Status,FlightYear,TripNotes&#10;Jane Doe,R44-2,CONTACT,S3,2026-08-01,Capt. Smith,1.2,82,BELOW STANDARD,2026-2027," aria-label="CSV data"></textarea>
+      <textarea class="csv-input" v-model="importCsv.text" @input="parseImportCsv" placeholder="Student,Aircraft,Phase,Trip,Date,Instructor,Duration(h),FinalGrade,MIF Status,FlightYear,TripNotes&#10;Jane Doe,R44-2,CONTACT,S3,2026-08-01,Capt. Smith,1.2,82,BELOW STANDARD,2026-2027,"></textarea>
       <div v-if="importCsv.error" class="import-err">{{importCsv.error}}</div>
       <div v-if="importCsv.parsed && importCsv.parsed.total" class="import-ok">
         {{importCsv.parsed.total}} row(s) ready to import
@@ -676,7 +826,7 @@
 
   <!-- FEEDBACK CHANNEL (audit item 9) — in-app, anonymous, stored locally -->
   <div class="modal-mask" v-if="loggedIn && feedback.open" @click.self="closeFeedback">
-    <div class="modal" role="dialog" aria-modal="true" style="max-width:480px">
+    <div class="modal" style="max-width:480px">
       <h2 style="margin-top:0">Send feedback</h2>
       <p class="muted" style="margin:0 0 10px;line-height:1.5">Spotted a bug or have an idea? Send it to the app owner. Stored on this device only (no account link) for now.</p>
       <label>Your role
@@ -687,7 +837,7 @@
         <option value="unknown">Prefer not to say</option>
       </select></label>
       <label style="margin-top:10px">Message</label>
-      <textarea v-model="feedback.text" rows="5" placeholder="What's working, what's not, what you'd like next…" :disabled="feedback.busy || feedback.done" aria-label="Message"></textarea>
+      <textarea v-model="feedback.text" rows="5" placeholder="What's working, what's not, what you'd like next…" :disabled="feedback.busy || feedback.done"></textarea>
       <div v-if="feedback.error" class="import-err">{{feedback.error}}</div>
       <div v-if="feedback.done" class="import-ok">Thanks — feedback saved on this device.</div>
       <div class="modal-actions" style="position:static;border:none;padding-top:0;margin-top:14px">
@@ -701,19 +851,19 @@
 
   <!-- GENERIC DIALOG (replaces native prompt()/confirm()) — audit item 2 -->
   <div class="modal-mask" v-if="loggedIn && dlg.open" @click.self="dlgCancel">
-    <div class="modal" role="dialog" aria-modal="true" style="max-width:480px">
+    <div class="modal" style="max-width:480px">
       <h2 style="margin-top:0">{{dlg.title}}</h2>
       <p v-if="dlg.message" class="muted" style="margin:0 0 10px;line-height:1.5">{{dlg.message}}</p>
       <!-- single text input -->
       <div v-if="dlg.mode==='input'">
         <label>{{dlg.label}}</label>
-        <input type="text" v-model="dlg.value" @keyup.enter="!dlg.busy && dlgConfirm()" :disabled="dlg.busy"  :aria-label="dlg.label"/>
+        <input type="text" v-model="dlg.value" @keyup.enter="!dlg.busy && dlgConfirm()" :disabled="dlg.busy" />
       </div>
       <!-- multi-field form (add student/aircraft/MIF table/maneuver/announcement/role) -->
       <div v-if="dlg.mode==='form'">
         <div v-for="f in (dlg.fields||[])" :key="f.key" style="margin-bottom:10px">
           <label>{{f.label}}</label>
-          <textarea v-if="f.type==='textarea'" v-model="f.value" rows="4" :disabled="dlg.busy" :aria-label="f.label"></textarea>
+          <textarea v-if="f.type==='textarea'" v-model="f.value" rows="4" :disabled="dlg.busy"></textarea>
           <input v-else :type="f.type==='number' ? 'number' : 'text'" v-model="f.value" :disabled="dlg.busy" />
         </div>
       </div>
@@ -728,7 +878,7 @@
 
   <!-- EVALUATION DETAIL MODAL -->
   <div class="modal-mask" v-if="loggedIn && selectedEval" @click.self="closeDetail">
-    <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal">
       <div class="row">
         <h2 style="margin:0">{{selectedEval.studentName}}</h2>
         <span class="spacer" style="flex:1"></span>
@@ -767,7 +917,7 @@
 
   <!-- STUDENT PROFILE MODAL -->
   <div class="modal-mask" v-if="loggedIn && selectedStudent" @click.self="closeDetail">
-    <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal">
       <div class="row">
         <h2 style="margin:0">{{selectedStudent.name}}</h2>
         <span class="spacer" style="flex:1"></span>
@@ -796,7 +946,7 @@
     </div>
   </div>
 
-  <div class="toast" role="status" aria-live="polite" v-if="toast">{{toast}}</div>
+  <div class="toast" :class="toastType" role="status" :aria-live="toastType==='error'?'assertive':'polite'" v-if="toast">{{toast}}</div>
   <footer v-if="loggedIn">Student Grading Portal · web PWA · Firebase</footer>
 </div>
 
@@ -852,15 +1002,6 @@ html.light-theme .maneuver-name.below{background:rgba(210,59,59,.12)}
 .import-ok{background:rgba(70,224,138,.1);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:8px;font-size:12px;margin-top:8px}
 textarea.csv-input{width:100%;min-height:160px;font-family:var(--mono);font-size:12px}
 </style>
-<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js" integrity="sha384-3dQMr5IYbX54CRsE04108MMs7jeEV/IWSMASoZPvju7G87xGB1a2oHweoRc6Fc4z" crossorigin="anonymous"></script>
-<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js" integrity="sha384-5I6kB//hXDU3+uF6P5whMNsiMpLfjPrRMnO628LkoLTV1F4roavOGYGkaES3TPAa" crossorigin="anonymous"></script>
-<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js" integrity="sha384-x/Sc6BbQTFJ8Xok/nKTwZ6hrjKCAPuoiUBD0gRRS0yNLtHZiq2MpDvGVEGBUQefs" crossorigin="anonymous"></script>
-<script src="vue.global.prod.js?v=63" integrity="sha384-arPHRzOKPl8g3Rbe/cQBWYPnq4HcxfPFSFWD3qvI/hc2XQf+4GkVqkOlWgjN5mD3" crossorigin="anonymous"></script>
-<script src="firebase-config.js?v=65"></script>
-<script src="seed.js?v=65"></script>
-<script src="faa-rag/faa_index.js?v=65"></script>
-<script src="faa-rag/faaRag.js?v=65"></script>
-<script src="store.js?v=65"></script>
-<script src="app.js?v=65"></script>
+
 </body>
 </html>
