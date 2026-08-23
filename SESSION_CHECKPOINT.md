@@ -122,3 +122,12 @@ is NOT deployed) and scoped 5 critical paths. This entry records what was actual
 **Bottom line:** Path 3 (the highest-risk app-blanking bug) is verified by a committed, re-runnable
 unit test. Paths 1/2/4/5 remain pending real-backend validation and must not be reported as
 production-confirmed until t_095b2d3d produces and commits a live run report.
+
+---
+
+**UPDATE 2026-08-23 (post t_095b2d3d completion):**
+- The Playwright smoke suite for src/store.js critical paths is now **committed** (`tests/store.smoke.spec.js`, `tests/fixture/firebase/firestore.js`, `playwright.config.js`) at `2cb9615` on main.
+- Re-run this session: **15 passed / 0 failed** via `npx playwright test` (chromium).
+- Covers all 5 paths at unit/fixture level: auth+role resolution, watch() listener contract + date normalization, Timestamp/year-3995 guard, grading math + analytics (calcFinalGrade/calcMifStatus/buildPerformance), AI config + RAG-grounded debrief builders, flight-year derivation.
+- `scripts/_ts_audit_test.mjs` re-run this session: **16 passed / 0 failed**.
+- Scope honesty unchanged: these are fixture-driven runs (local fake Firestore, no live Firebase network calls). Paths 1/2/4/5 are now unit-level verified by a committed, re-runnable suite; a seeded-live-Firestore run remains the only remaining gap before claiming production-data parity. Path 3 stands fully verified.
