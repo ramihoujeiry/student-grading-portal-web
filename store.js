@@ -327,32 +327,38 @@ function stddev(a){ if(!a||!a.length) return 0; const m=avg(a);return Math.sqrt(
 function maxKey(o){ if(!o) return null; let bk=null,bv=-Infinity;Object.keys(o).forEach(k=>{if(o[k]>bv){bv=o[k];bk=k;}});return bk; }
 function minKey(o){ if(!o) return null; let bk=null,bv=Infinity;Object.keys(o).forEach(k=>{if(o[k]<bv){bv=o[k];bk=k;}});return bk; }
 function computeTrend(sorted){
-  if(!sorted||sorted.length<2)return{t:'STABLE',d:0};
-  const half=Math.floor(sorted.length/2);
-  const first=avg(sorted.slice(0,half).map(e=>e.finalGrade));
-  const second=avg(sorted.slice(half).map(e=>e.finalGrade));
+  // Skip null / non-object elements so a malformed entry in the list can't
+  // throw on `.finalGrade` (the c8c9d3a app-blanking class).
+  const items=(sorted||[]).filter(e=>e&&typeof e==='object');
+  if(items.length<2)return{t:'STABLE',d:0};
+  const half=Math.floor(items.length/2);
+  const first=avg(items.slice(0,half).map(e=>e.finalGrade));
+  const second=avg(items.slice(half).map(e=>e.finalGrade));
   const d=second-first;
   return d>=3?{t:'IMPROVING',d}:d<=-3?{t:'DECLINING',d}:{t:'STABLE',d};
 }
 function maneuverTrendOf(by){
-  if(!by||by.length<2)return 'FLAT';
-  const half=Math.floor(by.length/2);
-  const first=avg(by.slice(0,half).map(p=>p[1]));
-  const second=avg(by.slice(half).map(p=>p[1]));
+  // Skip null / non-array pairs so a malformed entry can't throw on `[1]`.
+  const items=(by||[]).filter(p=>Array.isArray(p));
+  if(items.length<2)return 'FLAT';
+  const half=Math.floor(items.length/2);
+  const first=avg(items.slice(0,half).map(p=>p[1]));
+  const second=avg(items.slice(half).map(p=>p[1]));
   const d=second-first;
   return d>=5?'IMPROVING':d<=-5?'DECLINING':'FLAT';
 }
 function extractThemes(notes){
   if(!notes||!notes.length) return [];
   const counts={};
-  notes.forEach(n=>n.toLowerCase().split(/[^a-z]+/).forEach(w=>{if(w.length>=4&&!STOP_WORDS.has(w))counts[w]=(counts[w]||0)+1;}));
+  // Skip null / non-string notes so a malformed entry can't throw on toLowerCase().
+  notes.filter(n=>n&&typeof n==='string').forEach(n=>n.toLowerCase().split(/[^a-z]+/).forEach(w=>{if(w.length>=4&&!STOP_WORDS.has(w))counts[w]=(counts[w]||0)+1;}));
   return Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,5);
 }
 
 function buildPerformance(student, evals){
   // Normalize each eval's date field defensively so a raw Firestore Timestamp,
   // JS Date, or malformed value can never reach the sort/display math below.
-  const normEvals = (evals || []).map(e => e && typeof e === 'object' ? { ...e, date: toEpochSec(e.date) } : e);
+  const normEvals = (evals || []).filter(e=>e&&typeof e==='object').map(e => ({ ...e, date: toEpochSec(e.date) }));
   const sorted=normEvals.slice().sort((a,b)=>(a.date||0)-(b.date||0));
   const overallScore=sorted.length?avg(sorted.map(e=>e.finalGrade)):0;
   const grades=sorted.map(e=>e.finalGrade);
