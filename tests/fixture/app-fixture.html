@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>app flows smoke fixture</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "vue": "/node_modules/vue/dist/vue.esm-bundler.js",
+      "firebase/app": "./firebase/app.js",
+      "firebase/auth": "./firebase/auth.js",
+      "firebase/firestore": "./firebase/firestore.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- The REAL app template, inlined from src/index.html at serve time -->
+  <!-- APP_TEMPLATE -->
+  <script type="module">
+    import { app } from '/src/app.js';
+    app.mount('#app');
+    window.__vm = app._container && app._container._vnode
+      ? app._container._vnode.component?.proxy ?? null
+      : null;
+    document.documentElement.dataset.appReady = '1';
+  </script>
+</body>
+</html>

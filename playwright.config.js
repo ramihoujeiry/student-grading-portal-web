@@ -8,9 +8,10 @@ const PORT = process.env.E2E_PORT || 4173;
 const BASE_URL = process.env.E2E_BASE_URL || `http://127.0.0.1:${PORT}/`;
 
 export default defineConfig({
-  // The smoke suite lives directly in tests/ (tests/store.smoke.spec.js).
+  // The smoke suites live directly in tests/ (store.js data layer + the
+  // index.html feature surface, both served by tests/serve.mjs).
   testDir: './tests',
-  testMatch: /store\.smoke\.spec\.js$/,
+  testMatch: /.*\.smoke\.spec\.js$/,
   fullyParallel: false,      // app shares one Firebase backend; keep tests sequential
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

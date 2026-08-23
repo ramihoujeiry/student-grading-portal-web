@@ -31,6 +31,12 @@ async function sendFile(res, filePath) {
   res.end(body);
 }
 
+
+async function sendText(res, text) {
+  res.writeHead(200, { 'Content-Type': MIME['.html'] });
+  res.end(text);
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -45,6 +51,22 @@ const server = http.createServer(async (req, res) => {
       const info = await stat(filePath).catch(() => null);
       if (!info || !info.isFile()) { res.writeHead(404); res.end('not found'); return; }
       await sendFile(res, filePath);
+      return;
+    }
+
+
+    // Live-parity app fixture: /app.html serves tests/fixture/app-fixture.html
+    // with the REAL src/index.html body injected at the APP_TEMPLATE marker,
+    // so Playwright exercises the authentic in-DOM Vue template + app.js.
+    if (urlPath === '/app.html') {
+      const tpl = await readFile(join(fixtureRoot, 'app-fixture.html'), 'utf8');
+      let srcHtml = await readFile(join(srcRoot, 'index.html'), 'utf8');
+      // Extract everything between <body> and </body>.
+      const m = srcHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      let body = m ? m[1] : '';
+      // Drop the bundler entry (the fixture mounts app.js itself).
+      body = body.replace(/<script[^>]*main\.js[^>]*><\/script>/i, '');
+      await sendText(res, tpl.replace('<!-- APP_TEMPLATE -->', body));
       return;
     }
 
