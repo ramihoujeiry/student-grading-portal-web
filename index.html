@@ -6,8 +6,9 @@
 <meta name="theme-color" content="#1a237e" />
 <title>Student Grading Portal</title>
 <!-- Security: lock down script/connection origins. App is a bundled ESM SPA (no inline handlers, no cross-origin runtime).
-     'unsafe-eval' is required by Vue's runtime template compiler for the in-DOM template. All scripts are same-origin (bundled). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'; connect-src 'self' https://raspberrypi.tail3a08db.ts.net https://*.firebaseio.com https://*.firebasestorage.googleapis.com https://*.googleapis.com; manifest-src 'self'; worker-src 'self'" />
+     'unsafe-eval' is required by Vue's runtime template compiler for the in-DOM template. Scripts are same-origin (bundled)
+     except https://www.gstatic.com, which is allowed for the Firebase compat CDN if it is ever loaded. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://www.gstatic.com 'unsafe-eval'; connect-src 'self' https://raspberrypi.tail3a08db.ts.net https://*.firebaseio.com https://*.firebasestorage.googleapis.com https://*.googleapis.com; manifest-src 'self'; worker-src 'self'" />
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.png" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -43,6 +44,20 @@
     border-bottom:1px solid var(--glass-line);padding:8px;padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}
   nav.tabs .tab-btn{flex:1 1 auto;min-width:84px;background:rgba(22,34,47,.6);border:1px solid var(--line);color:var(--muted);
     padding:9px 10px;font-size:12px;font-weight:600;cursor:pointer;border-radius:9px;white-space:nowrap;text-align:center;transition:all .15s}
+  /* Visual group separators between nav clusters (admin | data | AI) on wider screens. */
+  nav.tabs .tab-sep{flex:0 0 1px;align-self:stretch;width:1px;background:var(--glass-line);margin:2px 2px}
+  /* On narrow phones the tab row scrolls horizontally instead of wrapping into a tall block. */
+  @media (max-width:560px){
+    nav.tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    nav.tabs::-webkit-scrollbar{display:none}
+    nav.tabs .tab-btn{flex:0 0 auto}
+    nav.tabs .tab-sep{flex:0 0 1px;width:1px}
+  }
+  /* Keyboard skip-link: hidden until focused, then jumps to main content (a11y). */
+  .skip-link{position:absolute;left:8px;top:-48px;z-index:200;background:var(--hud);color:#04181a;font-weight:700;
+    padding:8px 12px;border-radius:8px;transition:top .15s;text-decoration:none}
+  .skip-link:focus{top:8px}
+  main:focus{outline:none}
   nav.tabs .tab-btn:hover{color:var(--text);border-color:var(--glass-line)}
   nav.tabs .tab-btn.active{background:linear-gradient(180deg,var(--hud),var(--hud-dim));border-color:var(--hud);color:#04181a;box-shadow:0 0 12px rgba(57,208,196,.35)}
   main{padding:14px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));max-width:980px;margin:0 auto calc(80px + env(safe-area-inset-bottom))}
@@ -125,7 +140,12 @@
   .preview{display:flex;gap:14px;align-items:center;margin:12px 0;border-top:1px solid var(--glass-line);padding-top:12px}
   .preview .big{font-size:28px;font-weight:800;color:var(--hud);text-shadow:0 0 12px rgba(57,208,196,.3)}
   .toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:rgba(10,18,26,.92);color:var(--text);
-    padding:10px 18px;border-radius:24px;font-size:13px;z-index:80;opacity:.95;box-shadow:0 4px 14px rgba(0,0,0,.5);border:1px solid var(--glass-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    padding:10px 18px;border-radius:24px;font-size:13px;z-index:80;opacity:.95;box-shadow:0 4px 14px rgba(0,0,0,.5);border:1px solid var(--glass-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    max-width:calc(92vw - 24px);text-align:center}
+  /* Error toasts are visually distinct from success/info toasts (color is never the
+     only signal — see status pills) and persist longer so a save failure isn't missed. */
+  .toast.error{border-color:var(--red);color:#ffd9d9;background:rgba(40,12,12,.94);box-shadow:0 4px 14px rgba(120,20,20,.5)}
+  .toast.success{border-color:var(--green);color:#d7ffe9}
   footer{text-align:center;color:var(--muted);font-size:11px;padding:18px;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
 
   /* Respect users who prefer reduced motion (vestibular safety) */
@@ -166,8 +186,26 @@
   .warn-box{background:rgba(255,176,32,.1);border:1px solid var(--amber);color:var(--amber);border-radius:9px;padding:10px;font-size:12px;margin-top:14px;line-height:1.5}
   .warn-box.danger{background:rgba(255,93,93,.12);border-color:var(--red);color:var(--red)}
   .warn-box b{font-weight:800}
+
+  /* Segmented control (Settings: theme + density toggles) */
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg-btn{background:rgba(22,34,47,.6);border:none;color:var(--muted);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+  .seg-btn:hover{color:var(--text)}
+  .seg-btn.on{background:linear-gradient(180deg,var(--hud),var(--hud-dim));color:#04181a}
+  /* Feedback icon button in the tab bar */
+  .btn-logout.ghost.icon{border:none;background:transparent;color:var(--hud);font-size:15px;padding:6px 10px}
+  /* Compact density: tighten card/list spacing for small phone screens at the ramp */
+  html.compact .card{padding:9px;margin-bottom:8px}
+  html.compact .list li{padding:9px;margin-bottom:6px}
+  html.compact main{padding-top:8px}
+  html.compact .stats{gap:7px}
+  html.compact .stat{padding:9px}
+  html.compact .topbar{margin:2px 0 8px;gap:8px}
+  /* Class-maneuver-difficulty meter bar */
+  .meter{height:8px;background:rgba(8,14,20,.7);border-radius:5px;overflow:hidden;margin-top:10px}
+  .meter-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--amber) 55%,var(--red));border-radius:5px;transition:width .25s}
 </style>
-  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-BZmeaFeT.js"></script>
+  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-5FQl3qlg.js"></script>
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-vue-CxFK-cW8.js">
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-firebase-CAVvKspe.js">
 </head>
@@ -219,14 +257,6 @@
     <header class="app">
       <span class="spacer"></span>
       <h1 class="sr-only">Student Grading Portal</h1>
-      <span class="ai-badge" :class="aiBadge" :title="aiBadge==='live' ? 'AI: live (Pi model online)' : aiBadge==='offline' ? 'AI: offline template (Pi unreachable)' : 'Checking AI status…'">
-        <span class="dot"></span>
-        <span>{{aiBadge==='live' ? 'AI LIVE' : aiBadge==='offline' ? 'AI OFFLINE' : 'AI…'}}</span>
-      </span>
-      <button class="btn-logout" @click="toggleTheme" :title="theme==='dark' ? 'Switch to light theme' : 'Switch to dark theme'" :aria-label="theme==='dark' ? 'Switch to light theme' : 'Switch to dark theme'">
-        {{theme==='dark' ? '☀' : '☾'}}
-      </button>
-      <button class="btn-logout" @click="openFeedback" title="Send feedback to the app owner" aria-label="Send feedback to the app owner">Feedback</button>
       <label class="year-pick">Year
         <select v-model="activeYear" aria-label="School year">
           <option v-for="y in years" :key="y" :value="y">{{y}}</option>
@@ -241,35 +271,30 @@
       Your account is awaiting role approval. You can view data, but editing is locked until an admin sets your role.
     </div>
 
-    <nav class="tabs">
-      <button class="tab-btn" :class="{active:tab==='dashboard'}" @click="setTab('dashboard')">Dashboard</button>
-      <button class="tab-btn" :class="{active:tab==='students'}" v-if="isAdmin" @click="setTab('students')">Students</button>
-      <button class="tab-btn" :class="{active:tab==='instructors'}" v-if="isAdmin" @click="setTab('instructors')">Instructors</button>
-      <button class="tab-btn" :class="{active:tab==='aircraft'}" v-if="isAdmin" @click="setTab('aircraft')">Aircraft</button>
-      <button class="tab-btn" :class="{active:tab==='mif'}" v-if="isAdmin" @click="setTab('mif')">MIF Tables</button>
-      <button class="tab-btn" :class="{active:tab==='evaluations'}" v-if="!isViewer" @click="setTab('evaluations')">Evaluations</button>
-      <button class="tab-btn" :class="{active:tab==='announcements'}" @click="setTab('announcements')">Announcements</button>
-      <button class="tab-btn" :class="{active:tab==='analytics'}" @click="setTab('analytics')">Analytics</button>
-      <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" @click="setTab('admin')">Users</button>
-      <button class="tab-btn" :class="{active:tab==='ai'}" @click="setTab('ai')">AI Feedback</button>
-      <button class="tab-btn" :class="{active:tab==='ask'}" @click="setTab('ask')">Ask Data</button>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <nav class="tabs" aria-label="Primary">
+      <button class="tab-btn" :class="{active:tab==='dashboard'}" :aria-current="tab==='dashboard'?'page':null" @click="setTab('dashboard')">Dashboard</button>
+      <button class="tab-btn" :class="{active:tab==='students'}" v-if="isAdmin" :aria-current="tab==='students'?'page':null" @click="setTab('students')">Students</button>
+      <button class="tab-btn" :class="{active:tab==='instructors'}" v-if="isAdmin" :aria-current="tab==='instructors'?'page':null" @click="setTab('instructors')">Instructors</button>
+      <button class="tab-btn" :class="{active:tab==='aircraft'}" v-if="isAdmin" :aria-current="tab==='aircraft'?'page':null" @click="setTab('aircraft')">Aircraft</button>
+      <button class="tab-btn" :class="{active:tab==='mif'}" v-if="isAdmin" :aria-current="tab==='mif'?'page':null" @click="setTab('mif')">MIF Tables</button>
+      <span class="tab-sep" v-if="isAdmin" aria-hidden="true"></span>
+      <button class="tab-btn" :class="{active:tab==='evaluations'}" v-if="!isViewer" :aria-current="tab==='evaluations'?'page':null" @click="setTab('evaluations')">Evaluations</button>
+      <button class="tab-btn" :class="{active:tab==='announcements'}" :aria-current="tab==='announcements'?'page':null" @click="setTab('announcements')">Announcements</button>
+      <button class="tab-btn" :class="{active:tab==='analytics'}" :aria-current="tab==='analytics'?'page':null" @click="setTab('analytics')">Analytics</button>
+      <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" :aria-current="tab==='admin'?'page':null" @click="setTab('admin')">Users</button>
+      <span class="tab-sep" aria-hidden="true"></span>
+      <button class="tab-btn" :class="{active:tab==='ai'}" :aria-current="tab==='ai'?'page':null" @click="setTab('ai')">AI Feedback</button>
+      <button class="tab-btn" :class="{active:tab==='ask'}" :aria-current="tab==='ask'?'page':null" @click="setTab('ask')">Ask Data</button>
+      <span class="tab-sep" aria-hidden="true"></span>
+      <button class="tab-btn" :class="{active:tab==='settings'}" :aria-current="tab==='settings'?'page':null" @click="setTab('settings')">Settings</button>
+      <button class="btn-logout ghost icon" title="Send feedback" aria-label="Send feedback" @click="openFeedback">✉</button>
     </nav>
     </div><!-- /.app-shell -->
 
-    <main>
+    <main id="main-content" tabindex="-1">
       <!-- DASHBOARD -->
       <section v-show="tab==='dashboard'">
-        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
-          <div style="flex:1;min-width:130px"><label>Student
-            <select v-model="dashStudent" aria-label="Dashboard student filter"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></label></div>
-          <div style="flex:1;min-width:130px"><label>Aircraft
-            <select v-model="dashAircraft" aria-label="Dashboard aircraft filter"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></label></div>
-          <div style="flex:1;min-width:120px"><label>From
-            <input type="date" v-model="dashStart" /></label></div>
-          <div style="flex:1;min-width:120px"><label>To
-            <input type="date" v-model="dashEnd" /></label></div>
-          <button class="btn sm ghost" @click="dashStudent='All Cadets';dashAircraft='All Aircraft';dashStart='';dashEnd=''">Reset</button>
-        </div>
         <div class="stats" style="margin-top:12px">
           <div class="stat"><div class="n">{{stats.students}}</div><div class="l">Students</div></div>
           <div class="stat"><div class="n">{{stats.instructors}}</div><div class="l">Instructors</div></div>
@@ -280,42 +305,51 @@
           <div class="stat"><div class="n">{{dashTotalHours.toFixed(1)}}</div><div class="l">Total Hours</div></div>
           <div class="stat"><div class="n">{{dashFilteredEvals.length}}</div><div class="l">Filtered</div></div>
         </div>
-        <!-- Quick Grade widget (audit-derived): one tap opens a new evaluation for the
-             selected student+aircraft+phase with the next trip pre-suggested. -->
-        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
-          <div style="flex:2;min-width:150px"><label>Quick grade — student
-            <select v-model="evalForm.studentId" @change="suggestTrip" aria-label="Quick grade — student"><option value="">— select student —</option><option v-for="s in activeStudents" :key="s.id" :value="s.id">{{s.name}}</option></select></label></div>
-          <div style="flex:1.4;min-width:140px"><label>Aircraft
-            <select v-model="evalForm.aircraftType" @change="onEvalContextChange; suggestTrip" aria-label="Quick grade — aircraft"><option value="">— select —</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></label></div>
-          <div style="flex:1.4;min-width:140px"><label>Phase
-            <select v-model="evalForm.phaseName" @change="onEvalContextChange; suggestTrip" aria-label="Quick grade — phase"><option value="">— select —</option><option v-for="t in mifTables.filter(x=>x.aircraftType===evalForm.aircraftType)" :key="t.id" :value="t.phaseName">{{t.phaseName}}</option></select></label></div>
-          <button class="btn sm" :disabled="!canEdit || !evalForm.studentId || !evalForm.aircraftType || !evalForm.phaseName" @click="openNewEval">+ Grade</button>
-        </div>
-        <div v-if="dashCoveredYears.length" class="muted" style="margin-top:8px">
-          School years with data: {{dashCoveredYears.join(' · ')}}
+
+        <!-- Dashboard filters (scope the stats, readiness board and recent feed) -->
+        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:12px">
+          <div style="flex:2 1 200px;min-width:160px"><label>Student</label>
+            <select v-model="dashStudent" aria-label="Dashboard student filter"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></div>
+          <div style="flex:1 1 160px;min-width:140px"><label>Aircraft</label>
+            <select v-model="dashAircraft" aria-label="Dashboard aircraft filter"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></div>
+          <div style="flex:1 1 130px;min-width:120px"><label>From</label><input type="date" v-model="dashStart" aria-label="Dashboard from date" /></div>
+          <div style="flex:1 1 130px;min-width:120px"><label>To</label><input type="date" v-model="dashEnd" aria-label="Dashboard to date" /></div>
+          <button class="btn sm ghost" @click="dashStudent='All Cadets';dashAircraft='All Aircraft';dashStart='';dashEnd=''">Clear</button>
         </div>
 
-        <!-- Class Readiness board (dashboard widget, reuses buildPerformance) -->
-        <h3 style="margin:18px 2px 8px">Class Readiness</h3>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">
-          <div class="card clickable" v-for="c in classReadiness" :key="c.id" @click="openStudent(students.find(s=>s.id===c.id))" style="padding:12px">
-            <div class="row nowrap"><strong style="font-size:14px">{{c.name}}</strong><span class="spacer" style="flex:1"></span>
-              <span class="pill" :class="{'good':c.readiness==='READY','ok':c.readiness==='RECOVERING','bad':c.readiness==='REMEDIAL','pending':c.readiness==='INSUFFICIENT_DATA'}">{{readinessLabel(c.readiness)}}</span></div>
-            <div class="row nowrap muted" style="margin-top:6px;font-size:12px">
-              <span>Avg {{c.avg}}</span><span style="flex:1"></span>
-              <span class="pill" :class="c.trend==='IMPROVING'?'good':c.trend==='DECLINING'?'bad':'pending'">{{c.trend}}</span>
-              <span style="margin-left:8px">{{c.weak}} weak</span>
+        <!-- Class Readiness board: per-student verdict using the same engine as AI Feedback -->
+        <div class="topbar"><h2 style="margin:0">Class Readiness</h2><span class="spacer"></span>
+          <span class="muted" style="font-size:12px">{{dashFilteredEvals.length}} eval(s) in view</span></div>
+        <div v-if="classReadiness.length" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+          <div class="card clickable" v-for="r in classReadiness" :key="r.id" @click="openStudent(students.find(s=>s.id===r.id))">
+            <div class="row" style="align-items:center">
+              <strong style="font-size:15px">{{r.name}}</strong>
+              <span class="spacer" style="flex:1"></span>
+              <span class="pill" :class="r.readiness==='READY'?'good':r.readiness==='REMEDIAL'?'bad':r.readiness==='RECOVERING'?'ok':'pending'">{{readinessLabel(r.readiness)}}</span>
+            </div>
+            <div class="row nowrap" style="margin-top:8px;gap:8px">
+              <span class="muted">Avg {{r.avg}}</span>
+              <span class="pill" :class="r.trend==='IMPROVING'?'good':r.trend==='DECLINING'?'bad':'pending'">{{r.trend}}</span>
+              <span class="muted" v-if="r.weak">{{r.weak}} weak</span>
             </div>
           </div>
         </div>
-        <div v-if="!classReadiness.length" class="muted">No evaluations yet this year.</div>
+        <div v-else class="muted">No evaluations in {{activeYearResolved}} yet.</div>
 
-        <!-- Recent activity (lightweight local analytics, audit item 9) -->
-        <h3 style="margin:18px 2px 8px">Recent Activity (this app)</h3>
-        <div v-if="recentActivity().length" style="display:flex;flex-wrap:wrap;gap:8px">
-          <span class="pill ok" v-for="a in recentActivity()" :key="a.label">{{a.label}}: {{a.n}}</span>
-        </div>
-        <div v-else class="muted">No recorded activity yet — usage stats build up locally as you grade.</div>
+        <!-- Recent evaluations feed (newest-first) -->
+        <div class="topbar"><h2 style="margin:0">Recent Evaluations</h2><span class="spacer"></span>
+          <button class="btn sm ghost" v-if="!isViewer" @click="setTab('evaluations')">View all</button></div>
+        <ul class="list">
+          <li v-for="e in dashRecent" :key="e.id" class="clickable" @click="openEval(e)">
+            <div class="row nowrap">
+              <strong>{{e.studentName}} · {{e.aircraftType}} {{e.phaseName}} {{e.tripNumber}}</strong>
+              <span class="muted">{{fmt(e.date)}}</span>
+              <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
+              <span class="pill" :class="statusColor(e.overallMifStatus)">{{statusLabel(e.overallMifStatus)}}</span>
+            </div>
+          </li>
+          <li v-if="!dashRecent.length" class="muted">No evaluations match the current filters.</li>
+        </ul>
       </section>
 
       <!-- STUDENTS -->
@@ -422,7 +456,7 @@
                 <strong>{{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
                 <span class="muted">{{fmt(e.date)}} · {{e.instructorName}}</span>
                 <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
-                <span class="pill" :class="statusColor(e.overallMifStatus)">{{e.overallMifStatus}}</span>
+                <span class="pill" :class="statusColor(e.overallMifStatus)">{{statusLabel(e.overallMifStatus)}}</span>
                 <span class="spacer" style="flex:1"></span>
                 <button class="btn sm danger" v-if="isAdmin" @click.stop="deleteEval(e)">Delete</button>
               </div>
@@ -487,6 +521,25 @@
         </div>
         <div v-if="!perStudentAnalytics.length" class="muted">No students with evaluations for {{activeYearResolved}}.</div>
 
+        <h3 style="margin:22px 2px 10px">Class Maneuver Difficulty</h3>
+        <p class="muted" style="margin:0 2px 12px">Where the cohort as a whole scores below required MIF — useful for syllabus emphasis. Aggregated from all evaluations in {{activeYearResolved}}.</p>
+        <div v-if="classManeuverDifficulty.length" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+          <div class="card" v-for="m in classManeuverDifficulty" :key="m.name">
+            <div class="row nowrap" style="align-items:center">
+              <strong style="font-size:14px">{{m.name}}</strong>
+              <span class="spacer" style="flex:1"></span>
+              <span class="pill" :class="m.belowPct>=40?'bad':m.belowPct>=20?'ok':'good'">{{m.belowPct}}% below MIF</span>
+            </div>
+            <div class="row nowrap" style="margin-top:8px;gap:10px">
+              <span class="muted">avg {{m.avg}}</span>
+              <span class="muted">req {{m.req}}</span>
+              <span class="muted">{{m.n}} graded</span>
+            </div>
+            <div class="meter" :aria-label="m.belowPct+' percent below required MIF'" role="img"><div class="meter-fill" :style="{width: m.belowPct + '%'}"></div></div>
+          </div>
+        </div>
+        <div v-else class="muted">No maneuver grades recorded in {{activeYearResolved}}.</div>
+
         <h3 style="margin:22px 2px 10px">Failed Items (maneuvers below required MIF)</h3>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
           <div class="card" v-for="f in failedItems" :key="f.id">
@@ -545,6 +598,55 @@
           </li>
           <li v-if="!allUsers.length" class="muted">No users.</li>
         </ul>
+      </section>
+
+      <!-- SETTINGS -->
+      <section v-show="tab==='settings'">
+        <div class="topbar"><h2 style="margin:0">Settings</h2></div>
+
+        <div class="card">
+          <h3>Appearance</h3>
+          <div class="row" style="gap:12px;flex-wrap:wrap">
+            <div class="seg" role="group" aria-label="Theme">
+              <button class="seg-btn" :class="{on:theme==='dark'}" @click="theme='dark'">Dark</button>
+              <button class="seg-btn" :class="{on:theme==='light'}" @click="theme='light'">Light</button>
+            </div>
+            <span class="muted">Theme — light mode is sunlight-readable for ramp use.</span>
+          </div>
+          <div class="row" style="gap:12px;flex-wrap:wrap;margin-top:12px">
+            <div class="seg" role="group" aria-label="Density">
+              <button class="seg-btn" :class="{on:uiDensity==='comfortable'}" @click="uiDensity='comfortable'">Comfortable</button>
+              <button class="seg-btn" :class="{on:uiDensity==='compact'}" @click="uiDensity='compact'">Compact</button>
+            </div>
+            <span class="muted">Density — compact fits more on small phone screens.</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Data &amp; Backup</h3>
+          <p class="muted" style="margin:0 0 12px">Export the whole dataset (students, instructors, aircraft, MIF tables, evaluations, announcements) as a JSON file for safekeeping or offline re-seed. Restore overwrites the current records — user accounts are never touched.</p>
+          <div class="row" style="gap:10px;flex-wrap:wrap">
+            <button class="btn sm" @click="backupExport">Export backup (JSON)</button>
+            <label class="btn sm ghost" style="margin:0">Import backup<input type="file" accept="application/json,.json" class="sr-only" @change="backupImportFile" :disabled="backup.busy" /></label>
+          </div>
+          <div v-if="backup.msg" class="import-ok" style="margin-top:10px">{{backup.msg}}</div>
+          <div v-if="backup.error" class="import-err" style="margin-top:10px">{{backup.error}}</div>
+        </div>
+
+        <div class="card">
+          <h3>Local data</h3>
+          <p class="muted" style="margin:0 0 12px">Usage analytics and feedback are stored on this device only. Clear them if you share this device.</p>
+          <button class="btn sm danger" @click="clearLocalData">Clear local analytics &amp; feedback</button>
+        </div>
+
+        <div class="card" v-if="isAdmin">
+          <h3>Admin</h3>
+          <div class="row" style="gap:12px;flex-wrap:wrap">
+            <span class="pill" :class="role==='admin'?'good':'pending'">Role: {{role.toUpperCase()}}</span>
+            <button class="btn sm ghost" @click="setTab('admin')">User management</button>
+            <button class="btn sm ghost" @click="setTab('mif')">MIF tables</button>
+          </div>
+        </div>
       </section>
 
       <!-- AI FEEDBACK -->
@@ -649,14 +751,6 @@
         </div>
       </div>
       <label>Maneuver Grades</label>
-      <div class="bulk-bar" v-if="evalForm.maneuverGrades.length">
-        <span class="lbl">Fill all:</span>
-        <div class="bulk-pick">
-          <button v-for="n in [1,2,3,4]" :key="n" :class="{on: bulkGrade===n}" @click="applyBulkGrade(n)">{{n}}</button>
-        </div>
-        <button class="btn sm ghost" @click="clearBulkGrade">Clear</button>
-        <button class="btn sm ghost" @click="copyLastTrip">⧉ Copy last trip</button>
-      </div>
       <div class="card" v-if="evalForm.maneuverGrades.length">
         <div class="grade-row" v-for="(m,idx) in evalForm.maneuverGrades" :key="m.name" style="margin-bottom:12px">
           <div class="maneuver-name" :class="{below:m.studentGrade && m.requiredMif!=null && m.studentGrade < m.requiredMif, meets:m.studentGrade && m.requiredMif!=null && m.studentGrade >= m.requiredMif}">
@@ -853,7 +947,7 @@
     </div>
   </div>
 
-  <div class="toast" role="status" aria-live="polite" v-if="toast">{{toast}}</div>
+  <div class="toast" :class="toastType" role="status" :aria-live="toastType==='error'?'assertive':'polite'" v-if="toast">{{toast}}</div>
   <footer v-if="loggedIn">Student Grading Portal · web PWA · Firebase</footer>
 </div>
 
