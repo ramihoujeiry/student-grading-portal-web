@@ -33,6 +33,45 @@ const COL = {
   announcements: 'announcements'
 };
 
+/* ---------- Timestamp -> epoch seconds normalization -------------------- */
+/* Single source of truth for coercing ANY date-like value into epoch SECONDS
+   (the unit the rest of the app expects: fmtDate multiplies by 1000, sorting
+   subtracts `date` fields, sqrt/avg use finalGrade which is separate).
+
+   Handles every shape a Firestore-backed doc can surface a date as:
+     - number            -> already epoch seconds (or ms if >= 1e11)
+     - Firestore Timestamp ({seconds, nanoseconds}) -> .seconds
+     - Timestamp-like    (.toDate / .toMillis)        -> converted
+     - JS Date object    -> getTime()/1000
+     - ISO / parseable string                          -> Date.parse/1000
+   Anything invalid (NaN, null, out-of-range) collapses to 0 so callers can
+   never emit an impossible year (the prior "year 3995" app-blanking bug came
+   from passing a raw Timestamp/Date through fmtDate, which did `Date * 1000`). */
+const EPOCH_FLOOR = 0;          // 1970-01-01
+const EPOCH_CEIL = 4102444800;  // ~2100-01-01 (generous upper bound)
+function toEpochSec(v) {
+  if (v == null) return 0;
+  if (typeof v === 'number') {
+    if (!Number.isFinite(v)) return 0;
+    const s = v >= 1e11 ? Math.floor(v / 1000) : v;  // ms-scale -> seconds
+    return (s >= EPOCH_FLOOR && s <= EPOCH_CEIL) ? s : 0;
+  }
+  if (typeof v === 'object') {
+    if (typeof v.seconds === 'number') return v.seconds;
+    if (typeof v.toMillis === 'function') return Math.floor(v.toMillis() / 1000);
+    if (typeof v.toDate === 'function') {
+      const d = v.toDate();
+      return (d instanceof Date && !isNaN(d.getTime())) ? Math.floor(d.getTime() / 1000) : 0;
+    }
+    if (v instanceof Date) return isNaN(v.getTime()) ? 0 : Math.floor(v.getTime() / 1000);
+  }
+  if (typeof v === 'string') {
+    const ms = Date.parse(v);
+    if (!isNaN(ms)) return Math.floor(ms / 1000);
+  }
+  return 0;
+}
+
 /* ---------- AI backend (LAN default = Hermes gateway proxy on the Pi) ------ */
 /* The Pi (pi@192.168.1.200) runs ai_proxy.py exposing an OpenAI-compatible
    /v1/chat/completions endpoint that forwards to OpenRouter using the key
@@ -100,16 +139,17 @@ const Store = {
     if (!fbReady) { cb([]); return () => {}; }
     let q = dbFs.collection(collection);
     if (opts.orderBy) q = q.orderBy(opts.orderBy, opts.dir || 'asc');
-    // Firestore may store date-like fields as Timestamp objects. Normalize them to
-    // plain epoch SECONDS so the rest of the app (fmtDate multiplies by 1000) stays correct.
+    // Firestore may store date-like fields as Timestamp objects (or, in legacy
+    // data, raw JS Date objects). Normalize every known date field to plain
+    // epoch SECONDS via toEpochSec() so the rest of the app (fmtDate multiplies
+    // by 1000, sorting/subtraction use the value directly) stays safe. Invalid
+    // values collapse to 0 — never an impossible year.
     const TS_FIELDS = ['date', 'createdAt', 'updatedAt', 'timestamp', 'dateSec', 'lastFlightDate'];
     const norm = (o) => {
       if (o == null || typeof o !== 'object') return o;
       const out = { ...o };
       for (const f of TS_FIELDS) {
-        const v = out[f];
-        if (v && typeof v === 'object' && typeof v.seconds === 'number') out[f] = v.seconds;
-        else if (v && typeof v.toDate === 'function' && typeof v.toMillis === 'function') out[f] = Math.floor(v.toMillis() / 1000);
+        if (out[f] != null) out[f] = toEpochSec(out[f]);
       }
       return out;
     };
@@ -272,7 +312,15 @@ function ol(s){return s>=90?'Excellent':s>=75?'Good':s>=60?'Satisfactory':'Needs
 function tl(t){return t==='IMPROVING'?'Improving':t==='DECLINING'?'Declining':'Stable';}
 function vl(v){return v<3?'Steady':v<8?'Variable':'Inconsistent';}
 function rl(r){return r==='READY'?'Ready to progress / consolidate':r==='RECOVERING'?'Recovering - keep current plan':r==='REMEDIAL'?'Remedial focus needed':'Insufficient data for a confident verdict';}
-function fmtDate(sec){if(!sec)return '-';const d=new Date(sec*1000);return d.toISOString().slice(0,10);}
+function fmtDate(sec){
+  const s = toEpochSec(sec);
+  if (!s) return '-';
+  const d = new Date(s*1000);
+  if (isNaN(d.getTime())) return '-';
+  const y = d.getUTCFullYear();
+  if (y < 1970 || y > 2099) return '-';   // reject impossible years (year-3995 guard)
+  return d.toISOString().slice(0,10);
+}
 
 function avg(a){return a.reduce((s,x)=>s+x,0)/a.length;}
 function stddev(a){const m=avg(a);return Math.sqrt(a.map(x=>(x-m)*(x-m)).reduce((s,x)=>s+x,0)/a.length);}
@@ -300,7 +348,10 @@ function extractThemes(notes){
 }
 
 function buildPerformance(student, evals){
-  const sorted=evals.slice().sort((a,b)=>(a.date||0)-(b.date||0));
+  // Normalize each eval's date field defensively so a raw Firestore Timestamp,
+  // JS Date, or malformed value can never reach the sort/display math below.
+  const normEvals = (evals || []).map(e => e && typeof e === 'object' ? { ...e, date: toEpochSec(e.date) } : e);
+  const sorted=normEvals.slice().sort((a,b)=>(a.date||0)-(b.date||0));
   const overallScore=sorted.length?avg(sorted.map(e=>e.finalGrade)):0;
   const grades=sorted.map(e=>e.finalGrade);
   const volatility=grades.length>=2?stddev(grades):0;
