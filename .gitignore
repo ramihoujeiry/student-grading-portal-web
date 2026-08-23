@@ -12,3 +12,6 @@ vue.global.dev.js
 # Vite build output
 dist/
 node_modules/
+
+test-results/
+playwright-report/

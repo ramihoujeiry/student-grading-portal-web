@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>store.js smoke fixture</title>
+  <!-- Map bare 'firebase/*' specifiers to local stubs so store.js loads in a
+       plain browser without the Firebase SDK or a bundler. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "./firebase/app.js",
+      "firebase/auth": "./firebase/auth.js",
+      "firebase/firestore": "./firebase/firestore.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="ready">loading</div>
+  <script type="module">
+    // Import the REAL src/store.js (served at /src/store.js by tests/serve.mjs)
+    // so the Playwright suite asserts against the authentic module, not a
+    // duplicated copy. Only the Firebase SDK + config are stubbed.
+    import * as Store from '/src/store.js';
+    window.__STORE__ = Store;
+    document.getElementById('ready').textContent = 'ready';
+  </script>
+</body>
+</html>

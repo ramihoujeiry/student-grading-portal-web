@@ -49,7 +49,7 @@ export const app = createApp({
       aiForStudent: null,    // student id for AI on profile
       activeYear: '',        // school-year filter
       DURATIONS: [0.5, 0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0], // duration picker presets (h)
-      toast: '',
+      toast: '', toastType: 'info',
       aiStudentId: '', aiResult: '', aiLoading: false,
       aiRagStatus: '', // '' | 'ok' (manuals cited) | 'failed' (index unreachable)
       ragReady: null,  // null = checking, true = index loaded, false = failed (set on mount)
@@ -73,6 +73,10 @@ export const app = createApp({
       // Feedback channel + lightweight local usage analytics (audit item 9)
       feedback: { open: false, text: '', role: '', busy: false, done: false, error: '' },
       analytics: []   // rolling event log (localStorage-backed, privacy-respecting)
+      // UI density preference (compact mode saves screen space on phones at the ramp)
+      , uiDensity: 'comfortable',
+      // Full-dataset JSON backup/restore (offline disaster recovery)
+      backup: { busy: false, msg: '', error: '' }
     };
   },
   watch: {
@@ -81,6 +85,11 @@ export const app = createApp({
     theme(t) {
       try { localStorage.setItem('sgp.theme', t); } catch (e) {}
       this._applyTheme(t);
+    },
+    // Persist UI density (compact / comfortable) — pure client preference.
+    uiDensity(t) {
+      try { localStorage.setItem('sgp.density', t); } catch (e) {}
+      this._applyDensity(t);
     },
     // Lightweight, privacy-respecting usage analytics (audit item 9): log a tab
     // open event locally. No PII, no network — just an anonymous event counter
@@ -274,11 +283,51 @@ export const app = createApp({
       // READY first, then RECOVERING, REMEDIAL, INSUFFICIENT_DATA; by name within group
       const order = { READY: 0, RECOVERING: 1, REMEDIAL: 2, INSUFFICIENT_DATA: 3 };
       return out.sort((a, b) => (order[a.readiness] - order[b.readiness]) || (a.name || '').localeCompare(b.name || ''));
+    },
+
+    // Most-recent evaluations (across the dashboard's active filters) for the
+    // dashboard activity feed. Sorted newest-first, capped for the widget.
+    dashRecent() {
+      return this.dashFilteredEvals.slice().sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, 10);
+    },
+
+    // Class-wide maneuver difficulty (Analytics "Cohort difficulty" widget):
+    // aggregate every scored maneuver across ALL students' evaluations, then
+    // rank by (a) share of grades below required MIF and (b) average grade.
+    // Surfaces the maneuvers the *cohort* struggles with most — actionable for
+    // syllabus emphasis. Reuses the same grade/required-MIF math as grading.
+    classManeuverDifficulty() {
+      const tally = {}; // name -> {sum, w, below, n, req}
+      this.evaluations.forEach(e => (e.maneuverGrades || []).forEach(m => {
+        if (m.studentGrade == null || m.studentGrade === 0) return;
+        const f = m.factor || 1;
+        if (!tally[m.name]) tally[m.name] = { sum: 0, w: 0, below: 0, n: 0, req: (m.requiredMif != null ? m.requiredMif : 0) };
+        const t = tally[m.name];
+        t.sum += (m.studentGrade || 0) * f;
+        t.w += f;
+        t.n += 1;
+        if (m.requiredMif != null && m.studentGrade < m.requiredMif) t.below += 1;
+      }));
+      const out = Object.keys(tally).map(name => {
+        const t = tally[name];
+        const avg = t.w ? t.w : 0;
+        return { name, avg: Math.round((t.sum / (t.w || 1)) * 10) / 10, belowPct: t.n ? Math.round((t.below / t.n) * 100) : 0, below: t.below, n: t.n, req: t.req };
+      });
+      // Hardest first: most % below MIF, then lowest average.
+      return out.sort((a, b) => (b.belowPct - a.belowPct) || (a.avg - b.avg)).slice(0, 12);
     }
   },
   methods: {
     setTab(t) { this.tab = t; },
-    toastMsg(m) { this.toast = m; setTimeout(() => { if (this.toast === m) this.toast = ''; }, 2200); },
+    // toastMsg(message, type) — type is 'info' (default), 'success', or 'error'.
+    // Errors stay visible longer (4s vs 2.2s) and get a distinct red style so a
+    // failed save is never missed and color is never the only signal.
+    toastMsg(m, type) {
+      this.toast = m; this.toastType = type || 'info';
+      const ms = type === 'error' ? 4000 : 2200;
+      clearTimeout(this._toastTimer);
+      this._toastTimer = setTimeout(() => { if (this.toast === m) { this.toast = ''; this.toastType = 'info'; } }, ms);
+    },
 
     /* ---- auth ---- */
     async doLogin() {
@@ -514,10 +563,11 @@ export const app = createApp({
         await Store.saveEvaluation(ev);
         this.showEvalModal = false;
         this.logEvent('eval:saved', ev.phaseName + ' ' + ev.tripNumber);
-        this.toastMsg('Evaluation saved');
+        this.toastMsg('Evaluation saved', 'success');
       } catch (err) {
         console.error('saveEval', err);
-        this.toastMsg('Could not save evaluation: ' + (err && err.message ? err.message : 'unknown error'));
+        // Keep the modal open so the instructor can retry; surface a clear, retry-oriented message.
+        this.toastMsg('Could not save evaluation — check your connection and try again. (' + (err && err.message ? err.message : 'unknown error') + ')', 'error');
       } finally {
         this.saving = false;       // re-enable Save (modal stays open so fixable errors can be retried)
       }
@@ -873,6 +923,88 @@ export const app = createApp({
       else root.classList.remove('light-theme');
     },
     toggleTheme() { this.theme = (this.theme === 'dark') ? 'light' : 'dark'; },
+    // Apply the UI density preference as a root class (compact = tighter spacing).
+    _applyDensity(t) {
+      const root = document.documentElement;
+      if (t === 'compact') root.classList.add('compact');
+      else root.classList.remove('compact');
+    },
+    setDensity(t) { this.uiDensity = t; },
+
+    /* ---- Full-dataset JSON backup / restore (offline disaster recovery) ----
+       Exports the entire grading dataset (students, instructors, aircraft, MIF
+       tables, evaluations, announcements) as a single JSON file. Restore
+       re-imports it into Firestore via Store.importAll (users are excluded for
+       safety). Useful for an offline copy or a clean re-seed after a bad import. */
+    backupExport() {
+      const ds = {
+        app: 'student-grading-portal-web',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        year: this.activeYearResolved,
+        students: this.students, instructors: this.instructors, aircraft: this.aircraft,
+        mifTables: this.mifTables, evaluations: this.evaluations, announcements: this.announcements
+      };
+      const blob = new Blob([JSON.stringify(ds, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'grading-backup_' + (this.activeYearResolved || 'all') + '_' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      this.logEvent('backup:export');
+      this.backup.msg = 'Exported ' + (this.evaluations.length + this.students.length + this.aircraft.length + this.mifTables.length) + ' records to JSON';
+      this.backup.error = '';
+      this.toastMsg('Backup exported');
+    },
+    backupImportFile(ev) {
+      const file = ev && ev.target && ev.target.files && ev.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(String(reader.result));
+          if (!data || typeof data !== 'object' || !Array.isArray(data.evaluations)) throw new Error('not a valid backup file');
+          this._pendingBackup = data;
+          this.openConfirm({
+            title: 'Restore backup?',
+            message: 'This will OVERWRITE the ' + (data.year || 'current') + ' dataset with ' +
+              ((data.evaluations || []).length + (data.students || []).length) + ' records from the backup. ' +
+              'Students, instructors, aircraft, MIF tables, evaluations and announcements will be replaced. ' +
+              'User accounts are NOT changed. This cannot be undone — export a fresh backup first if unsure.',
+            confirmText: 'Restore',
+            onOk: async () => {
+              this.backup.busy = true; this.backup.error = '';
+              try {
+                const n = await Store.importAll(this._pendingBackup);
+                this.backup.msg = 'Restored ' + n + ' records';
+                this.backup.error = '';
+                this.toastMsg('Backup restored (' + n + ' records)');
+                this.logEvent('backup:import');
+              } catch (e) {
+                this.backup.error = 'Restore failed: ' + (e && e.message ? e.message : e);
+              } finally { this.backup.busy = false; this._pendingBackup = null; }
+            }
+          });
+        } catch (e) {
+          this.backup.error = 'Could not read backup: ' + (e && e.message ? e.message : e);
+        }
+      };
+      reader.readAsText(file);
+      try { ev.target.value = ''; } catch (e) {} // allow re-picking the same file
+    },
+
+    /* ---- clear device-local analytics + feedback (privacy) ---- */
+    clearLocalData() {
+      this.openConfirm({
+        title: 'Clear local data?',
+        message: 'This removes usage analytics and feedback stored on THIS device only (no server data is touched).',
+        confirmText: 'Clear',
+        onOk: () => {
+          try { localStorage.removeItem('sgp.analytics'); localStorage.removeItem('sgp.feedback'); this.analytics = []; } catch (e) {}
+          this.toastMsg('Local data cleared');
+        }
+      });
+    },
     // Reflect the offline/online AI status in the header badge (audit item 13).
     _setAiBadge(status) { this.aiBadge = status; },
 
@@ -1159,6 +1291,9 @@ export const app = createApp({
     // Restore the saved theme preference (default dark) and apply it.
     try { const t = localStorage.getItem('sgp.theme'); if (t === 'light' || t === 'dark') this.theme = t; } catch (e) {}
     this._applyTheme(this.theme);
+    // Restore the saved density preference (default comfortable) and apply it.
+    try { const d = localStorage.getItem('sgp.density'); if (d === 'compact' || d === 'comfortable') this.uiDensity = d; } catch (e) {}
+    this._applyDensity(this.uiDensity);
     // Load the rolling local usage-analytics log (audit item 9).
     this.loadAnalytics();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=65').catch(() => {});
