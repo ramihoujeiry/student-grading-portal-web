@@ -85,3 +85,40 @@ Native nav groups:
 - New "Ask Data" tab in web PWA: natural-language Q&A over the grading data, powered by the same free Funnel AI (no Firebase Admin key — uses `this.evaluations/students/mifTables` already loaded for the logged-in user).
 - `app.js`: `askData()` builds a compact `buildDataSnapshot()` (counts, per-student eval counts, recent 25 evals, MIF phases) → `callAIModelWithPrompt({system,user}, cfg)` via `getAIConfig()`. Tab markup in `index.html`; SW cache `grading-portal-v43`. Committed `6c3a...` (6c3ea41). Verified `node --check app.js` passes; Funnel health + chat confirmed live.
 - Caveat: answers reflect only data the signed-in user can read (Firestore rules still apply). Falls back to an error message if the Pi/Funnel is offline.
+
+## live-parity verification — store.js new feature surface (2026-08-23)
+
+**Context:** auto-triage flagged ~565 added lines of new store.js feature surface (Auth + Firestore
+CRUD, realtime listeners, grading math, AI feedback + RAG grounding) with no committed verification
+artifact. t_6cc84b1f audited `src/store.js` (689 lines — the live Vite source; legacy root `store.js`
+is NOT deployed) and scoped 5 critical paths. This entry records what was actually validated vs not.
+
+**Environment at verification time**
+- Repo: `/d/grading-portal-web` (`main` @ `671791d`, ahead of `origin/main` by 1, uncommitted: `src/index.html` CSP tweak + untracked `test/`).
+- Firebase project `grading-portal-app`; real `src/firebase-config.js` present (`FIREBASE_READY=true` on a live client).
+- RAG assets present: `src/faa-rag/faaRag.js` + `faa_index.js` (lazy-loaded). Build `dist/` present (Vite).
+- AI endpoint: Pi Tailscale Funnel `https://raspberrypi.tail3a08db.ts.net/v1/chat/completions` (model `tencent/hy3:free`); cloud `config/ai` override supported.
+
+**Path 3 — Timestamp normalization (year-3995 guard) — VERIFIED, unit-level**
+- Fix committed: `671791d` "fix(store): harden Timestamp normalization (year-3995 guard)".
+- Re-ran its standalone audit test `scripts/_ts_audit_test.mjs` just now: **16 passed, 0 failed**.
+- Covers: numbers (s/ms), Firestore Timestamps (`{seconds}`/`toDate`/`toMillis`), raw JS `Date` objects, ISO strings; invalid/out-of-range (NaN/null/undefined, years <1970 or >2099) collapse to 0 / '-'. The prior bug (a raw `Date` passed where epoch-secs was expected yielding "year 3995") is covered and now passes.
+- `node --check src/store.js` → parses clean.
+- Scope limitation: the test mirrors the function logic; it does not exercise the live Firestore `watch()` snapshot path end-to-end. That path reuses the same `toEpochSec`/norm logic, so risk is low, but it is not a live-backend run.
+
+**Paths 1, 2, 4, 5 — NOT live-validated yet (status as of this entry)**
+- The sibling Playwright task (t_095b2d3d) was still running at the time of writing. Its `test/harness.mjs`
+  is **untracked and uncommitted**, and it drives the **real bundled Vue app but injects a LOCAL fake
+  dataset — it makes NO Firebase / Firestore calls**. It therefore validates UI render/overflow/a11y
+  across viewports and roles, NOT the live data-layer parity (Auth self-heal, realtime CRUD, role sync,
+  grading math against real docs, RAG-grounded AI debriefs).
+- No committed Playwright run report (`report-all.json` / `summary.txt`) exists yet, so I cannot state
+  these paths are confirmed in production-like conditions. I am NOT claiming they are — that would be
+  fabricated until the live-backend run produces a report and the test is committed.
+- What IS in place to enable that run later: `scripts/_ts_audit_test.mjs` (committed, passing) and the
+  `test/` harness scaffold (pending commit + a real Firebase-seeded run). Recommend completing t_095b2d3d
+  and appending its report before declaring Paths 1/2/4/5 live-verified.
+
+**Bottom line:** Path 3 (the highest-risk app-blanking bug) is verified by a committed, re-runnable
+unit test. Paths 1/2/4/5 remain pending real-backend validation and must not be reported as
+production-confirmed until t_095b2d3d produces and commits a live run report.
