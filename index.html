@@ -191,11 +191,11 @@
       <div v-if="fbReady">
         <div v-if="authError" class="auth-err">{{authError}}</div>
         <label>Email</label>
-        <input type="email" v-model="authEmail" placeholder="you@squadron" />
+        <input type="email" v-model="authEmail" placeholder="you@squadron"  aria-label="Email"/>
         <label v-if="authMode==='register'">Full name</label>
-        <input v-if="authMode==='register'" v-model="authName" placeholder="Rank. Name" />
+        <input v-if="authMode==='register'" v-model="authName" placeholder="Rank. Name"  aria-label="Full name"/>
         <label>Password</label>
-        <input type="password" v-model="authPass" placeholder="••••••••" @keyup.enter="authMode==='login'?doLogin():doRegister()" />
+        <input type="password" v-model="authPass" placeholder="••••••••" @keyup.enter="authMode==='login'?doLogin():doRegister()"  aria-label="Password"/>
 
         <button class="btn" style="width:100%;margin-top:14px" :disabled="authBusy" v-if="authMode==='login'" @click="doLogin">
           {{authBusy?'Signing in…':'Sign in'}}
@@ -346,7 +346,7 @@
           <button class="btn sm" v-if="canEdit" @click="openNewEval">+ New Evaluation</button></div>
         <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
           <div style="flex:2 1 240px;min-width:200px"><label>Search evaluations</label>
-            <input v-model="evSearch" placeholder="date, student, phase, instructor, aircraft…" style="width:100%" /></div>
+            <input v-model="evSearch" placeholder="date, student, phase, instructor, aircraft…" style="width:100%"  aria-label="Search evaluations"/></div>
           <div style="flex:1;min-width:150px"><label>Student
             <select v-model="evStudent" aria-label="Evaluations student filter"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></label></div>
           <div style="flex:1;min-width:140px"><label>Aircraft
@@ -522,7 +522,7 @@
           <h3>Ask Your Grading Data</h3>
           <p class="muted" style="margin:4px 2px 12px">Ask a plain-English question about students, phases, MIF status or recent evaluations. Answers come from the live AI model over the data you already have access to.</p>
           <label>Your question</label>
-          <textarea v-model="askQuery" rows="3" placeholder="e.g. Which students are currently below MIF this phase? / Summarize last week's evaluations. / Who needs the most attention?"></textarea>
+          <textarea v-model="askQuery" rows="3" placeholder="e.g. Which students are currently below MIF this phase? / Summarize last week's evaluations. / Who needs the most attention?" aria-label="Your question"></textarea>
           <div style="margin-top:12px" class="row">
             <button class="btn" :disabled="askLoading" @click="askData">{{askLoading ? 'Thinking…' : 'Ask'}}</button>
             <button class="btn ghost" :disabled="!askResult" @click="askQuery='';askResult=''">Clear</button>
@@ -536,7 +536,7 @@
 
   <!-- EVALUATION MODAL -->
   <div class="modal-mask fullscreen" v-if="loggedIn && showEvalModal" @click.self="showEvalModal=false">
-    <div class="modal full">
+    <div class="modal full" role="dialog" aria-modal="true">
       <h2>New Evaluation</h2>
       <label>Aircraft
       <select v-model="evalForm.aircraftType" @change="onEvalContextChange; suggestTrip" aria-label="Evaluation aircraft">
@@ -613,7 +613,7 @@
       </div>
       <div v-else class="muted">Select an aircraft + phase that has a MIF table.</div>
       <label>Trip Notes</label>
-      <textarea v-model="evalForm.tripNotes" placeholder="Coach comments, safety items…"></textarea>
+      <textarea v-model="evalForm.tripNotes" placeholder="Coach comments, safety items…" aria-label="Trip Notes"></textarea>
       <div class="modal-actions">
         <button class="btn" :disabled="saving" @click="saveEval">{{ saving ? 'Saving…' : 'Save Evaluation' }}</button>
         <button class="btn ghost" @click="printFormEval">Print PDF</button>
@@ -624,7 +624,7 @@
 
   <!-- OVERWRITE CONFIRM MODAL (replaces native confirm: Cancel-safe) -->
   <div class="modal-mask" v-if="loggedIn && overwriteClash" @click.self="cancelOverwrite">
-    <div class="modal" style="max-width:440px">
+    <div class="modal" role="dialog" aria-modal="true" style="max-width:440px">
       <h2 style="color:var(--red);margin-top:0">⚠ Trip already graded</h2>
       <p style="line-height:1.6">
         Trip <b>{{overwriteClash.tripNumber}}</b> ({{overwriteClash.phaseName}}) for this student was already graded
@@ -642,11 +642,11 @@
 
   <!-- IMPORT CSV MODAL (audit item 11) -->
   <div class="modal-mask" v-if="loggedIn && importCsv.open" @click.self="closeImport">
-    <div class="modal" style="max-width:680px">
+    <div class="modal" role="dialog" aria-modal="true" style="max-width:680px">
       <h2 style="margin-top:0">Import evaluations from CSV</h2>
       <p class="muted" style="margin:4px 2px 10px">Paste the CSV produced by <b>Export CSV</b> (or match its header). Rows are validated against known students/aircraft; matching student+phase+trip rows overwrite the existing evaluation. Unknown students/aircraft are skipped with a warning.</p>
       <label>CSV data</label>
-      <textarea class="csv-input" v-model="importCsv.text" @input="parseImportCsv" placeholder="Student,Aircraft,Phase,Trip,Date,Instructor,Duration(h),FinalGrade,MIF Status,FlightYear,TripNotes&#10;Jane Doe,R44-2,CONTACT,S3,2026-08-01,Capt. Smith,1.2,82,BELOW STANDARD,2026-2027,"></textarea>
+      <textarea class="csv-input" v-model="importCsv.text" @input="parseImportCsv" placeholder="Student,Aircraft,Phase,Trip,Date,Instructor,Duration(h),FinalGrade,MIF Status,FlightYear,TripNotes&#10;Jane Doe,R44-2,CONTACT,S3,2026-08-01,Capt. Smith,1.2,82,BELOW STANDARD,2026-2027," aria-label="CSV data"></textarea>
       <div v-if="importCsv.error" class="import-err">{{importCsv.error}}</div>
       <div v-if="importCsv.parsed && importCsv.parsed.total" class="import-ok">
         {{importCsv.parsed.total}} row(s) ready to import
@@ -676,7 +676,7 @@
 
   <!-- FEEDBACK CHANNEL (audit item 9) — in-app, anonymous, stored locally -->
   <div class="modal-mask" v-if="loggedIn && feedback.open" @click.self="closeFeedback">
-    <div class="modal" style="max-width:480px">
+    <div class="modal" role="dialog" aria-modal="true" style="max-width:480px">
       <h2 style="margin-top:0">Send feedback</h2>
       <p class="muted" style="margin:0 0 10px;line-height:1.5">Spotted a bug or have an idea? Send it to the app owner. Stored on this device only (no account link) for now.</p>
       <label>Your role
@@ -687,7 +687,7 @@
         <option value="unknown">Prefer not to say</option>
       </select></label>
       <label style="margin-top:10px">Message</label>
-      <textarea v-model="feedback.text" rows="5" placeholder="What's working, what's not, what you'd like next…" :disabled="feedback.busy || feedback.done"></textarea>
+      <textarea v-model="feedback.text" rows="5" placeholder="What's working, what's not, what you'd like next…" :disabled="feedback.busy || feedback.done" aria-label="Message"></textarea>
       <div v-if="feedback.error" class="import-err">{{feedback.error}}</div>
       <div v-if="feedback.done" class="import-ok">Thanks — feedback saved on this device.</div>
       <div class="modal-actions" style="position:static;border:none;padding-top:0;margin-top:14px">
@@ -701,19 +701,19 @@
 
   <!-- GENERIC DIALOG (replaces native prompt()/confirm()) — audit item 2 -->
   <div class="modal-mask" v-if="loggedIn && dlg.open" @click.self="dlgCancel">
-    <div class="modal" style="max-width:480px">
+    <div class="modal" role="dialog" aria-modal="true" style="max-width:480px">
       <h2 style="margin-top:0">{{dlg.title}}</h2>
       <p v-if="dlg.message" class="muted" style="margin:0 0 10px;line-height:1.5">{{dlg.message}}</p>
       <!-- single text input -->
       <div v-if="dlg.mode==='input'">
         <label>{{dlg.label}}</label>
-        <input type="text" v-model="dlg.value" @keyup.enter="!dlg.busy && dlgConfirm()" :disabled="dlg.busy" />
+        <input type="text" v-model="dlg.value" @keyup.enter="!dlg.busy && dlgConfirm()" :disabled="dlg.busy"  :aria-label="dlg.label"/>
       </div>
       <!-- multi-field form (add student/aircraft/MIF table/maneuver/announcement/role) -->
       <div v-if="dlg.mode==='form'">
         <div v-for="f in (dlg.fields||[])" :key="f.key" style="margin-bottom:10px">
           <label>{{f.label}}</label>
-          <textarea v-if="f.type==='textarea'" v-model="f.value" rows="4" :disabled="dlg.busy"></textarea>
+          <textarea v-if="f.type==='textarea'" v-model="f.value" rows="4" :disabled="dlg.busy" :aria-label="f.label"></textarea>
           <input v-else :type="f.type==='number' ? 'number' : 'text'" v-model="f.value" :disabled="dlg.busy" />
         </div>
       </div>
@@ -728,7 +728,7 @@
 
   <!-- EVALUATION DETAIL MODAL -->
   <div class="modal-mask" v-if="loggedIn && selectedEval" @click.self="closeDetail">
-    <div class="modal">
+    <div class="modal" role="dialog" aria-modal="true">
       <div class="row">
         <h2 style="margin:0">{{selectedEval.studentName}}</h2>
         <span class="spacer" style="flex:1"></span>
@@ -767,7 +767,7 @@
 
   <!-- STUDENT PROFILE MODAL -->
   <div class="modal-mask" v-if="loggedIn && selectedStudent" @click.self="closeDetail">
-    <div class="modal">
+    <div class="modal" role="dialog" aria-modal="true">
       <div class="row">
         <h2 style="margin:0">{{selectedStudent.name}}</h2>
         <span class="spacer" style="flex:1"></span>
