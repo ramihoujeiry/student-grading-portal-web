@@ -6,8 +6,9 @@
 <meta name="theme-color" content="#1a237e" />
 <title>Student Grading Portal</title>
 <!-- Security: lock down script/connection origins. App is a bundled ESM SPA (no inline handlers, no cross-origin runtime).
-     'unsafe-eval' is required by Vue's runtime template compiler for the in-DOM template. All scripts are same-origin (bundled). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval'; connect-src 'self' https://raspberrypi.tail3a08db.ts.net https://*.firebaseio.com https://*.firebasestorage.googleapis.com https://*.googleapis.com; manifest-src 'self'; worker-src 'self'" />
+     'unsafe-eval' is required by Vue's runtime template compiler for the in-DOM template. Scripts are same-origin (bundled)
+     except https://www.gstatic.com, which is allowed for the Firebase compat CDN if it is ever loaded. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://www.gstatic.com 'unsafe-eval'; connect-src 'self' https://raspberrypi.tail3a08db.ts.net https://*.firebaseio.com https://*.firebasestorage.googleapis.com https://*.googleapis.com; manifest-src 'self'; worker-src 'self'" />
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.png" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -125,7 +126,12 @@
   .preview{display:flex;gap:14px;align-items:center;margin:12px 0;border-top:1px solid var(--glass-line);padding-top:12px}
   .preview .big{font-size:28px;font-weight:800;color:var(--hud);text-shadow:0 0 12px rgba(57,208,196,.3)}
   .toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:rgba(10,18,26,.92);color:var(--text);
-    padding:10px 18px;border-radius:24px;font-size:13px;z-index:80;opacity:.95;box-shadow:0 4px 14px rgba(0,0,0,.5);border:1px solid var(--glass-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    padding:10px 18px;border-radius:24px;font-size:13px;z-index:80;opacity:.95;box-shadow:0 4px 14px rgba(0,0,0,.5);border:1px solid var(--glass-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    max-width:calc(92vw - 24px);text-align:center}
+  /* Error toasts are visually distinct from success/info toasts (color is never the
+     only signal — see status pills) and persist longer so a save failure isn't missed. */
+  .toast.error{border-color:var(--red);color:#ffd9d9;background:rgba(40,12,12,.94);box-shadow:0 4px 14px rgba(120,20,20,.5)}
+  .toast.success{border-color:var(--green);color:#d7ffe9}
   footer{text-align:center;color:var(--muted);font-size:11px;padding:18px;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
 
   /* Respect users who prefer reduced motion (vestibular safety) */
@@ -230,22 +236,25 @@
       Your account is awaiting role approval. You can view data, but editing is locked until an admin sets your role.
     </div>
 
-    <nav class="tabs">
-      <button class="tab-btn" :class="{active:tab==='dashboard'}" @click="setTab('dashboard')">Dashboard</button>
-      <button class="tab-btn" :class="{active:tab==='students'}" v-if="isAdmin" @click="setTab('students')">Students</button>
-      <button class="tab-btn" :class="{active:tab==='instructors'}" v-if="isAdmin" @click="setTab('instructors')">Instructors</button>
-      <button class="tab-btn" :class="{active:tab==='aircraft'}" v-if="isAdmin" @click="setTab('aircraft')">Aircraft</button>
-      <button class="tab-btn" :class="{active:tab==='mif'}" v-if="isAdmin" @click="setTab('mif')">MIF Tables</button>
-      <button class="tab-btn" :class="{active:tab==='evaluations'}" v-if="!isViewer" @click="setTab('evaluations')">Evaluations</button>
-      <button class="tab-btn" :class="{active:tab==='announcements'}" @click="setTab('announcements')">Announcements</button>
-      <button class="tab-btn" :class="{active:tab==='analytics'}" @click="setTab('analytics')">Analytics</button>
-      <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" @click="setTab('admin')">Users</button>
-      <button class="tab-btn" :class="{active:tab==='ai'}" @click="setTab('ai')">AI Feedback</button>
-      <button class="tab-btn" :class="{active:tab==='ask'}" @click="setTab('ask')">Ask Data</button>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <nav class="tabs" aria-label="Primary">
+      <button class="tab-btn" :class="{active:tab==='dashboard'}" :aria-current="tab==='dashboard'?'page':null" @click="setTab('dashboard')">Dashboard</button>
+      <button class="tab-btn" :class="{active:tab==='students'}" v-if="isAdmin" :aria-current="tab==='students'?'page':null" @click="setTab('students')">Students</button>
+      <button class="tab-btn" :class="{active:tab==='instructors'}" v-if="isAdmin" :aria-current="tab==='instructors'?'page':null" @click="setTab('instructors')">Instructors</button>
+      <button class="tab-btn" :class="{active:tab==='aircraft'}" v-if="isAdmin" :aria-current="tab==='aircraft'?'page':null" @click="setTab('aircraft')">Aircraft</button>
+      <button class="tab-btn" :class="{active:tab==='mif'}" v-if="isAdmin" :aria-current="tab==='mif'?'page':null" @click="setTab('mif')">MIF Tables</button>
+      <span class="tab-sep" v-if="isAdmin" aria-hidden="true"></span>
+      <button class="tab-btn" :class="{active:tab==='evaluations'}" v-if="!isViewer" :aria-current="tab==='evaluations'?'page':null" @click="setTab('evaluations')">Evaluations</button>
+      <button class="tab-btn" :class="{active:tab==='announcements'}" :aria-current="tab==='announcements'?'page':null" @click="setTab('announcements')">Announcements</button>
+      <button class="tab-btn" :class="{active:tab==='analytics'}" :aria-current="tab==='analytics'?'page':null" @click="setTab('analytics')">Analytics</button>
+      <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" :aria-current="tab==='admin'?'page':null" @click="setTab('admin')">Users</button>
+      <span class="tab-sep" aria-hidden="true"></span>
+      <button class="tab-btn" :class="{active:tab==='ai'}" :aria-current="tab==='ai'?'page':null" @click="setTab('ai')">AI Feedback</button>
+      <button class="tab-btn" :class="{active:tab==='ask'}" :aria-current="tab==='ask'?'page':null" @click="setTab('ask')">Ask Data</button>
     </nav>
     </div><!-- /.app-shell -->
 
-    <main>
+    <main id="main-content" tabindex="-1">
       <!-- DASHBOARD -->
       <section v-show="tab==='dashboard'">
         <div class="stats" style="margin-top:12px">
