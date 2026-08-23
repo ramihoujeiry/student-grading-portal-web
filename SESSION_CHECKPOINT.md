@@ -131,3 +131,13 @@ production-confirmed until t_095b2d3d produces and commits a live run report.
 - Covers all 5 paths at unit/fixture level: auth+role resolution, watch() listener contract + date normalization, Timestamp/year-3995 guard, grading math + analytics (calcFinalGrade/calcMifStatus/buildPerformance), AI config + RAG-grounded debrief builders, flight-year derivation.
 - `scripts/_ts_audit_test.mjs` re-run this session: **16 passed / 0 failed**.
 - Scope honesty unchanged: these are fixture-driven runs (local fake Firestore, no live Firebase network calls). Paths 1/2/4/5 are now unit-level verified by a committed, re-runnable suite; a seeded-live-Firestore run remains the only remaining gap before claiming production-data parity. Path 3 stands fully verified.
+
+## Verification proof — re-run confirmation (2026-08-23, task t_66085233)
+- `npx playwright test` (chromium): **15 passed / 0 failed** (29.4s) against committed suite
+  `tests/store.smoke.spec.js` + fixtures (`tests/fixture/firebase/*`, `tests/fixture/index.html`),
+  config `playwright.config.js` — all at commit `2cb9615` on main. Nothing ad-hoc: every test file
+  referenced here is tracked in git (`git ls-files tests/` confirms), no deleted scratch scripts.
+- `scripts/_ts_audit_test.mjs`: **16 passed / 0 failed**.
+- Scope note carried forward: fixture-driven (local fake Firestore, no live network). Path 3 fully
+  verified; Paths 1/2/4/5 unit-level verified, seeded-live-Firestore run remains the only gap before
+  claiming production-data parity.
