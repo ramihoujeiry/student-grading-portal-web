@@ -280,12 +280,12 @@ const Store = {
   }
 };
 
-function omitId(o) { const { id, ...rest } = o; return rest; }
+function omitId(o) { if (!o) return {}; const { id, ...rest } = o; return rest; }
 
 /* ---------- grading math (ported 1:1 from Android) ---------------------- */
 function calcFinalGrade(maneuverGrades) {
   if (!maneuverGrades || maneuverGrades.length === 0) return null;
-  const graded = maneuverGrades.filter(m => m.studentGrade != null && m.studentGrade !== 0);
+  const graded = maneuverGrades.filter(m => m && m.studentGrade != null && m.studentGrade !== 0);
   if (graded.length === 0) return null;
   let tw = 0, w = 0;
   for (const m of graded) {
@@ -296,10 +296,10 @@ function calcFinalGrade(maneuverGrades) {
   return Math.round((tw / w) * 1000) / 1000;
 }
 function calcMifStatus(maneuverGrades) {
-  const any = (maneuverGrades || []).some(m => m.studentGrade != null && m.studentGrade !== 0);
+  const any = (maneuverGrades || []).some(m => m && m.studentGrade != null && m.studentGrade !== 0);
   if (!any) return STATUS_PENDING;
   let fail = 0;
-  for (const m of maneuverGrades) if (m.studentGrade != null && m.studentGrade !== 0 && m.requiredMif != null && m.studentGrade < m.requiredMif) fail++;
+  for (const m of (maneuverGrades || [])) if (m && m.studentGrade != null && m.studentGrade !== 0 && m.requiredMif != null && m.studentGrade < m.requiredMif) fail++;
   return fail >= 2 ? STATUS_BELOW_STANDARD : STATUS_MEETS_STANDARD;
 }
 
@@ -322,12 +322,12 @@ function fmtDate(sec){
   return d.toISOString().slice(0,10);
 }
 
-function avg(a){return a.reduce((s,x)=>s+x,0)/a.length;}
-function stddev(a){const m=avg(a);return Math.sqrt(a.map(x=>(x-m)*(x-m)).reduce((s,x)=>s+x,0)/a.length);}
-function maxKey(o){let bk=null,bv=-Infinity;Object.keys(o).forEach(k=>{if(o[k]>bv){bv=o[k];bk=k;}});return bk;}
-function minKey(o){let bk=null,bv=Infinity;Object.keys(o).forEach(k=>{if(o[k]<bv){bv=o[k];bk=k;}});return bk;}
+function avg(a){ if(!a||!a.length) return 0; return a.reduce((s,x)=>s+x,0)/a.length; }
+function stddev(a){ if(!a||!a.length) return 0; const m=avg(a);return Math.sqrt(a.map(x=>(x-m)*(x-m)).reduce((s,x)=>s+x,0)/a.length); }
+function maxKey(o){ if(!o) return null; let bk=null,bv=-Infinity;Object.keys(o).forEach(k=>{if(o[k]>bv){bv=o[k];bk=k;}});return bk; }
+function minKey(o){ if(!o) return null; let bk=null,bv=Infinity;Object.keys(o).forEach(k=>{if(o[k]<bv){bv=o[k];bk=k;}});return bk; }
 function computeTrend(sorted){
-  if(sorted.length<2)return{t:'STABLE',d:0};
+  if(!sorted||sorted.length<2)return{t:'STABLE',d:0};
   const half=Math.floor(sorted.length/2);
   const first=avg(sorted.slice(0,half).map(e=>e.finalGrade));
   const second=avg(sorted.slice(half).map(e=>e.finalGrade));
@@ -335,6 +335,7 @@ function computeTrend(sorted){
   return d>=3?{t:'IMPROVING',d}:d<=-3?{t:'DECLINING',d}:{t:'STABLE',d};
 }
 function maneuverTrendOf(by){
+  if(!by||by.length<2)return 'FLAT';
   const half=Math.floor(by.length/2);
   const first=avg(by.slice(0,half).map(p=>p[1]));
   const second=avg(by.slice(half).map(p=>p[1]));
@@ -342,6 +343,7 @@ function maneuverTrendOf(by){
   return d>=5?'IMPROVING':d<=-5?'DECLINING':'FLAT';
 }
 function extractThemes(notes){
+  if(!notes||!notes.length) return [];
   const counts={};
   notes.forEach(n=>n.toLowerCase().split(/[^a-z]+/).forEach(w=>{if(w.length>=4&&!STOP_WORDS.has(w))counts[w]=(counts[w]||0)+1;}));
   return Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,5);
@@ -357,7 +359,7 @@ function buildPerformance(student, evals){
   const volatility=grades.length>=2?stddev(grades):0;
   const trend=computeTrend(sorted);
   const sums={},weights={},requiredMap={};
-  sorted.forEach(ev=>(ev.maneuverGrades||[]).forEach(m=>{
+  sorted.forEach(ev=>(ev.maneuverGrades||[]).forEach(m=>{ if(!m) return;
     const w=Math.max(m.factor,0.01);
     sums[m.name]=(sums[m.name]||0)+m.studentGrade*w;
     weights[m.name]=(weights[m.name]||0)+w;
@@ -366,7 +368,7 @@ function buildPerformance(student, evals){
   const practicalScores={};
   Object.keys(sums).forEach(n=>{practicalScores[n]=sums[n]/(weights[n]||1);});
   const series={};
-  sorted.forEach(ev=>(ev.maneuverGrades||[]).forEach(m=>{(series[m.name]=series[m.name]||[]).push([ev.date||0,m.studentGrade]);}));
+  sorted.forEach(ev=>(ev.maneuverGrades||[]).forEach(m=>{ if(!m) return; (series[m.name]=series[m.name]||[]).push([ev.date||0,m.studentGrade]);}));
   const maneuverTrends={};
   Object.keys(series).forEach(n=>{const by=series[n].slice().sort((a,b)=>a[0]-b[0]);maneuverTrends[n]=by.length<2?'FLAT':maneuverTrendOf(by);});
   const weakManeuvers=Object.keys(practicalScores).map(n=>{
@@ -387,7 +389,7 @@ function buildPerformance(student, evals){
   else if(volatility>8)readiness='REMEDIAL';
   else readiness='READY';
   const firstDate=sorted.length?sorted[0].date:0,lastDate=sorted.length?sorted[sorted.length-1].date:0;
-  return{studentName:student.name,overallScore,trend:trend.t,trendDelta:trend.d,volatility,
+  return{studentName:(student&&student.name)||'',overallScore,trend:trend.t,trendDelta:trend.d,volatility,
     practicalScores,weakManeuvers,maneuverTrends,phaseScores,bestManeuver,worstManeuver,overallMifStatus,
     instructorNotes,noteThemes,readiness,tripCount:sorted.length,
     firstDateLabel:fmtDate(firstDate),lastDateLabel:fmtDate(lastDate),
@@ -395,6 +397,19 @@ function buildPerformance(student, evals){
 }
 
 async function generateFeedback(data){
+  data = data || {};
+  // Default the fields this template reads so a partially-populated or
+  // missing analytics object (e.g. an evaluation doc with no grade math)
+  // can never throw mid-render and tear down the whole app (the same
+  // null-access class as prior bug c8c9d3a).
+  data.overallScore = (data.overallScore != null) ? data.overallScore : 0;
+  data.trendDelta = (data.trendDelta != null) ? data.trendDelta : 0;
+  data.volatility = (data.volatility != null) ? data.volatility : 0;
+  data.practicalScores = data.practicalScores || {};
+  data.phaseScores = data.phaseScores || {};
+  data.weakManeuvers = data.weakManeuvers || [];
+  data.noteThemes = data.noteThemes || [];
+  data.instructorNotes = data.instructorNotes || [];
   if(!data.evaluationCount)return 'No evaluations found for '+(data.studentName||'this student')+'.\nOpen a student profile from a completed trip to generate feedback.';
   const L=[];const name=data.studentName||'the cadet';
   L.push('AI Performance Analysis - '+name);
@@ -409,7 +424,7 @@ async function generateFeedback(data){
   if(data.bestManeuver&&(data.practicalScores[data.bestManeuver]||0)>=70)L.push('STRENGTH: '+data.bestManeuver+' (avg '+data.practicalScores[data.bestManeuver].toFixed(1)+')');
   L.push('');
   if(data.weakManeuvers.length){L.push('PRIORITY TO IMPROVE:');data.weakManeuvers.slice(0,5).forEach(w=>{const tag=w.belowRequired?'below required MIF '+w.requiredMif:'below pass mark';const tr=w.trend==='IMPROVING'?'improving':w.trend==='DECLINING'?'STILL DECLINING':'flat';L.push('- '+w.name+': avg '+w.avgGrade.toFixed(1)+' ('+tag+') - '+tr);});L.push('');}
-  else if(data.worstManeuver)L.push('Lowest scoring area: '+data.worstManeuver+' (avg '+data.practicalScores[data.worstManeuver].toFixed(1)+')\n');
+  else if(data.worstManeuver)L.push('Lowest scoring area: '+data.worstManeuver+' (avg '+(data.practicalScores[data.worstManeuver]||0).toFixed(1)+')\n');
   if(Object.keys(data.phaseScores).length){L.push('PHASE AVERAGES:');Object.keys(data.phaseScores).sort().forEach(p=>L.push('- '+p+': '+data.phaseScores[p].toFixed(1)));L.push('');}
   if(data.noteThemes.length)L.push('RECURRING COACH THEMES: '+data.noteThemes.join(', '));
   L.push('');
@@ -419,12 +434,12 @@ async function generateFeedback(data){
   else L.push('- Skill: at/above standard across evaluated maneuvers.');
   if(data.trend==='DECLINING'||data.volatility>8)L.push('- Risk Mgmt: unstable performance - brief hazards and personal minimums before the next trip.');
   else L.push('- Risk Mgmt: stable - maintain standard operating routines.');
-  if(data.noteThemes.length||data.instructorNotes.some(n=>/watch|caution|unsafe/i.test(n)))L.push('- Knowledge: gaps flagged in notes ('+data.noteThemes.slice(0,3).join(', ')+').');
+  if(data.noteThemes.length||(data.instructorNotes||[]).some(n=>/watch|caution|unsafe/i.test(n)))L.push('- Knowledge: gaps flagged in notes ('+data.noteThemes.slice(0,3).join(', ')+').');
   else L.push('- Knowledge: no recurring gaps flagged.');
   L.push('');
   L.push('FOR THE INSTRUCTOR - NEXT TRIP:');
   if(!data.weakManeuvers.length)L.push('- No failing maneuvers against standard. Keep current coaching; introduce advanced scenarios to stretch the cadet.');
-  else{const top=data.weakManeuvers[0];L.push("- Next trip: demonstrate '"+top.name+"' to standard, then guided practice, then solo - do not advance until consistently at "+top.requiredMif+'+.');L.push('- Give cockpit attention to: '+data.weakManeuvers.slice(0,3).map(w=>w.name).join(', ')+'.');const dec=data.weakManeuvers.filter(w=>w.trend==='DECLINING');if(dec.length)L.push("- "+dec[0].name+' is still declining: change the teaching technique (demonstrate the correct feel), not just more repetition.');if(data.trend==='DECLINING')L.push('- Trend is down. Run a standardisation/recurrency check before progressing phases; remediate the weak fundamental first.');else if(data.trend==='IMPROVING')L.push('- Momentum is good. Let the cadet lead more; reduce instructor inputs on strengths to build airmanship.');if(data.volatility>8)L.push('- Grades are inconsistent (high variance). Focus on repeatability and "feel of the airplane" before advancing.');if(data.instructorNotes.some(n=>/watch|caution|unsafe/i.test(n)))L.push('- Prioritise the safety items flagged in previous notes before adding new tasks.');L.push('- After each sortie, review with the cadet using ADM: what happened, why, and the correction.');if(data.volatility>8||data.trend==='DECLINING'||data.instructorNotes.some(n=>/watch|caution|unsafe/i.test(n)))L.push('- Run a PAVE brief (Pilot, Aircraft, EnVironment, External) before the next trip; set personal minimums for the weak area.');}
+  else{const top=data.weakManeuvers[0];L.push("- Next trip: demonstrate '"+top.name+"' to standard, then guided practice, then solo - do not advance until consistently at "+top.requiredMif+'+.');L.push('- Give cockpit attention to: '+data.weakManeuvers.slice(0,3).map(w=>w.name).join(', ')+'.');const dec=data.weakManeuvers.filter(w=>w.trend==='DECLINING');if(dec.length)L.push("- "+dec[0].name+' is still declining: change the teaching technique (demonstrate the correct feel), not just more repetition.');if(data.trend==='DECLINING')L.push('- Trend is down. Run a standardisation/recurrency check before progressing phases; remediate the weak fundamental first.');else if(data.trend==='IMPROVING')L.push('- Momentum is good. Let the cadet lead more; reduce instructor inputs on strengths to build airmanship.');if(data.volatility>8)L.push('- Grades are inconsistent (high variance). Focus on repeatability and "feel of the airplane" before advancing.');if((data.instructorNotes||[]).some(n=>/watch|caution|unsafe/i.test(n)))L.push('- Prioritise the safety items flagged in previous notes before adding new tasks.');L.push('- After each sortie, review with the cadet using ADM: what happened, why, and the correction.');if(data.volatility>8||data.trend==='DECLINING'||(data.instructorNotes||[]).some(n=>/watch|caution|unsafe/i.test(n)))L.push('- Run a PAVE brief (Pilot, Aircraft, EnVironment, External) before the next trip; set personal minimums for the weak area.');}
   L.push('');
   L.push('TRAINING PLAN - WHAT THE CADET SHOULD DO:');
   if(!data.weakManeuvers.length)L.push('- Maintain current rhythm. Practise variations of strong maneuvers to build consistency and airmanship.');
@@ -459,24 +474,26 @@ async function generateFeedback(data){
 
 /* ---- Single-evaluation AI debrief (per-evaluation, not whole student) ---- */
 function buildSingleEvalData(ev){
-  const grades=(ev.maneuverGrades||[]).map(m=>({name:m.name,grade:m.studentGrade,req:(m.requiredMif>0?m.requiredMif:0),factor:m.factor}));
+  ev = ev || {};
+  const grades=(ev.maneuverGrades||[]).filter(m=>m).map(m=>({name:m.name,grade:m.studentGrade,req:(m.requiredMif>0?m.requiredMif:0),factor:m.factor}));
   const below=grades.filter(g=>g.req>0 && g.grade<g.req).sort((a,b)=>a.grade-b.grade);
   return {studentName:ev.studentName, aircraft:ev.aircraftType, phase:ev.phaseName, trip:ev.tripNumber,
     date:fmtDate(ev.date), instructor:ev.instructorName, duration:ev.duration, finalGrade:ev.finalGrade,
     mifStatus:ev.overallMifStatus, grades, below, notes:ev.tripNotes||''};
 }
 function generateSingleEvalFeedback(d){
+  d = d || {};
   const L=[]; const name=d.studentName||'the cadet';
   L.push('AI Debrief — Single Evaluation');
   L.push(name+' · '+d.aircraft+' · '+d.phase+' '+d.trip+' · '+d.date+' · '+d.instructor+' · '+d.duration+'h');
   L.push('Final grade: '+(d.finalGrade!=null?d.finalGrade.toFixed(1):'-')+'   MIF status: '+d.mifStatus);
   L.push('');
-  if(d.grades.length){
+  if((d.grades||[]).length){
     L.push('Maneuver grades:');
-    d.grades.forEach(g=>{const tag=g.req>0?(g.grade<g.req?'  BELOW required MIF '+g.req:'  meets MIF '+g.req):'  (no MIF set)'; L.push('- '+g.name+': '+g.grade+tag);});
+    (d.grades||[]).forEach(g=>{const tag=g.req>0?(g.grade<g.req?'  BELOW required MIF '+g.req:'  meets MIF '+g.req):'  (no MIF set)'; L.push('- '+g.name+': '+g.grade+tag);});
     L.push('');
   }
-  if(d.below.length){
+  if((d.below||[]).length){
     L.push('PRIORITY TO IMPROVE THIS TRIP:');
     d.below.slice(0,5).forEach(w=>L.push('- '+w.name+': '+w.grade+' (below required MIF '+w.req+')'));
     L.push('');
@@ -488,14 +505,15 @@ function generateSingleEvalFeedback(d){
   return L.join('\n');
 }
 function buildSingleEvalPrompt(d){
+  d = d || {};
   const sys='You are a senior flight instructor (CFI) writing a concise, candid coaching debrief for ONE evaluation (a single training trip). Use the data provided. Be specific and actionable. Do NOT invent grades or maneuvers that are not in the data. Write in plain language a human instructor would say. Use short paragraphs. End with concrete next-trip actions.';
   const L=[];
   L.push('Student: '+(d.studentName||'cadet'));
   L.push('Evaluation: '+d.aircraft+' · '+d.phase+' '+d.trip+' · '+d.date+' · instructor '+d.instructor+' · duration '+d.duration+'h');
   L.push('Final grade: '+(d.finalGrade!=null?d.finalGrade.toFixed(1):'-')+'   MIF status: '+d.mifStatus);
-  if(d.grades.length){
+  if((d.grades||[]).length){
     L.push('Maneuver grades (name : student grade : required MIF):');
-    d.grades.forEach(g=>L.push('- '+g.name+' : '+g.grade+' : '+(g.req>0?g.req:'n/a')));
+    (d.grades||[]).forEach(g=>L.push('- '+g.name+' : '+g.grade+' : '+(g.req>0?g.req:'n/a')));
   }
   if(d.notes)L.push('Instructor trip notes: '+d.notes);
   L.push('Write a debrief focused on THIS evaluation: what went well, what to fix, and the single most important next-trip action.');
@@ -550,6 +568,7 @@ async function getAIConfig() {
    maneuvers + risk management are appended so the debrief cites FAA source
    material instead of guessing. */
 async function buildAIPrompt(data) {
+  data = data || {};
   const sys = 'You are a senior flight instructor (CFI) writing a concise, candid coaching debrief for a student pilot. ' +
     'Use the data provided. Be specific and actionable. Do NOT invent grades or maneuvers that are not in the data. ' +
     'Write in plain language a human instructor would say. Use short paragraphs. End with concrete next-trip actions.';
@@ -604,6 +623,7 @@ async function callAIModelWithPrompt(prompt, cfg) {
 }
 
 async function _postAIModel(prompt, cfg) {
+  if (!prompt || !prompt.system || !prompt.user) throw new Error('no prompt');
   const body = {
     model: cfg.model || 'qwen/qwen3.8-max',
     messages: [
