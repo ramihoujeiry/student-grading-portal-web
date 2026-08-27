@@ -13,5 +13,8 @@ vue.global.dev.js
 dist/
 node_modules/
 
+# Manuals drop-zone (large PDFs kept locally as RAG source; do NOT commit ~500MB of binaries)
+manuals/
+
 test-results/
 playwright-report/
