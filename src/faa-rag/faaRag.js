@@ -102,10 +102,11 @@ async function buildFaaContext(data) {
 
   // Hard budget so the prompt payload stays well under the Pi proxy's ARG_MAX
   // (the proxy shells out to python with the prompt as a CLI arg; a huge RAG
-  // block previously triggered "Argument list too long" → HTTP 502).
-  const MAX_CHARS = 6000;
-  const PER_WEAK = 2;      // passages per weak maneuver
-  const PER_GENERAL = 2;   // passages per always-included general topic
+  // block previously triggered "Argument list too long" → HTTP 502). Keep it
+  // SMALL — the Pi's argv limit is low, so we stay around ~2.5 KB here.
+  const MAX_CHARS = 2500;
+  const PER_WEAK = 1;      // passages per weak maneuver
+  const PER_GENERAL = 1;   // passages per always-included general topic
 
   // 1) Weak maneuvers (below required MIF) — highest priority.
   (data.weakManeuvers || []).slice(0, 5).forEach(w => {

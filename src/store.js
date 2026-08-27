@@ -590,6 +590,11 @@ async function buildAIPrompt(data) {
       if (faa) user += faa;
     }
   } catch (e) { console.warn('FAA RAG attach skipped:', e && e.message); }
+  // Hard safety net: keep the total user payload small so the Pi proxy's argv
+  // limit is never exceeded (HTTP 502 "Argument list too long"). Truncate mid-
+  // word at the budget and append a marker.
+  const USER_MAX = 4000;
+  if (user.length > USER_MAX) user = user.slice(0, USER_MAX) + '\n…[truncated]';
   return { system: sys, user };
 }
 
