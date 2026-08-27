@@ -204,7 +204,7 @@
   .meter{height:8px;background:rgba(8,14,20,.7);border-radius:5px;overflow:hidden;margin-top:10px}
   .meter-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--amber) 55%,var(--red));border-radius:5px;transition:width .25s}
 </style>
-  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-CnWSkDmC.js"></script>
+  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-CUcunljw.js"></script>
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-vue-CxFK-cW8.js">
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-firebase-CAVvKspe.js">
 </head>
@@ -447,23 +447,20 @@
             <select v-model="evYear" aria-label="Evaluations school-year filter"><option>All Years</option><option v-for="yr in years" :key="yr" :value="yr">{{yr}}</option></select></label></div>
           <button class="btn sm ghost" @click="evStudent='All Cadets';evAircraft='All Aircraft';evPhase='All Phases';evYear='All Years';evSearch=''">Clear</button>
         </div>
-        <div v-for="(evs, sid) in evalsByStudentInYear" :key="sid">
-          <h3 style="color:var(--text);text-transform:none;letter-spacing:0">{{studentName(sid)}}</h3>
-          <ul class="list">
-            <li v-for="e in evs" :key="e.id" class="clickable" @click="openEval(e)">
-              <div class="row nowrap">
-                <strong>{{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
-                <span class="muted">{{fmt(e.date)}} · {{e.instructorName}}</span>
-                <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
-                <span class="pill" :class="statusColor(e.overallMifStatus)">{{statusLabel(e.overallMifStatus)}}</span>
-                <span class="spacer" style="flex:1"></span>
-                <button class="btn sm danger" v-if="isAdmin" @click.stop="deleteEval(e)">Delete</button>
-              </div>
-              <div class="muted" v-if="e.tripNotes">{{e.tripNotes}}</div>
-            </li>
-          </ul>
-        </div>
-        <div v-if="!Object.keys(evalsByStudentInYear).length" class="muted">No evaluations for {{activeYearResolved}}.</div>
+        <ul class="list">
+          <li v-for="e in evalsSortedByDate" :key="e.id" class="clickable" @click="openEval(e)">
+            <div class="row nowrap">
+              <strong>{{studentName(e.studentId)}} · {{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
+              <span class="muted">{{fmt(e.date)}} · {{e.instructorName}}</span>
+              <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
+              <span class="pill" :class="statusColor(e.overallMifStatus)">{{statusLabel(e.overallMifStatus)}}</span>
+              <span class="spacer" style="flex:1"></span>
+              <button class="btn sm danger" v-if="isAdmin" @click.stop="deleteEval(e)">Delete</button>
+            </div>
+            <div class="muted" v-if="e.tripNotes">{{e.tripNotes}}</div>
+          </li>
+        </ul>
+        <div v-if="!evalsSortedByDate.length" class="muted">No evaluations for {{activeYearResolved}}.</div>
       </section>
 
       <!-- ANNOUNCEMENTS -->
