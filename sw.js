@@ -7,10 +7,10 @@
  *   - RAG index (faa_index.json) + any API / chat endpoint: network-first,
  *     never served stale.
  *
- * Bump the CACHE name on every deploy (paired with main.js "mt5kawf1")
+ * Bump the CACHE name on every deploy (paired with main.js "mtbzaxsf")
  * so users never run stale JS.
  * ========================================================================= */
-const CACHE = 'grading-portal-v' + "mt5kawf1";
+const CACHE = 'grading-portal-v' + "mtbzaxsf";
 
 // The core shell to pre-cache on install. Vite emits hashed names, so instead
 // of hard-coding them we cache-on-fetch (stale-while-revalidate below). The

@@ -204,7 +204,7 @@
   .meter{height:8px;background:rgba(8,14,20,.7);border-radius:5px;overflow:hidden;margin-top:10px}
   .meter-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--amber) 55%,var(--red));border-radius:5px;transition:width .25s}
 </style>
-  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-BdBaVTtI.js"></script>
+  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-BfU1UPz6.js"></script>
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-vue-CxFK-cW8.js">
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-firebase-CAVvKspe.js">
 </head>
@@ -436,7 +436,7 @@
           <button class="btn sm" v-if="canEdit" @click="openNewEval">+ New Evaluation</button></div>
         <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
           <div style="flex:2 1 240px;min-width:200px"><label>Search evaluations</label>
-            <input v-model="evSearch" placeholder="date, student, phase, instructor, aircraft…" style="width:100%" /></div>
+            <input v-model="evSearch" aria-label="Search evaluations" placeholder="date, student, phase, instructor, aircraft…" style="width:100%" /></div>
           <div style="flex:1;min-width:150px"><label>Student
             <select v-model="evStudent" aria-label="Evaluations student filter"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></label></div>
           <div style="flex:1;min-width:140px"><label>Aircraft
@@ -680,7 +680,7 @@
           <h3>Ask Your Grading Data</h3>
           <p class="muted" style="margin:4px 2px 12px">Ask a plain-English question about students, phases, MIF status or recent evaluations. Answers come from the live AI model over the data you already have access to.</p>
           <label>Your question</label>
-          <textarea v-model="askQuery" rows="3" placeholder="e.g. Which students are currently below MIF this phase? / Summarize last week's evaluations. / Who needs the most attention?"></textarea>
+          <textarea v-model="askQuery" rows="3" aria-label="Ask a question about your data" placeholder="e.g. Which students are currently below MIF this phase? / Summarize last week's evaluations. / Who needs the most attention?"></textarea>
           <div style="margin-top:12px" class="row">
             <button class="btn" :disabled="askLoading" @click="askData">{{askLoading ? 'Thinking…' : 'Ask'}}</button>
             <button class="btn ghost" :disabled="!askResult" @click="askQuery='';askResult=''">Clear</button>
@@ -1001,6 +1001,6 @@ html.light-theme .maneuver-name.below{background:rgba(210,59,59,.12)}
 .import-err{background:rgba(255,93,93,.1);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:8px;font-size:12px;margin-top:8px}
 .import-ok{background:rgba(70,224,138,.1);border:1px solid var(--green);color:var(--green);border-radius:8px;padding:8px;font-size:12px;margin-top:8px}
 textarea.csv-input{width:100%;min-height:160px;font-family:var(--mono);font-size:12px}
-</style>
+</style>
 </body>
 </html>
