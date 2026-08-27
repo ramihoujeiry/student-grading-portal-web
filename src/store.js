@@ -558,6 +558,7 @@ async function buildAIPrompt(data) {
     'Write in plain language a human instructor would say. Use short paragraphs. End with concrete next-trip actions.';
   const L = [];
   L.push('Student: ' + (data.studentName || 'cadet'));
+  if (data.yearScope) L.push('School year in scope: ' + data.yearScope + ' (debrief covers ONLY this school year\'s trips)');
   L.push('Trips evaluated: ' + (data.evaluationCount || 0) + '  (' + (data.firstDateLabel || '-') + ' -> ' + (data.lastDateLabel || '-') + ')');
   L.push('Overall average grade: ' + (data.overallScore != null ? data.overallScore.toFixed(1) : '-'));
   L.push('Trend: ' + (data.trend || '-') + (data.evaluationCount >= 2 ? ' (' + Math.abs(data.trendDelta || 0).toFixed(1) + ' pts ' + ((data.trendDelta || 0) >= 0 ? 'up' : 'down') + ')' : ''));

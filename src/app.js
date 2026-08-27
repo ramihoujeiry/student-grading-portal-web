@@ -1202,8 +1202,10 @@ export const app = createApp({
     // print-friendly per-student report -> window.print() (PDF via browser)
     async printStudent(s) {
       if (!s) return;
-      const evals = this.evaluations.filter(e => e.studentId === s.id).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
+      const y = this.activeYearResolved;   // school-year scope (defaults to most recent)
+      const evals = this.evaluations.filter(e => e.studentId === s.id && (!y || e.flightYear === y)).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
       const perf = buildPerformance(s, evals);
+      perf.yearScope = y;   // so the AI debrief is explicitly year-scoped
       // Live AI debrief only — never the offline template.
       let analysis = '';
       try {
@@ -1217,7 +1219,7 @@ export const app = createApp({
       const rows = evals.map(e => `<tr><td>${e.aircraftType} · ${e.phaseName} ${e.tripNumber}</td><td>${this.fmt(e.date)}</td><td>${e.finalGrade != null ? e.finalGrade.toFixed(1) : '-'}</td><td>${e.overallMifStatus || ''}</td></tr>`).join('');
       win.document.write(`<!doctype html><html><head><title>${s.name} — Report</title>
         <style>body{font-family:system-ui,Arial;padding:24px;color:#111}h1{margin:0}table{width:100%;border-collapse:collapse;margin-top:14px}td,th{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:13px}pre{white-space:pre-wrap;background:#f5f5f5;padding:12px;border-radius:8px}@media print{button{display:none}}</style>
-        </head><body><h1>${s.name}</h1><div>Avg ${perf.overallScore ? perf.overallScore.toFixed(1) : '-'} · Trend ${perf.trend} · Readiness ${perf.readiness} · ${evals.length} trips</div>
+        <h1>${s.name}</h1><div>School Year: ${y || 'all'} · Avg ${perf.overallScore ? perf.overallScore.toFixed(1) : '-'} · Trend ${perf.trend} · Readiness ${perf.readiness} · ${evals.length} trips</div>
         <table><thead><tr><th>Trip</th><th>Date</th><th>Final</th><th>MIF</th></tr></thead><tbody>${rows}</tbody></table>
         <h3 style="margin-top:18px">AI Performance Analysis</h3><pre>${analysis.replace(/</g, '&lt;')}</pre>
         <button onclick="window.print()" style="margin-top:16px;padding:10px 16px">Print / Save as PDF</button></body></html>`);
