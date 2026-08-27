@@ -100,12 +100,19 @@ async function buildFaaContext(data) {
     return { label: (p.page ? 'p.' + p.page : ''), body: p.text || '' };
   }
 
+  // Hard budget so the prompt payload stays well under the Pi proxy's ARG_MAX
+  // (the proxy shells out to python with the prompt as a CLI arg; a huge RAG
+  // block previously triggered "Argument list too long" → HTTP 502).
+  const MAX_CHARS = 6000;
+  const PER_WEAK = 2;      // passages per weak maneuver
+  const PER_GENERAL = 2;   // passages per always-included general topic
+
   // 1) Weak maneuvers (below required MIF) — highest priority.
   (data.weakManeuvers || []).slice(0, 5).forEach(w => {
     const key = normalize(w.name);
     const passages = idx[key];
     if (passages && passages.length) {
-      passages.forEach(p => {
+      passages.slice(0, PER_WEAK).forEach(p => {
         const { label, body } = extract(p);
         if (seen.has(body)) return;
         seen.add(body);
@@ -120,7 +127,7 @@ async function buildFaaContext(data) {
   ['Risk Management', 'Aeronautical Decision Making', 'Instructional technique',
    'Common errors', 'Safety / accident prevention', 'Human factors',
    'Crew resource management'].forEach(k => {
-    (idx[k] || []).slice(0, 4).forEach(p => {
+    (idx[k] || []).slice(0, PER_GENERAL).forEach(p => {
       const { label, body } = extract(p);
       if (seen.has(body)) return;
       seen.add(body);
@@ -129,8 +136,11 @@ async function buildFaaContext(data) {
   });
 
   if (!blocks.length) return '';
-  return '\n\n--- REFERENCE SOURCE MATERIAL (FAA-H-8083-25B + UH-1 Instructor Pilot Course + Robinson FTG) ---\n' +
-    blocks.join('\n\n') +
+  // Enforce the global character budget (trim from the end if needed).
+  let out = blocks.join('\n\n');
+  if (out.length > MAX_CHARS) out = out.slice(0, MAX_CHARS);
+  return '\n\n--- REFERENCE SOURCE MATERIAL (FAA-H-8083-25B, FAA-H-8083-21B, UH-1 FTG, Robinson FTG, TC 1-211, PHAK, FAA-H-8083-4, FAA-H-8083-9, + more) ---\n' +
+    out +
     '\n--- END REFERENCE ---\n' +
     'Use the above source material to anchor your coaching points where relevant. ' +
     'Cite the referenced manual when you reference a specific principle. Do not contradict FAA / UH-1 / Robinson guidance.\n';
