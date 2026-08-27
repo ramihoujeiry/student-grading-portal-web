@@ -189,6 +189,14 @@ export const app = createApp({
       evs.forEach(e => { (map[e.studentId] = map[e.studentId] || []).push(e); });
       return map;
     },
+    evalsSortedByDate() {
+      // Flat, date-sorted (most recent first) view of the filtered evaluations.
+      // Reuses evalsByStudentInYear's filtering (year/student/aircraft/phase/search),
+      // flattens the per-student groups, and sorts by date descending.
+      const out = [];
+      Object.values(this.evalsByStudentInYear).forEach(arr => out.push(...arr));
+      return out.sort((a, b) => (b.date || 0) - (a.date || 0));
+    },
     // Unique phase names available for the Evaluations filter dropdown.
     phaseOptions() {
       const set = new Set();
