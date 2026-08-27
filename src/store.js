@@ -19,8 +19,8 @@
  *   STATUS_MEETS_STANDARD, STATUS_BELOW_STANDARD, STATUS_PENDING, GRADE_SCORE,
  *   LAN_AI_ENABLED, LAN_AI_ENDPOINT, LAN_AI_MODEL,
  *   getAIConfig, callAIModel, callAIModelWithPrompt,
- *   buildPerformance, generateFeedback,
- *   buildSingleEvalData, generateSingleEvalFeedback, buildSingleEvalPrompt,
+ *   buildPerformance, buildAIPrompt,
+ *   buildSingleEvalData, buildSingleEvalPrompt,
  *   getRag (lazy-loads the FAA RAG layer), getRagIndex (raw index, lazy)
  * ========================================================================= */
 
@@ -387,10 +387,6 @@ const STOP_WORDS = new Set(('the a an and or to of in on for with is are was wer
   'he she they you we my your their not no but if so do did has have had will would can could should very more than ' +
   'into out up down about his her its our them then there also after before when while which who what how why').split(' '));
 
-function ol(s){return s>=90?'Excellent':s>=75?'Good':s>=60?'Satisfactory':'Needs improvement';}
-function tl(t){return t==='IMPROVING'?'Improving':t==='DECLINING'?'Declining':'Stable';}
-function vl(v){return v<3?'Steady':v<8?'Variable':'Inconsistent';}
-function rl(r){return r==='READY'?'Ready to progress / consolidate':r==='RECOVERING'?'Recovering - keep current plan':r==='REMEDIAL'?'Remedial focus needed':'Insufficient data for a confident verdict';}
 export function fmtDate(sec){
   const s = toEpochSec(sec);
   if (!s) return '-';
@@ -481,78 +477,6 @@ function buildPerformance(student, evals){
     spanDays:sorted.length?Math.floor((lastDate-firstDate)/86400):0,evaluationCount:sorted.length};
 }
 
-async function generateFeedback(data){
-  data = data || {};
-  // Default the fields this template reads so a partially-populated or
-  // missing analytics object (e.g. an evaluation doc with no grade math)
-  // can never throw mid-render and tear down the whole app (the same
-  // null-access class as prior bug c8c9d3a).
-  data.overallScore = (data.overallScore != null) ? data.overallScore : 0;
-  data.trendDelta = (data.trendDelta != null) ? data.trendDelta : 0;
-  data.volatility = (data.volatility != null) ? data.volatility : 0;
-  data.practicalScores = data.practicalScores || {};
-  data.phaseScores = data.phaseScores || {};
-  data.weakManeuvers = data.weakManeuvers || [];
-  data.noteThemes = data.noteThemes || [];
-  data.instructorNotes = data.instructorNotes || [];
-  if(!data.evaluationCount)return 'No evaluations found for '+(data.studentName||'this student')+'.\nOpen a student profile from a completed trip to generate feedback.';
-  const L=[];const name=data.studentName||'the cadet';
-  L.push('AI Performance Analysis - '+name);
-  L.push(data.evaluationCount+' trip(s) | '+data.firstDateLabel+' -> '+data.lastDateLabel);
-  if(data.spanDays>0)L.push('  ~'+(data.tripCount/Math.max(data.spanDays/30,1)).toFixed(1)+' trips/mo');
-  L.push('');
-  L.push('OVERALL: '+ol(data.overallScore)+' (avg '+data.overallScore.toFixed(1)+')');
-  L.push('Trend: '+tl(data.trend)+(data.evaluationCount>=2?' ('+Math.abs(data.trendDelta).toFixed(1)+' pts '+(data.trendDelta>=0?'up':'down')+')':''));
-  L.push('Consistency: '+vl(data.volatility)+' (std '+data.volatility.toFixed(1)+')');
-  if(data.overallMifStatus)L.push('MIF status: '+data.overallMifStatus);
-  L.push('');
-  if(data.bestManeuver&&(data.practicalScores[data.bestManeuver]||0)>=70)L.push('STRENGTH: '+data.bestManeuver+' (avg '+data.practicalScores[data.bestManeuver].toFixed(1)+')');
-  L.push('');
-  if(data.weakManeuvers.length){L.push('PRIORITY TO IMPROVE:');data.weakManeuvers.slice(0,5).forEach(w=>{const tag=w.belowRequired?'below required MIF '+w.requiredMif:'below pass mark';const tr=w.trend==='IMPROVING'?'improving':w.trend==='DECLINING'?'STILL DECLINING':'flat';L.push('- '+w.name+': avg '+w.avgGrade.toFixed(1)+' ('+tag+') - '+tr);});L.push('');}
-  else if(data.worstManeuver)L.push('Lowest scoring area: '+data.worstManeuver+' (avg '+(data.practicalScores[data.worstManeuver]||0).toFixed(1)+')\n');
-  if(Object.keys(data.phaseScores).length){L.push('PHASE AVERAGES:');Object.keys(data.phaseScores).sort().forEach(p=>L.push('- '+p+': '+data.phaseScores[p].toFixed(1)));L.push('');}
-  if(data.noteThemes.length)L.push('RECURRING COACH THEMES: '+data.noteThemes.join(', '));
-  L.push('');
-  L.push('READINESS: '+rl(data.readiness));L.push('');
-  L.push('ACS FRAMEWORK (Knowledge + Risk Mgmt + Skill):');
-  if(data.weakManeuvers.length)L.push('- Skill: below standard on '+data.weakManeuvers[0].name+' - remediate before advancing.');
-  else L.push('- Skill: at/above standard across evaluated maneuvers.');
-  if(data.trend==='DECLINING'||data.volatility>8)L.push('- Risk Mgmt: unstable performance - brief hazards and personal minimums before the next trip.');
-  else L.push('- Risk Mgmt: stable - maintain standard operating routines.');
-  if(data.noteThemes.length||(data.instructorNotes||[]).some(n=>/watch|caution|unsafe/i.test(n)))L.push('- Knowledge: gaps flagged in notes ('+data.noteThemes.slice(0,3).join(', ')+').');
-  else L.push('- Knowledge: no recurring gaps flagged.');
-  L.push('');
-  L.push('FOR THE INSTRUCTOR - NEXT TRIP:');
-  if(!data.weakManeuvers.length)L.push('- No failing maneuvers against standard. Keep current coaching; introduce advanced scenarios to stretch the cadet.');
-  else{const top=data.weakManeuvers[0];L.push("- Next trip: demonstrate '"+top.name+"' to standard, then guided practice, then solo - do not advance until consistently at "+top.requiredMif+'+.');L.push('- Give cockpit attention to: '+data.weakManeuvers.slice(0,3).map(w=>w.name).join(', ')+'.');const dec=data.weakManeuvers.filter(w=>w.trend==='DECLINING');if(dec.length)L.push("- "+dec[0].name+' is still declining: change the teaching technique (demonstrate the correct feel), not just more repetition.');if(data.trend==='DECLINING')L.push('- Trend is down. Run a standardisation/recurrency check before progressing phases; remediate the weak fundamental first.');else if(data.trend==='IMPROVING')L.push('- Momentum is good. Let the cadet lead more; reduce instructor inputs on strengths to build airmanship.');if(data.volatility>8)L.push('- Grades are inconsistent (high variance). Focus on repeatability and "feel of the airplane" before advancing.');if((data.instructorNotes||[]).some(n=>/watch|caution|unsafe/i.test(n)))L.push('- Prioritise the safety items flagged in previous notes before adding new tasks.');L.push('- After each sortie, review with the cadet using ADM: what happened, why, and the correction.');if(data.volatility>8||data.trend==='DECLINING'||(data.instructorNotes||[]).some(n=>/watch|caution|unsafe/i.test(n)))L.push('- Run a PAVE brief (Pilot, Aircraft, EnVironment, External) before the next trip; set personal minimums for the weak area.');}
-  L.push('');
-  L.push('TRAINING PLAN - WHAT THE CADET SHOULD DO:');
-  if(!data.weakManeuvers.length)L.push('- Maintain current rhythm. Practise variations of strong maneuvers to build consistency and airmanship.');
-  else{data.weakManeuvers.slice(0,3).forEach(w=>L.push("- Drill '"+w.name+"' (avg "+w.avgGrade.toFixed(1)+'): chair-fly + repeat to standard until steady at '+w.requiredMif+'+.'));L.push('- Use simulator / chair-flying for the weakest item(s) before the next flight.');if(data.trend==='DECLINING')L.push('- Slow the pace: consolidate the fundamentals rather than advancing to new material.');else if(data.trend==='IMPROVING')L.push('- Keep the current study cadence; it is paying off.');if(data.noteThemes.length)L.push('- Re-study ground theory for: '+data.noteThemes.slice(0,3).join(', ')+' (flagged in instructor notes).');L.push('- Self-grade each session against the required MIF and log what improved.');}
-  L.push('');
-  L.push('METHOD (FAA AIH / CFI ACS / Risk Mgmt Hbk): demonstrate, then guided practice, then solo.');
-  L.push('Grade against ACS (Knowledge + Risk Mgmt + Skill); remediate weak fundamentals before advancing.');
-  // --- Ground the offline debrief in the embedded RAG index (lazy-loaded). ---
-  try {
-    const FaaRag = await getRag();
-    if (FaaRag && FaaRag.buildFaaContext) {
-      const faa = await FaaRag.buildFaaContext(data);
-      if (faa) {
-        const cites = (faa.match(/\(([^)]*p\.\d[^)]*?)\)/g) || [])
-          .map(s => s.replace(/[()]/g, '').trim())
-          .filter((v, i, a) => a.indexOf(v) === i)
-          .slice(0, 6);
-        if (cites.length) {
-          L.push('');
-          L.push('GROUNDING (from bundled FAA / UH-1 / Robinson FTG manuals):');
-          cites.forEach(c => L.push('  - ' + c));
-        }
-      }
-    }
-  } catch (e) { /* offline template still useful without RAG */ }
-  return L.join('\n');
-}
-
 /* ---- Single-evaluation AI debrief (per-evaluation, not whole student) ---- */
 function buildSingleEvalData(ev){
   ev = ev || {};
@@ -561,29 +485,6 @@ function buildSingleEvalData(ev){
   return {studentName:ev.studentName, aircraft:ev.aircraftType, phase:ev.phaseName, trip:ev.tripNumber,
     date:fmtDate(toEpochSec(ev.date)), instructor:ev.instructorName, duration:ev.duration, finalGrade:ev.finalGrade,
     mifStatus:ev.overallMifStatus, grades, below, notes:ev.tripNotes||''};
-}
-function generateSingleEvalFeedback(d){
-  d = d || {};
-  const L=[]; const name=d.studentName||'the cadet';
-  L.push('AI Debrief — Single Evaluation');
-  L.push(name+' · '+d.aircraft+' · '+d.phase+' '+d.trip+' · '+d.date+' · '+d.instructor+' · '+d.duration+'h');
-  L.push('Final grade: '+(d.finalGrade!=null?d.finalGrade.toFixed(1):'-')+'   MIF status: '+d.mifStatus);
-  L.push('');
-  if((d.grades||[]).length){
-    L.push('Maneuver grades:');
-    (d.grades||[]).forEach(g=>{const tag=g.req>0?(g.grade<g.req?'  BELOW required MIF '+g.req:'  meets MIF '+g.req):'  (no MIF set)'; L.push('- '+g.name+': '+g.grade+tag);});
-    L.push('');
-  }
-  if((d.below||[]).length){
-    L.push('PRIORITY TO IMPROVE THIS TRIP:');
-    d.below.slice(0,5).forEach(w=>L.push('- '+w.name+': '+w.grade+' (below required MIF '+w.req+')'));
-    L.push('');
-    L.push('Next trip: demonstrate the weakest item(s) to standard, then guided practice, then solo. Do not advance until consistently at the required MIF.');
-  } else {
-    L.push('All maneuvers met or exceeded required MIF for this evaluation. Maintain the standard; introduce advanced scenarios to stretch the cadet on the next trip.');
-  }
-  if(d.notes){ L.push(''); L.push('Coach notes:'); L.push(d.notes); }
-  return L.join('\n');
 }
 function buildSingleEvalPrompt(d){
   d = d || {};
@@ -623,7 +524,8 @@ function buildSingleEvalPrompt(d){
    Expected doc shape:
      { enabled:true, endpoint:"https://.../v1/chat/completions",
        model:"qwen/qwen3.8-max", apiKey:*** }
-   Falls back to the offline template (generateFeedback) if unset or on error. */
+   If unset, falls back to the LAN Pi proxy default below. The debrief is
+   always generated live by the model — there is no offline template. */
 async function getAIConfig() {
   // 1) Cloud config (admin-set, overrides LAN default) — only if Firestore rules allow read
   if (fbReady) {
@@ -743,7 +645,7 @@ export {
   // test the null-safety guards added in t_7cbd0242 without re-implementing them.
   toEpochSec,
   avg, stddev, maxKey, minKey, computeTrend, maneuverTrendOf, extractThemes, omitId,
-  buildPerformance, generateFeedback, buildAIPrompt,
-  buildSingleEvalData, generateSingleEvalFeedback, buildSingleEvalPrompt,
+  buildPerformance, buildAIPrompt,
+  buildSingleEvalData, buildSingleEvalPrompt,
   getAIConfig, callAIModel, callAIModelWithPrompt
 };

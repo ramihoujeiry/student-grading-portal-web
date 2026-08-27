@@ -9,8 +9,8 @@ import {
   COL,
   STATUS_MEETS_STANDARD, STATUS_BELOW_STANDARD, STATUS_PENDING,
   Auth, Store, getRag, fmtDate, calcFinalGrade, calcMifStatus,
-  buildPerformance, generateFeedback,
-  buildSingleEvalData, generateSingleEvalFeedback, buildSingleEvalPrompt,
+  buildPerformance,
+  buildSingleEvalData, buildSingleEvalPrompt,
   getAIConfig, callAIModel, callAIModelWithPrompt, getCurrentUser
 } from './store.js';
 
@@ -640,24 +640,25 @@ export const app = createApp({
       this.logEvent('ai:used');
       const evals = this.evaluations.filter(e => e.studentId === student.id);
       const data = buildPerformance(student, evals);
-      // Warm the RAG index so status() is accurate, then call the model.
+      // Warm the RAG index so the grounding badge is accurate, then call the live model.
       let ragOk = false;
       try { const FaaRag = await getRag(); await FaaRag.loadIndex(); ragOk = (FaaRag.status() === 'ok'); } catch (e) {}
       this.aiRagStatus = ragOk ? 'ok' : 'failed';
-      // Try the online model first; fall back to the offline template on any problem.
-      try {
-        const cfg = await getAIConfig();
-        if (cfg) {
-          const text = await callAIModel(data, cfg);
-          this.aiResult = text;
-          this.aiRagStatus = (this.aiRagStatus === 'ok') ? 'ok' : 'online';
-          this.aiLoading = false;
-          return;
-        }
-      } catch (e) {
-        console.warn('AI model call failed, using offline template:', e);
+      // Live AI debrief only — no offline template fallback.
+      const cfg = await getAIConfig();
+      if (!cfg) {
+        this.aiResult = '⚠️ No AI endpoint configured. Set config/ai in Firestore, or enable the LAN Pi proxy.';
+        this.aiLoading = false;
+        return;
       }
-      this.aiResult = await generateFeedback(data);
+      try {
+        const text = await callAIModel(data, cfg);
+        this.aiResult = text;
+        this.aiRagStatus = (this.aiRagStatus === 'ok') ? 'ok' : 'online';
+      } catch (e) {
+        console.warn('AI model call failed:', e);
+        this.aiResult = '⚠️ Could not reach the AI model (' + (e.message || e) + '). Make sure the Pi AI proxy is online, or try again shortly.';
+      }
       this.aiLoading = false;
     },
 
@@ -668,20 +669,21 @@ export const app = createApp({
       this.aiSingleLoading = true;
       this.aiSingleResult = '';
       const data = buildSingleEvalData(ev);
-      try {
-        const cfg = await getAIConfig();
-        if (cfg) {
-          const prompt = await buildSingleEvalPrompt(data);
-          // callAIModel expects {system,user}; reuse by temporarily swapping the prompt builder
-          const text = await callAIModelWithPrompt(prompt, cfg);
-          this.aiSingleResult = text;
-          this.aiSingleLoading = false;
-          return;
-        }
-      } catch (e) {
-        console.warn('Single-eval AI call failed, using offline template:', e);
+      // Live AI debrief only — no offline template fallback.
+      const cfg = await getAIConfig();
+      if (!cfg) {
+        this.aiSingleResult = '⚠️ No AI endpoint configured. Set config/ai in Firestore, or enable the LAN Pi proxy.';
+        this.aiSingleLoading = false;
+        return;
       }
-      this.aiSingleResult = generateSingleEvalFeedback(data);
+      try {
+        const prompt = await buildSingleEvalPrompt(data);
+        const text = await callAIModelWithPrompt(prompt, cfg);
+        this.aiSingleResult = text;
+      } catch (e) {
+        console.warn('Single-eval AI call failed:', e);
+        this.aiSingleResult = '⚠️ Could not reach the AI model (' + (e.message || e) + '). Make sure the Pi AI proxy is online, or try again shortly.';
+      }
       this.aiSingleLoading = false;
     },
 
@@ -1202,7 +1204,14 @@ export const app = createApp({
       if (!s) return;
       const evals = this.evaluations.filter(e => e.studentId === s.id).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
       const perf = buildPerformance(s, evals);
-      const analysis = generateFeedback(perf);
+      // Live AI debrief only — never the offline template.
+      let analysis = '';
+      try {
+        const cfg = await getAIConfig();
+        if (cfg) analysis = await callAIModel(perf, cfg);
+      } catch (e) {
+        analysis = '⚠️ Live AI debrief unavailable (' + (e.message || e) + '). Open the student profile and re-run AI Feedback to retry.';
+      }
       const win = window.open('', '_blank');
       if (!win) { this.toastMsg('Allow popups to print the report'); return; }
       const rows = evals.map(e => `<tr><td>${e.aircraftType} · ${e.phaseName} ${e.tripNumber}</td><td>${this.fmt(e.date)}</td><td>${e.finalGrade != null ? e.finalGrade.toFixed(1) : '-'}</td><td>${e.overallMifStatus || ''}</td></tr>`).join('');

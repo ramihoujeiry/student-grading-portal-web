@@ -44,8 +44,11 @@ function throws(name, fn, re) {
 const realDate = Math.floor(Date.UTC(2025, 6, 15) / 1000);
 const ts = (sec) => ({ seconds: sec, nanoseconds: 0, toDate() { return new Date(sec * 1000); }, toMillis() { return sec * 1000; } });
 
-// API surface
-['Auth','Store','COL','toEpochSec','fmtDate','calcFinalGrade','calcMifStatus','buildPerformance','generateFeedback','getAIConfig','callAIModel','callAIModelWithPrompt','buildSingleEvalPrompt','generateSingleEvalFeedback','buildSingleEvalData'].forEach((s) => ok('export ' + s, s in Store));
+// API surface (offline template functions generateFeedback / generateSingleEvalFeedback
+// were intentionally removed — debriefs are now live-only)
+['Auth','Store','COL','toEpochSec','fmtDate','calcFinalGrade','calcMifStatus','buildPerformance','getAIConfig','callAIModel','callAIModelWithPrompt','buildSingleEvalPrompt','buildSingleEvalData'].forEach((s) => ok('export ' + s, s in Store));
+ok('no offline generateFeedback export', !('generateFeedback' in Store));
+ok('no offline generateSingleEvalFeedback export', !('generateSingleEvalFeedback' in Store));
 
 // Path 1/2 degradation
 ok('Auth.ready false', Store.Auth.ready === false);
@@ -99,11 +102,11 @@ eq('perf first label', perf.firstDateLabel, '2026-01-01');
 eq('perf last label', perf.lastDateLabel, '2026-01-11');
 ok('perf phase scores', Object.keys(perf.phaseScores).length > 0);
 
-let fbThrew = false; let fbOut = '';
-try { fbOut = Store.generateFeedback(perf); } catch (e) { fbThrew = true; fbOut = String(e); }
-ok('generateFeedback no throw', !fbThrew);
-ok('generateFeedback content', fbOut.length > 50 && fbOut.includes('Test Cadet') && fbOut.includes('READINESS') && fbOut.includes('AI Performance Analysis'));
-ok('generateFeedback empty msg', /No evaluations found/i.test(Store.generateFeedback(Store.buildPerformance({name:'X'},[]))));
+// buildAIPrompt is the live-only prompt builder (no offline template)
+let apThrew = false; let apOut = null;
+try { apOut = await Store.buildAIPrompt(perf); } catch (e) { apThrew = true; }
+ok('buildAIPrompt no throw', !apThrew);
+ok('buildAIPrompt has system+user', apOut && typeof apOut.system === 'string' && typeof apOut.user === 'string');
 
 // Path 5
 const cfg = await Store.getAIConfig();
@@ -120,11 +123,12 @@ ok('callAIModelWithPrompt no prompt', noPromptThrew && /no prompt/i.test(noPromp
 
 const ev = { studentName:'Test Cadet', aircraftType:'R44-2', phaseName:'CONTACT', tripNumber:'T3', date: Math.floor(Date.UTC(2026,2,5)/1000), instructorName:'Cap. Haddad', duration:'1.5', finalGrade:72, overallMifStatus:'BELOW STANDARD', maneuverGrades:[g(1,3,1.5)], tripNotes:'Watch nose attitude in the hover.' };
 const sdata = Store.buildSingleEvalData(ev);
-const sf = Store.generateSingleEvalFeedback(sdata);
-ok('single feedback ok', typeof sf === 'string' && sf.length > 20 && sf.includes('Test Cadet'));
+// Live-only: the single-eval debrief is produced by buildSingleEvalPrompt + the model,
+// not an offline template. Verify the prompt builder (which now also attaches RAG context).
 const sprompt = await Store.buildSingleEvalPrompt(sdata);
 ok('single prompt system', sprompt.system && sprompt.system.length > 10);
 ok('single prompt user', sprompt.user && sprompt.user.length > 20);
+ok('single prompt grounded in RAG', /REFERENCE SOURCE MATERIAL|FAA|UH-1|Robinson/i.test(sprompt.user));
 
 // flight year
 const d = new Date(); const y = d.getFullYear(); const start = d.getMonth() >= 6 ? y : y - 1;

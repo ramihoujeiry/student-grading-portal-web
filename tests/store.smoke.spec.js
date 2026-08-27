@@ -16,9 +16,9 @@
 //      missing-id guard (pre-Firebase throw).
 //   3. Timestamp normalization (year-3995 guard) -> toEpochSec / fmtDate.
 //   4. Grading math + analytics -> calcFinalGrade / calcMifStatus /
-//      buildPerformance / generateFeedback.
-//   5. AI feedback (offline branch + config resolution) -> getAIConfig LAN
-//      fallback, callAIModel guard, generateFeedback offline template.
+//      buildPerformance / buildAIPrompt (live-only prompt builder).
+//   5. AI feedback (config resolution + live path) -> getAIConfig LAN
+//      fallback, callAIModel guard, buildAIPrompt grounding.
 //
 // When run in an environment with a real FIREBASE_READY config, the "degradation"
 // assertions here flip to the true live-path assertions (see comments).
@@ -40,9 +40,9 @@ test.beforeEach(async ({ page }) => {
 test('module loads and exposes the documented public API', async ({ page }) => {
   const api = await page.evaluate(() => Object.keys(window.__STORE__).sort());
   for (const sym of ['Auth', 'Store', 'COL', 'toEpochSec', 'fmtDate', 'calcFinalGrade',
-    'calcMifStatus', 'buildPerformance', 'generateFeedback', 'getAIConfig',
+    'calcMifStatus', 'buildPerformance', 'getAIConfig',
     'callAIModel', 'callAIModelWithPrompt', 'buildSingleEvalPrompt',
-    'generateSingleEvalFeedback', 'buildSingleEvalData']) {
+    'buildSingleEvalData']) {
     expect(api, `missing export: ${sym}`).toContain(sym);
   }
 });
@@ -219,7 +219,8 @@ test('buildPerformance sorts by date and computes trend/readiness/weakness', asy
   expect(r.hasPhase).toBeGreaterThan(0);
 });
 
-test('generateFeedback (offline template) never throws and is well-formed', async ({ page }) => {
+// ---------- PATH 4: analytics + live-only prompt builder ----------
+test('buildAIPrompt builds a structured system/user prompt and grounds it in the FAA RAG index', async ({ page }) => {
   const r = await page.evaluate(async () => {
     const S = window.__STORE__;
     const base = Math.floor(Date.UTC(2026, 0, 1) / 1000);
@@ -234,28 +235,16 @@ test('generateFeedback (offline template) never throws and is well-formed', asyn
         maneuverGrades: [g(2, 3, 1)] },
     ];
     const perf = S.buildPerformance(student, evals);
-    let out = '';
-    let threw = false;
-    try { out = await S.generateFeedback(perf); } catch (e) { threw = true; out = String(e); }
-    return { threw, out, len: out.length };
+    const prompt = await S.buildAIPrompt(perf);
+    return { system: prompt.system || '', user: prompt.user || '' };
   });
-  expect(r.threw, 'generateFeedback threw: ' + r.out).toBe(false);
-  expect(r.len).toBeGreaterThan(50);
-  expect(r.out).toContain('Test Cadet');
-  expect(r.out).toContain('READINESS');                     // always-present section
-  expect(r.out).toContain('AI Performance Analysis');
+  expect(typeof r.system).toBe('string');
+  expect(r.system.length).toBeGreaterThan(10);
+  expect(r.user).toContain('Test Cadet');
+  expect(r.user).toMatch(/REFERENCE SOURCE MATERIAL|FAA|UH-1|Robinson/i); // grounded in manuals
 });
 
-test('generateFeedback on empty data returns the no-evaluations message', async ({ page }) => {
-  const r = await page.evaluate(async () => {
-    const S = window.__STORE__;
-    const perf = S.buildPerformance({ name: 'Lonely Cadet' }, []);
-    return await S.generateFeedback(perf);
-  });
-  expect(r).toMatch(/No evaluations found/i);
-});
-
-// ---------- PATH 5: AI feedback (offline branch + config resolution) ----------
+// ---------- PATH 5: AI feedback (config resolution + live path) ----------
 test('getAIConfig resolves the LAN Pi fallback when Firebase is not ready', async ({ page }) => {
   const r = await page.evaluate(async () => {
     const S = window.__STORE__;
@@ -296,19 +285,16 @@ test('single-eval debrief builders run and ground in the FAA RAG index', async (
       tripNotes: 'Watch nose attitude in the hover.',
     };
     const data = S.buildSingleEvalData(ev);
-    const fb = S.generateSingleEvalFeedback(data);
     const prompt = await S.buildSingleEvalPrompt(data);     // async — attaches RAG context
     return {
-      fbOk: typeof fb === 'string' && fb.length > 20,
-      fbHasStudent: fb.includes('Test Cadet'),
       promptSystem: prompt.system ? prompt.system.length > 10 : false,
       promptUser: prompt.user ? prompt.user.length > 20 : false,
+      promptGrounded: /REFERENCE SOURCE MATERIAL|FAA|UH-1|Robinson/i.test(prompt.user),
     };
   });
-  expect(r.fbOk).toBe(true);
-  expect(r.fbHasStudent).toBe(true);
   expect(r.promptSystem).toBe(true);
   expect(r.promptUser).toBe(true);                          // RAG context appended without throwing
+  expect(r.promptGrounded).toBe(true);                      // manuals attached (FAA/UH-1/Robinson)
 });
 
 // ---------- Cross-cutting: flight year is derived, never hardcoded ----------
