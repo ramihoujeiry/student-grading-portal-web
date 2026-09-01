@@ -806,7 +806,7 @@ export const app = createApp({
     /* ---- CSV export (mirrors Android CsvExporter) ---- */
     exportCSV() {
       const rows = [['Student', 'Aircraft', 'Phase', 'Trip', 'Date', 'Instructor', 'Duration(h)', 'FinalGrade', 'MIF Status', 'FlightYear', 'TripNotes']];
-      this.evaluations.slice().sort((a, b) => (a.date || 0) - (b.date || 0)).forEach(e => {
+      this.evalsSortedByDate.slice().reverse().forEach(e => {
         rows.push([
           e.studentName || '', e.aircraftType || '', e.phaseName || '', e.tripNumber || '',
           this.fmt(e.date) || '', e.instructorName || '', e.duration || '',
@@ -823,7 +823,7 @@ export const app = createApp({
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
       this.logEvent('csv:export');
-      this.toastMsg('Exported ' + (rows.length - 1) + ' evaluations to CSV');
+      this.toastMsg('Exported ' + (rows.length - 1) + ' filtered evaluations to CSV');
     },
 
     /* ---- CSV import (mirror of exportCSV) — audit item 11 ----

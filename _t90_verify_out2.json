@@ -1,0 +1,99 @@
+{
+ "errors": [
+  "vp320 onUser: page.evaluate: FirebaseError: Missing or insufficient permissions.",
+  "vp360 onUser: page.evaluate: FirebaseError: Missing or insufficient permissions.",
+  "vp414 onUser: page.evaluate: FirebaseError: Missing or insufficient permissions.",
+  "vp768 onUser: page.evaluate: FirebaseError: Missing or insufficient permissions.",
+  "pageerror: Unexpected token '<'"
+ ],
+ "tabs": [
+  {
+   "tab": "Dashboard",
+   "docOver": 0,
+   "worst": 0,
+   "worstEl": "",
+   "text": 582
+  },
+  {
+   "tab": "Evaluations",
+   "docOver": 0,
+   "worst": 0,
+   "worstEl": "",
+   "text": 461
+  },
+  {
+   "tab": "Announcements",
+   "docOver": 0,
+   "worst": 0,
+   "worstEl": "",
+   "text": 328
+  },
+  {
+   "tab": "Analytics",
+   "docOver": 0,
+   "worst": 0,
+   "worstEl": "",
+   "text": 777
+  },
+  {
+   "tab": "AI Feedback",
+   "docOver": 0,
+   "worst": 0,
+   "worstEl": "",
+   "text": 553
+  },
+  {
+   "tab": "Ask Data",
+   "docOver": 0,
+   "worst": 0,
+   "worstEl": "",
+   "text": 509
+  },
+  {
+   "tab": "Settings",
+   "docOver": 0,
+   "worst": 206,
+   "worstEl": "sr-only",
+   "text": 872
+  }
+ ],
+ "viewports": [
+  {
+   "name": "phone-se",
+   "width": 320,
+   "docOverflow": 0,
+   "navWrapOk": false
+  },
+  {
+   "name": "phone",
+   "width": 360,
+   "docOverflow": 0,
+   "navWrapOk": false
+  },
+  {
+   "name": "phone-max",
+   "width": 414,
+   "docOverflow": 0,
+   "navWrapOk": false
+  },
+  {
+   "name": "tablet",
+   "width": 768,
+   "docOverflow": 0,
+   "navWrapOk": true
+  }
+ ],
+ "modals": {},
+ "axe": "axe not loadable",
+ "onUserError": "page.evaluate: FirebaseError: Missing or insufficient permissions.",
+ "loggedIn": true,
+ "tabList": [
+  "Dashboard",
+  "Evaluations",
+  "Announcements",
+  "Analytics",
+  "AI Feedback",
+  "Ask Data",
+  "Settings"
+ ]
+}
