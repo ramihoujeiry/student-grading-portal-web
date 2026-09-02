@@ -805,13 +805,16 @@ export const app = createApp({
 
     /* ---- CSV export (mirrors Android CsvExporter) ---- */
     exportCSV() {
-      const rows = [['Student', 'Aircraft', 'Phase', 'Trip', 'Date', 'Instructor', 'Duration(h)', 'FinalGrade', 'MIF Status', 'FlightYear', 'TripNotes']];
+      const rows = [['Student', 'Aircraft', 'Phase', 'Trip', 'Date', 'Instructor', 'Duration(h)', 'FinalGrade', 'MIF Status', 'FlightYear', 'TripNotes', 'Maneuvers']];
       this.evalsSortedByDate.slice().reverse().forEach(e => {
+        const maneuvers = (e.maneuverGrades || []).filter(m => m && m.studentGrade != null && m.studentGrade !== 0)
+          .map(m => ({ name: m.name, req: m.requiredMif, grade: m.studentGrade, factor: m.factor }));
         rows.push([
           e.studentName || '', e.aircraftType || '', e.phaseName || '', e.tripNumber || '',
           this.fmt(e.date) || '', e.instructorName || '', e.duration || '',
           e.finalGrade != null ? e.finalGrade.toFixed(1) : '', e.overallMifStatus || '', e.flightYear || '',
-          (e.tripNotes || '').replace(/[\n\r]+/g, ' ')
+          (e.tripNotes || '').replace(/[\n\r]+/g, ' '),
+          JSON.stringify(maneuvers)
         ]);
       });
       const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
@@ -843,9 +846,9 @@ export const app = createApp({
         if (rows.length < 2) { this.importCsv.error = 'Need a header row plus at least one data row.'; this.importCsv.parsed = null; return; }
         const header = rows[0].map(h => h.trim().toLowerCase());
         const idx = {};
-        ['student', 'aircraft', 'phase', 'trip', 'date', 'instructor', 'duration(h)', 'finalgrade', 'mif status', 'flightyear'].forEach(h => { idx[h] = header.indexOf(h); });
+        ['student', 'aircraft', 'phase', 'trip', 'date', 'instructor', 'duration(h)', 'finalgrade', 'mif status', 'flightyear', 'maneuvers'].forEach(h => { idx[h] = header.indexOf(h) });
         if (idx.student < 0 || idx.aircraft < 0 || idx.phase < 0 || idx.trip < 0) {
-          this.importCsv.error = 'Header must include: Student, Aircraft, Phase, Trip (and ideally Date, Instructor, Duration(h), FinalGrade, MIF Status, FlightYear).';
+          this.importCsv.error = 'Header must include: Student, Aircraft, Phase, Trip (and ideally Date, Instructor, Duration(h), FinalGrade, MIF Status, FlightYear, Maneuvers).';
           this.importCsv.parsed = null; return;
         }
         const unq = (s) => (s || '').trim();
@@ -874,7 +877,18 @@ export const app = createApp({
             finalGrade: isNaN(fg) ? 0 : fg,
             overallMifStatus: get('mif status') || '',
             flightYear: get('flightyear') || (dateSec ? this.getFlightYear(dateSec) : this.activeYearResolved),
-            maneuverGrades: [],
+            maneuverGrades: (() => {
+              if (idx.maneuvers < 0) return [];
+              try {
+                const arr = JSON.parse(unq(r[idx.maneuvers]));
+                return (Array.isArray(arr) ? arr : []).map(m => ({
+                  name: m.name || '',
+                  factor: m.factor != null ? Number(m.factor) : 1.0,
+                  requiredMif: m.req != null ? Number(m.req) : 0,
+                  studentGrade: m.grade != null ? Number(m.grade) : 0
+                }));
+              } catch (e) { return []; }
+            })(),
             tripNotes: unq(r[header.indexOf('tripnotes') >= 0 ? header.indexOf('tripnotes') : (idx['mif status'] >= 0 ? idx['mif status'] + 1 : -1)]) || ''
           };
           // Detect a duplicate (same student+phase+trip) so the import overwrites instead of duping.
