@@ -204,7 +204,7 @@
   .meter{height:8px;background:rgba(8,14,20,.7);border-radius:5px;overflow:hidden;margin-top:10px}
   .meter-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--amber) 55%,var(--red));border-radius:5px;transition:width .25s}
 </style>
-  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-CkYvHLd9.js"></script>
+  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-D-bE3pci.js"></script>
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-vue-CxFK-cW8.js">
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-firebase-CAVvKspe.js">
 </head>
@@ -793,7 +793,7 @@
       <h2 style="margin-top:0">Import evaluations from CSV</h2>
       <p class="muted" style="margin:4px 2px 10px">Paste the CSV produced by <b>Export CSV</b> (or match its header). Rows are validated against known students/aircraft; matching student+phase+trip rows overwrite the existing evaluation. Unknown students/aircraft are skipped with a warning.</p>
       <label>CSV data</label>
-      <textarea class="csv-input" v-model="importCsv.text" @input="parseImportCsv" placeholder="Student,Aircraft,Phase,Trip,Date,Instructor,Duration(h),FinalGrade,MIF Status,FlightYear,TripNotes&#10;Jane Doe,R44-2,CONTACT,S3,2026-08-01,Capt. Smith,1.2,82,BELOW STANDARD,2026-2027,"></textarea>
+      <textarea class="csv-input" v-model="importCsv.text" @input="parseImportCsv" placeholder="Student,Aircraft,Phase,Trip,Date,Instructor,Duration(h),FinalGrade,MIF Status,FlightYear,TripNotes,Maneuvers&#10;Jane Doe,R44-2,CONTACT,S3,2026-08-01,Capt. Smith,1.2,82,BELOW STANDARD,2026-2027,,[]"></textarea>
       <div v-if="importCsv.error" class="import-err">{{importCsv.error}}</div>
       <div v-if="importCsv.parsed && importCsv.parsed.total" class="import-ok">
         {{importCsv.parsed.total}} row(s) ready to import
