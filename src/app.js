@@ -32,8 +32,6 @@ export const app = createApp({
       // dashboard filters (mirror Android DashboardActivity)
       dashStudent: 'All Cadets', dashAircraft: 'All Aircraft',
       dashStart: '', dashEnd: '',
-      // training progress search (page removed; fields kept harmless)
-      tpSearch: '', tpAircraft: 'All Aircraft',
       evStudent: 'All Cadets', evAircraft: 'All Aircraft', evPhase: 'All Phases', evYear: 'All Years', evSearch: '',
       analyticsStudent: '',  // student filter on the Analytics page
 
@@ -592,6 +590,10 @@ export const app = createApp({
     /* ---- aircraft ---- */
     addAircraft() { this.openForm({ title: 'Add aircraft type', fields: [{ key: 'name', label: 'Aircraft type (e.g. R44-2)' }], onOk: async (v) => { await Store.addAircraft(v.name); this.toastMsg('Aircraft added'); } }); },
     deleteAircraft(a) { this.openConfirm({ title: 'Delete aircraft', message: 'Delete ' + a.name + '?', confirmText: 'Delete', onOk: async () => { await Store.deleteAircraft(a.id); } }); },
+    // ---- edit (rename) methods ----
+    editStudent(s) { this.openInput({ title: 'Edit student', label: 'Student name', value: s.name || '', onOk: async (v) => { await Store.updateStudentName(s.id, v); this.toastMsg('Student updated'); } }); },
+    editInstructor(i) { this.openInput({ title: 'Edit instructor', label: 'Instructor name', value: i.name || '', onOk: async (v) => { await Store.updateInstructorName(i.id, v); this.toastMsg('Instructor updated'); } }); },
+    editAircraft(a) { this.openInput({ title: 'Edit aircraft', label: 'Aircraft type', value: a.name || '', onOk: async (v) => { await Store.updateAircraftName(a.id, v); this.toastMsg('Aircraft updated'); } }); },
 
     /* ---- MIF tables ---- */
     addMifTable() {
@@ -629,6 +631,22 @@ export const app = createApp({
       });
     },
     async deleteManeuver(t, idx) { await Store.deleteManeuver(t.id, idx); },
+    // inline edit of a maneuver field (factor, name, stageMif) in the MIF table
+    async editManeuver(tableId, idx, field, value) {
+      const updates = {};
+      if (field === 'factor') updates.factor = parseFloat(value) || 1.0;
+      else if (field === 'name') updates.name = value;
+      else if (field === 'stageMif') {
+        // value is { stage: 'S1', mif: 3 }
+        const t = this.mifTables.find(x => x.id === tableId);
+        if (t && t.maneuvers && t.maneuvers[idx]) {
+          const stageMifs = { ...(t.maneuvers[idx].stageMifs || {}) };
+          stageMifs[value.stage] = parseInt(value.mif, 10) || 0;
+          updates.stageMifs = stageMifs;
+        }
+      }
+      await Store.updateManeuver(tableId, idx, updates);
+    },
     deleteMifTable(t) { this.openConfirm({ title: 'Delete MIF table', message: 'Delete table ' + t.phaseName + '?', confirmText: 'Delete', onOk: async () => { await Store.deleteMifTable(t.id); } }); },
 
     /* ---- evaluations ---- */
@@ -813,6 +831,43 @@ export const app = createApp({
       this.printEval(ev);
     },
     deleteEval(e) { this.openConfirm({ title: 'Delete evaluation', message: 'Delete this evaluation? This cannot be undone.', confirmText: 'Delete', onOk: async () => { await Store.deleteEvaluation(e); } }); },
+    // ---- edit / clone existing evaluation ----
+    editTrip(e) {
+      this.evalForm = {
+        id: e.id || '',
+        aircraftType: e.aircraftType || '',
+        studentId: e.studentId || '',
+        instructorName: e.instructorName || '',
+        phaseName: e.phaseName || '',
+        tripNumber: e.tripNumber || '',
+        date: e.date ? new Date(e.date * 1000).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+        flightYear: e.flightYear || this.activeYearResolved,
+        duration: e.duration || '',
+        tripNotes: e.tripNotes || '',
+        maneuverGrades: (e.maneuverGrades || []).map(m => ({ ...m }))
+      };
+      // parse duration HH:MM into picker
+      const parts = (this.evalForm.duration || '').split(':');
+      this.durationH = parts[0] || '01';
+      this.durationM = parts[1] || '00';
+      this.onEvalDateChange();
+      this.showEvalModal = true;
+      const load = () => {
+        const t = this.mifTables.find(x => x.aircraftType === this.evalForm.aircraftType && x.phaseName === this.evalForm.phaseName);
+        if (t) {
+          this.loadManeuversForForm();
+          // don't auto-suggest trip when editing — keep the original trip number
+        }
+      };
+      this.$nextTick(load);
+    },
+    cloneTrip(e) {
+      this.editTrip(e);
+      // clear id + trip number so it saves as a new evaluation
+      this.evalForm.id = '';
+      this.evalForm.tripNumber = '';
+      this.suggestTrip();
+    },
     studentName(id) { const s = this.students.find(x => x.id === id); return s ? s.name : '?'; },
 
     /* ---- detail views ---- */
@@ -974,6 +1029,23 @@ export const app = createApp({
       });
     },
     deleteAnnouncement(a) { this.openConfirm({ title: 'Delete announcement', message: 'Delete "' + (a.title || '') + '"?', confirmText: 'Delete', onOk: async () => { await Store.deleteAnnouncement(a.id); } }); },
+    // attach a file to an existing announcement (Firebase Storage + update doc)
+    async editAnnouncementFile(a) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.onchange = async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        try {
+          const { fileName, fileUrl } = await Store.uploadAnnouncementFile(file);
+          await Store.updateAnnouncementFile(a.id, fileName, fileUrl);
+          this.toastMsg('File attached');
+        } catch (e) {
+          this.toastMsg('Upload failed: ' + (e && e.message ? e.message : e), 'error');
+        }
+      };
+      input.click();
+    },
 
     /* ---- user management (admin only, mirror Android UserManagementActivity) ---- */
     async approveUser(u, role) { await Store.approveUser(u, role); this.toastMsg(u.name + ' → ' + role); },
@@ -1548,6 +1620,21 @@ export const app = createApp({
       return { labels, values };
     },
 
+    // ===== Progress Analytics: trend chart =====
+    paTrendChart(w = 280, h = 80) {
+      const evs = this.progressAnalyticsEvals();
+      if (evs.length < 2) return null;
+      const pts = evs.map(e => e.finalGrade || 0);
+      let min = Math.min(...pts), max = Math.max(...pts);
+      if (min === max) { min -= 5; max += 5; } else { const pad = (max - min) * 0.15; min -= pad; max += pad; }
+      const span = (max - min) || 1;
+      const step = pts.length > 1 ? w / (pts.length - 1) : 0;
+      const xy = pts.map((v, i) => [pts.length > 1 ? i * step : w / 2, h - ((v - min) / span) * (h - 8) - 4]);
+      const path = xy.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+      const area = path + ` L${w} ${h} L0 ${h} Z`;
+      return { path, area, w, h, last: pts[pts.length - 1] };
+    },
+
     // ===== Progress Analytics: pie chart data (failures by phase) =====
     progressFailureByPhase() {
       const evs = this.progressAnalyticsEvals().filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD);
@@ -1664,6 +1751,8 @@ export const app = createApp({
         this.toastMsg('Failed to send: ' + (e.message || e), 'error');
       } finally { this.bcBusy = false; }
     },
+
+    async deleteBroadcast(b) { this.openConfirm({ title: 'Delete broadcast', message: 'Delete "' + (b.title || '') + '"?', confirmText: 'Delete', onOk: async () => { await Store.deleteBroadcast(b.id); } }); },
 
     // ===== AI Feedback Hub: launch AI feedback for scoped evals =====
     async launchHubFeedback() {

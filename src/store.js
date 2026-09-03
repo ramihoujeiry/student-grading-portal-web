@@ -33,6 +33,7 @@ import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
   deleteDoc, onSnapshot, query, orderBy, limit, where, writeBatch, serverTimestamp
 } from 'firebase/firestore';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { FIREBASE_CONFIG, FIREBASE_READY } from './firebase-config.js';
 import { SEED } from './seed.js';
 
@@ -237,6 +238,35 @@ export const Store = {
   // aircraft
   async addAircraft(name) { await addDoc(collection(dbFs, COL.aircraft), { name }); },
   async deleteAircraft(id) { await deleteDoc(doc(dbFs, COL.aircraft, id)); },
+
+  // ---- update names (rename) ----
+  async updateStudentName(id, name) { await updateDoc(doc(dbFs, COL.students, id), { name }); },
+  async updateInstructorName(id, name) { await updateDoc(doc(dbFs, COL.instructors, id), { name }); },
+  async updateAircraftName(id, name) { await updateDoc(doc(dbFs, COL.aircraft, id), { name }); },
+
+  // update a single maneuver field in a MIF table doc
+  async updateManeuver(tableId, idx, updates) {
+    const ref = doc(dbFs, COL.mifTables, tableId);
+    const d = await getDoc(ref);
+    const maneuvers = (d.exists() && d.data().maneuvers) || [];
+    if (idx >= 0 && idx < maneuvers.length) {
+      maneuvers[idx] = { ...maneuvers[idx], ...updates };
+      await updateDoc(ref, { maneuvers });
+    }
+  },
+
+  // ---- announcement file attachment ----
+  async updateAnnouncementFile(id, fileName, fileUrl) {
+    await updateDoc(doc(dbFs, COL.announcements, id), { fileName, fileUrl });
+  },
+  async uploadAnnouncementFile(file) {
+    const storage = getStorage();
+    const path = 'announcements/' + Date.now() + '_' + file.name;
+    const ref = storageRef(storage, path);
+    await uploadBytes(ref, file);
+    const url = await getDownloadURL(ref);
+    return { fileName: file.name, fileUrl: url };
+  },
 
   // mif tables (doc id = aircraftType + '_' + phaseName, like Android)
   async addMifTable(aircraftType, phaseName, stages) {
