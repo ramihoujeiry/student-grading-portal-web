@@ -278,6 +278,15 @@
       <button class="tab-btn" :class="{active:tab==='evaluations'}" v-if="!isViewer" :aria-current="tab==='evaluations'?'page':null" @click="setTab('evaluations')">Evaluations</button>
       <button class="tab-btn" :class="{active:tab==='announcements'}" :aria-current="tab==='announcements'?'page':null" @click="setTab('announcements')">Announcements</button>
       <button class="tab-btn" :class="{active:tab==='analytics'}" :aria-current="tab==='analytics'?'page':null" @click="setTab('analytics')">Analytics</button>
+      <button class="tab-btn" :class="{active:tab==='progress'}" :aria-current="tab==='progress'?'page':null" @click="setTab('progress')">Training Progress</button>
+      <button class="tab-btn" :class="{active:tab==='studentAnalytics'}" :aria-current="tab==='studentAnalytics'?'page':null" @click="setTab('studentAnalytics')">Student Analytics</button>
+      <button class="tab-btn" :class="{active:tab==='studentHours'}" :aria-current="tab==='studentHours'?'page':null" @click="setTab('studentHours')">Student Hours</button>
+      <button class="tab-btn" :class="{active:tab==='progressAnalytics'}" :aria-current="tab==='progressAnalytics'?'page':null" @click="setTab('progressAnalytics')">Progress Analytics</button>
+      <button class="tab-btn" :class="{active:tab==='failedItems'}" :aria-current="tab==='failedItems'?'page':null" @click="setTab('failedItems')">Failed Items</button>
+      <button class="tab-btn" :class="{active:tab==='studentProfile'}" :aria-current="tab==='studentProfile'?'page':null" @click="setTab('studentProfile')">Student Profile</button>
+      <button class="tab-btn" :class="{active:tab==='tripHistory'}" :aria-current="tab==='tripHistory'?'page':null" @click="setTab('tripHistory')">Trip History</button>
+      <button class="tab-btn" :class="{active:tab==='adminBroadcast'}" v-if="isAdmin" :aria-current="tab==='adminBroadcast'?'page':null" @click="setTab('adminBroadcast')">Admin Broadcast</button>
+      <button class="tab-btn" :class="{active:tab==='aiHub'}" :aria-current="tab==='aiHub'?'page':null" @click="setTab('aiHub')">AI Feedback Hub</button>
       <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" :aria-current="tab==='admin'?'page':null" @click="setTab('admin')">Users</button>
       <span class="tab-sep" aria-hidden="true"></span>
       <button class="tab-btn" :class="{active:tab==='ai'}" :aria-current="tab==='ai'?'page':null" @click="setTab('ai')">AI Feedback</button>

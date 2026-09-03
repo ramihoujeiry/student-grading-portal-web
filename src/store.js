@@ -54,7 +54,7 @@ export const GRADE_SCORE = { 0: 0, 1: 65, 2: 75, 3: 85, 4: 95 };
 export const COL = {
   users: 'users', students: 'students', instructors: 'instructors',
   aircraft: 'aircraft', mifTables: 'mif_tables', evaluations: 'evaluations',
-  announcements: 'announcements'
+  announcements: 'announcements', broadcasts: 'broadcasts'
 };
 
 /* ---------- Timestamp -> epoch seconds normalization -------------------- */
@@ -218,7 +218,13 @@ export const Store = {
 
   // students
   async addStudent(name) {
-    await addDoc(collection(dbFs, COL.students), { name, active: true, activeYears: [this.currentFlightYear()], createdAt: Date.now() / 1000 });
+    // Mirror Android YearUtils.getNewStudentActiveYears(): tag with current AND next
+    // flight year so the student appears in the Android app's year filter for both
+    // years (web used to tag only the current year, so students added here vanished
+    // from the Android list once the year advanced).
+    const currentYear = this.currentFlightYear();
+    const nextYear = currentYear.split('-')[1] + '-' + (parseInt(currentYear.split('-')[1], 10) + 1);
+    await addDoc(collection(dbFs, COL.students), { name, active: true, activeYears: [currentYear, nextYear], createdAt: Date.now() / 1000 });
   },
   async setStudentActive(id, active) { await updateDoc(doc(dbFs, COL.students, id), { active }); },
   async deleteStudent(id) { await deleteDoc(doc(dbFs, COL.students, id)); },
@@ -272,6 +278,10 @@ export const Store = {
   // announcements
   async addAnnouncement(a) { await addDoc(collection(dbFs, COL.announcements), a); },
   async deleteAnnouncement(id) { await deleteDoc(doc(dbFs, COL.announcements, id)); },
+
+  // broadcasts (admin-only messaging)
+  async addBroadcast(b) { await addDoc(collection(dbFs, COL.broadcasts), { ...b, createdAt: Date.now() / 1000 }); },
+  async deleteBroadcast(id) { await deleteDoc(doc(dbFs, COL.broadcasts, id)); },
 
   // users (admin only) — mirrors Android UserManagementViewModel
   async approveUser(u, role) {

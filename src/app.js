@@ -27,7 +27,7 @@ export const app = createApp({
       fbReady: FIREBASE_READY,
 
       // collections (live from Firestore)
-      students: [], instructors: [], aircraft: [], mifTables: [], evaluations: [], announcements: [], users: [],
+      students: [], instructors: [], aircraft: [], mifTables: [], evaluations: [], announcements: [], users: [], broadcasts: [],
 
       // dashboard filters (mirror Android DashboardActivity)
       dashStudent: 'All Cadets', dashAircraft: 'All Aircraft',
@@ -76,7 +76,26 @@ export const app = createApp({
       // UI density preference (compact mode saves screen space on phones at the ramp)
       , uiDensity: 'comfortable',
       // Full-dataset JSON backup/restore (offline disaster recovery)
-      backup: { busy: false, msg: '', error: '' }
+      backup: { busy: false, msg: '', error: '' },
+
+      // ===== Training Progress tab =====
+      tpSearch: '', tpAircraft: 'All Aircraft',
+      // ===== Student Analytics tab =====
+      saSearch: '',
+      // ===== Student Hours tab =====
+      shStudents: [], shAircraft: 'All Aircraft', shYear: 'All Years',
+      // ===== Progress Analytics tab =====
+      paStudent: '', paPhase: 'All Phases', paAircraft: 'All Aircraft', paYear: 'All Years',
+      // ===== Failed Items tab =====
+      fiPhase: 'All Phases', fiYear: 'All Years', fiStudent: '', fiTrip: 'All Trips', fiSubTab: 'trips',
+      // ===== Student Profile tab (standalone) =====
+      spStudentId: '',
+      // ===== Trip History tab =====
+      thSearch: '', thStudent: 'All Cadets', thAircraft: 'All Aircraft', thPhase: 'All Phases', thYear: 'All Years',
+      // ===== Admin Broadcast tab =====
+      bcTitle: '', bcMessage: '', bcTargetRole: 'all', bcFileName: '', bcBusy: false, bcSent: false,
+      // ===== AI Feedback Hub tab =====
+      hubStudentId: '', hubScope: 'all', hubPhase: 'All Phases', hubTrip: 'All Trips'
     };
   },
   watch: {
@@ -323,6 +342,172 @@ export const app = createApp({
       });
       // Hardest first: most % below MIF, then lowest average.
       return out.sort((a, b) => (b.belowPct - a.belowPct) || (a.avg - b.avg)).slice(0, 12);
+    },
+
+    // ===== Training Progress (all students, current phase/aircraft/trips/avg/last flight) =====
+    trainingProgress() {
+      const y = this.activeYearResolved;
+      const q = (this.tpSearch || '').trim().toLowerCase();
+      const acFilter = this.tpAircraft;
+      const byStudent = {};
+      this.evaluations.forEach(e => {
+        if (e.flightYear !== y) return;
+        if (acFilter !== 'All Aircraft' && e.aircraftType !== acFilter) return;
+        (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e);
+      });
+      const out = [];
+      this.students.forEach(s => {
+        if (s.active === false) return;
+        const evals = byStudent[s.id] || [];
+        if (q && !(s.name || '').toLowerCase().includes(q)) return;
+        const sorted = evals.slice().sort((a, b) => (a.date || 0) - (b.date || 0));
+        const phases = [...new Set(sorted.map(e => e.phaseName).filter(Boolean))];
+        const aircraft = [...new Set(sorted.map(e => e.aircraftType).filter(Boolean))];
+        const totalTrips = sorted.length;
+        const completedPhases = phases.length;
+        const avg = sorted.length ? (sorted.reduce((sum, e) => sum + (e.finalGrade || 0), 0) / sorted.length) : 0;
+        const lastFlight = sorted.length ? sorted[sorted.length - 1].date : 0;
+        const fails = sorted.filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD).length;
+        out.push({
+          id: s.id, name: s.name,
+          currentPhase: phases.length ? phases[phases.length - 1] : '—',
+          aircraft: aircraft.join(', ') || '—',
+          completedTrips: totalTrips, totalTrips,
+          avgGrade: avg, lastFlight, failCount: fails,
+          progressPct: Math.min(100, Math.round((totalTrips / Math.max(1, (this.mifTables.length || 1) * 5)) * 100))
+        });
+      });
+      return out.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    },
+
+    // ===== Student Analytics (aggregate: trip count, avg grade, total hours) =====
+    studentAnalytics() {
+      const y = this.activeYearResolved;
+      const q = (this.saSearch || '').trim().toLowerCase();
+      const byStudent = {};
+      this.evaluations.forEach(e => { if (e.flightYear === y) (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e); });
+      const out = [];
+      this.students.forEach(s => {
+        if (s.active === false) return;
+        if (q && !(s.name || '').toLowerCase().includes(q)) return;
+        const evals = byStudent[s.id] || [];
+        const avg = evals.length ? (evals.reduce((sum, e) => sum + (e.finalGrade || 0), 0) / evals.length) : 0;
+        const hours = evals.reduce((sum, e) => sum + this.parseHours(e.duration), 0);
+        out.push({ id: s.id, name: s.name, tripCount: evals.length, avgGrade: avg, totalHours: hours });
+      });
+      return out.sort((a, b) => (b.tripCount - a.tripCount) || (a.name || '').localeCompare(b.name || ''));
+    },
+
+    // ===== Student Hours (per-student with multi-select filters) =====
+    studentHours() {
+      const y = this.activeYearResolved;
+      const studentIds = this.shStudents && this.shStudents.length ? this.shStudents : null;
+      const acFilter = this.shAircraft;
+      const yearFilter = this.shYear;
+      const byStudent = {};
+      this.evaluations.forEach(e => {
+        if (yearFilter !== 'All Years') { if (e.flightYear !== yearFilter) return; }
+        else if (e.flightYear !== y) return;
+        if (acFilter !== 'All Aircraft' && e.aircraftType !== acFilter) return;
+        if (studentIds && !studentIds.includes(e.studentId)) return;
+        (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e);
+      });
+      const out = [];
+      this.students.forEach(s => {
+        if (s.active === false) return;
+        const evals = byStudent[s.id] || [];
+        const hours = evals.reduce((sum, e) => sum + this.parseHours(e.duration), 0);
+        out.push({ id: s.id, name: s.name, tripCount: evals.length, totalHours: hours });
+      });
+      return out.sort((a, b) => (b.totalHours - a.totalHours) || (a.name || '').localeCompare(b.name || ''));
+    },
+
+    // ===== Progress Analytics: filtered evaluations =====
+    progressAnalyticsEvals() {
+      const y = this.activeYearResolved;
+      return this.evaluations.filter(e => {
+        if (this.paYear !== 'All Years') { if (e.flightYear !== this.paYear) return false; }
+        else if (e.flightYear !== y) return false;
+        if (this.paStudent && e.studentId !== this.paStudent) return false;
+        if (this.paPhase !== 'All Phases' && e.phaseName !== this.paPhase) return false;
+        if (this.paAircraft !== 'All Aircraft' && e.aircraftType !== this.paAircraft) return false;
+        return true;
+      }).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
+    },
+
+    // ===== Failed Items (trips + maneuvers with filters) =====
+    failedItemsData() {
+      const y = this.activeYearResolved;
+      const evs = this.evaluations.filter(e => {
+        if (this.fiYear !== 'All Years') { if (e.flightYear !== this.fiYear) return false; }
+        else if (e.flightYear !== y) return false;
+        if (this.fiStudent && e.studentId !== this.fiStudent) return false;
+        if (this.fiPhase !== 'All Phases' && e.phaseName !== this.fiPhase) return false;
+        if (this.fiTrip !== 'All Trips' && e.tripNumber !== this.fiTrip) return false;
+        return true;
+      });
+      const failedTrips = evs.filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD);
+      const maneuverTally = {};
+      evs.forEach(e => (e.maneuverGrades || []).forEach(m => {
+        if (m.studentGrade != null && m.studentGrade !== 0 && m.requiredMif != null && m.studentGrade < m.requiredMif) {
+          if (!maneuverTally[m.name]) maneuverTally[m.name] = { count: 0, required: m.requiredMif };
+          maneuverTally[m.name].count++;
+        }
+      }));
+      const failedManeuvers = Object.keys(maneuverTally).map(n => ({ name: n, count: maneuverTally[n].count, required: maneuverTally[n].required }))
+        .sort((a, b) => b.count - a.count);
+      const mostFailed = failedManeuvers.length ? failedManeuvers[0].name : '—';
+      return { failedTrips, failedManeuvers, totalFailed: failedTrips.length, mostFailed };
+    },
+
+    // ===== Trip History (searchable/filterable evaluations) =====
+    tripHistory() {
+      const y = this.activeYearResolved;
+      const q = (this.thSearch || '').trim().toLowerCase();
+      return this.evaluations.filter(e => {
+        if (this.thYear !== 'All Years') { if (e.flightYear !== this.thYear) return false; }
+        else if (e.flightYear !== y) return false;
+        if (this.thStudent !== 'All Cadets' && e.studentName !== this.thStudent) return false;
+        if (this.thAircraft !== 'All Aircraft' && e.aircraftType !== this.thAircraft) return false;
+        if (this.thPhase !== 'All Phases' && e.phaseName !== this.thPhase) return false;
+        if (q) {
+          const dateStr = (typeof e.date === 'number') ? new Date(e.date * 1000).toISOString().slice(0, 10) : '';
+          const hay = [e.studentName, e.phaseName, e.instructorName, e.aircraftType, e.tripNumber, e.flightYear, dateStr].filter(Boolean).join(' ').toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      }).slice().sort((a, b) => (b.date || 0) - (a.date || 0));
+    },
+
+    // ===== Student Profile (standalone tab) =====
+    studentProfile() {
+      if (!this.spStudentId) return null;
+      const s = this.students.find(x => x.id === this.spStudentId);
+      if (!s) return null;
+      const evals = this.evaluations.filter(e => e.studentId === s.id).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
+      const perf = buildPerformance(s, evals);
+      const totalTrips = evals.length;
+      const totalFails = evals.filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD).length;
+      const avg = totalTrips ? (evals.reduce((sum, e) => sum + (e.finalGrade || 0), 0) / totalTrips) : 0;
+      const phaseFails = {};
+      evals.filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD).forEach(e => { phaseFails[e.phaseName] = (phaseFails[e.phaseName] || 0) + 1; });
+      const strengths = Object.keys(perf.practicalScores || {}).filter(n => perf.practicalScores[n] >= 70).slice(0, 5);
+      const weaknesses = (perf.weakManeuvers || []).slice(0, 5).map(w => w.name);
+      return { student: s, evals, perf, totalTrips, totalFails, avg, phaseFails, strengths, weaknesses };
+    },
+
+    // ===== AI Feedback Hub: scoped evals for selected student/scope =====
+    hubEvals() {
+      if (!this.hubStudentId) return [];
+      const evals = this.evaluations.filter(e => e.studentId === this.hubStudentId);
+      if (this.hubScope === 'all') return evals.slice().sort((a, b) => (a.date || 0) - (b.date || 0));
+      if (this.hubScope === 'phase') {
+        return evals.filter(e => this.hubPhase !== 'All Phases' && e.phaseName === this.hubPhase).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
+      }
+      if (this.hubScope === 'trip') {
+        return evals.filter(e => this.hubTrip !== 'All Trips' && e.tripNumber === this.hubTrip).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
+      }
+      return evals.slice().sort((a, b) => (a.date || 0) - (b.date || 0));
     }
   },
   methods: {
@@ -389,6 +574,7 @@ export const app = createApp({
       Store.watch(COL.evaluations, l => this.evaluations = l);
       Store.watch(COL.announcements, l => this.announcements = l.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
       if (role === 'admin') Store.watch(COL.users, l => this.users = l);
+      if (role === 'admin') Store.watch(COL.broadcasts, l => this.broadcasts = l.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
       // first admin seeds an empty project
       if (role === 'admin') await Store.seedIfEmpty(u);
     },
@@ -808,13 +994,13 @@ export const app = createApp({
       const rows = [['Student', 'Aircraft', 'Phase', 'Trip', 'Date', 'Instructor', 'Duration(h)', 'FinalGrade', 'MIF Status', 'FlightYear', 'TripNotes', 'Maneuvers']];
       this.evalsSortedByDate.slice().reverse().forEach(e => {
         const maneuvers = (e.maneuverGrades || []).filter(m => m && m.studentGrade != null && m.studentGrade !== 0)
-          .map(m => ({ name: m.name, req: m.requiredMif, grade: m.studentGrade, factor: m.factor }));
+          .map(m => m.name + ': ' + m.studentGrade).join(', ');
         rows.push([
           e.studentName || '', e.aircraftType || '', e.phaseName || '', e.tripNumber || '',
           this.fmt(e.date) || '', e.instructorName || '', e.duration || '',
           e.finalGrade != null ? e.finalGrade.toFixed(1) : '', e.overallMifStatus || '', e.flightYear || '',
           (e.tripNotes || '').replace(/[\n\r]+/g, ' '),
-          JSON.stringify(maneuvers)
+          maneuvers
         ]);
       });
       const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
@@ -879,15 +1065,33 @@ export const app = createApp({
             flightYear: get('flightyear') || (dateSec ? this.getFlightYear(dateSec) : this.activeYearResolved),
             maneuverGrades: (() => {
               if (idx.maneuvers < 0) return [];
+              const raw = unq(r[idx.maneuvers]);
+              if (!raw) return [];
+              // Try old JSON format first (backward compat)
               try {
-                const arr = JSON.parse(unq(r[idx.maneuvers]));
-                return (Array.isArray(arr) ? arr : []).map(m => ({
-                  name: m.name || '',
-                  factor: m.factor != null ? Number(m.factor) : 1.0,
-                  requiredMif: m.req != null ? Number(m.req) : 0,
-                  studentGrade: m.grade != null ? Number(m.grade) : 0
-                }));
-              } catch (e) { return []; }
+                const arr = JSON.parse(raw);
+                if (Array.isArray(arr)) {
+                  return arr.map(m => ({
+                    name: m.name || '',
+                    factor: m.factor != null ? Number(m.factor) : 1.0,
+                    requiredMif: m.req != null ? Number(m.req) : 0,
+                    studentGrade: m.grade != null ? Number(m.grade) : 0
+                  }));
+                }
+              } catch (e) {}
+              // New simple format: "name: grade, name: grade"
+              return raw.split(',').map(s => {
+                const parts = s.split(':');
+                if (parts.length >= 2) {
+                  return {
+                    name: parts[0].trim(),
+                    factor: 1.0,
+                    requiredMif: 0,
+                    studentGrade: Number(parts[1].trim()) || 0
+                  };
+                }
+                return null;
+              }).filter(Boolean);
             })(),
             tripNotes: unq(r[header.indexOf('tripnotes') >= 0 ? header.indexOf('tripnotes') : (idx['mif status'] >= 0 ? idx['mif status'] + 1 : -1)]) || ''
           };
@@ -1319,6 +1523,162 @@ export const app = createApp({
         </body></html>`);
       win.document.close();
     },
+
+    // ===== Training Progress: open student profile tab =====
+    openTrainingProgressStudent(s) { this.spStudentId = s.id; this.tab = 'studentProfile'; },
+
+    // ===== Student Analytics: open student profile =====
+    openStudentAnalyticsStudent(s) { this.spStudentId = s.id; this.tab = 'studentProfile'; },
+
+    // ===== Student Hours: open student profile =====
+    openStudentHoursStudent(s) { this.spStudentId = s.id; this.tab = 'studentProfile'; },
+
+    // ===== Progress Analytics: radar chart data (skill proficiency by maneuver) =====
+    progressRadarData() {
+      const evs = this.progressAnalyticsEvals();
+      const tally = {};
+      evs.forEach(e => (e.maneuverGrades || []).forEach(m => {
+        if (m.studentGrade == null || m.studentGrade === 0) return;
+        if (!tally[m.name]) tally[m.name] = { sum: 0, w: 0 };
+        tally[m.name].sum += (m.studentGrade || 0) * (m.factor || 1);
+        tally[m.name].w += (m.factor || 1);
+      }));
+      const labels = Object.keys(tally);
+      const values = labels.map(n => tally[n].w ? Math.round((tally[n].sum / tally[n].w) * 10) / 10 : 0);
+      return { labels, values };
+    },
+
+    // ===== Progress Analytics: pie chart data (failures by phase) =====
+    progressFailureByPhase() {
+      const evs = this.progressAnalyticsEvals().filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD);
+      const tally = {};
+      evs.forEach(e => { tally[e.phaseName] = (tally[e.phaseName] || 0) + 1; });
+      return Object.keys(tally).map(p => ({ phase: p, count: tally[p] })).sort((a, b) => b.count - a.count);
+    },
+
+    // ===== Progress Analytics: SVG radar chart =====
+    radarChart(w = 240, h = 240) {
+      const data = this.progressRadarData();
+      if (!data.labels.length) return null;
+      const cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2 - 20;
+      const n = data.labels.length;
+      const maxVal = 4;
+      const angle = (i) => (Math.PI * 2 * i / n) - Math.PI / 2;
+      const pt = (i, v) => [cx + Math.cos(angle(i)) * (v / maxVal) * r, cy + Math.sin(angle(i)) * (v / maxVal) * r];
+      const polygon = data.values.map((v, i) => pt(i, v).join(',')).join(' ');
+      const gridLines = [0.25, 0.5, 0.75, 1].map(f => {
+        const pts = Array.from({ length: n }, (_, i) => pt(i, maxVal * f).join(',')).join(' ');
+        return `<polygon points="${pts}" fill="none" stroke="var(--glass-line)" stroke-width="1"/>`;
+      }).join('');
+      const axes = Array.from({ length: n }, (_, i) => {
+        const p = pt(i, maxVal);
+        return `<line x1="${cx}" y1="${cy}" x2="${p[0]}" y2="${p[1]}" stroke="var(--glass-line)" stroke-width="1"/>`;
+      }).join('');
+      const labels = data.labels.map((label, i) => {
+        const p = pt(i, maxVal + 0.3);
+        return `<text x="${p[0]}" y="${p[1]}" fill="var(--muted)" font-size="9" text-anchor="middle">${label.length > 8 ? label.slice(0, 8) + '…' : label}</text>`;
+      }).join('');
+      return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;max-width:${w}px">${gridLines}${axes}<polygon points="${polygon}" fill="rgba(57,208,196,.2)" stroke="var(--hud)" stroke-width="2"/>${data.values.map((v, i) => `<circle cx="${pt(i, v)[0]}" cy="${pt(i, v)[1]}" r="3" fill="var(--hud)"/>`).join('')}${labels}</svg>`;
+    },
+
+    // ===== Progress Analytics: SVG pie chart =====
+    pieChart(w = 200, h = 200) {
+      const data = this.progressFailureByPhase();
+      if (!data.length) return null;
+      const total = data.reduce((s, d) => s + d.count, 0);
+      const cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2 - 10;
+      const colors = ['var(--red)', 'var(--amber)', 'var(--blue)', 'var(--green)', 'var(--hud)', 'var(--bad)'];
+      let cumAngle = -Math.PI / 2;
+      const slices = data.map((d, i) => {
+        const angle = (d.count / total) * Math.PI * 2;
+        const x1 = cx + Math.cos(cumAngle) * r;
+        const y1 = cy + Math.sin(cumAngle) * r;
+        cumAngle += angle;
+        const x2 = cx + Math.cos(cumAngle) * r;
+        const y2 = cy + Math.sin(cumAngle) * r;
+        const large = angle > Math.PI ? 1 : 0;
+        return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${colors[i % colors.length]}" stroke="var(--bg)" stroke-width="1.5"><title>${d.phase}: ${d.count}</title></path>`;
+      }).join('');
+      const legend = data.map((d, i) => {
+        const y = 15 + i * 16;
+        return `<rect x="${w - 70}" y="${y - 8}" width="10" height="10" fill="${colors[i % colors.length]}"/><text x="${w - 56}" y="${y}" fill="var(--muted)" font-size="10">${d.phase.length > 10 ? d.phase.slice(0, 10) + '…' : d.phase} (${d.count})</text>`;
+      }).join('');
+      return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;max-width:${w}px">${slices}${legend}</svg>`;
+    },
+
+    // ===== Student Profile: trend chart (reuse existing pattern) =====
+    studentProfileTrendChart(w = 300, h = 80) {
+      const profile = this.studentProfile();
+      if (!profile || profile.evals.length < 2) return null;
+      const pts = profile.evals.map(e => e.finalGrade || 0);
+      let min = Math.min(...pts), max = Math.max(...pts);
+      if (min === max) { min -= 5; max += 5; } else { const pad = (max - min) * 0.15; min -= pad; max += pad; }
+      const span = (max - min) || 1;
+      const step = pts.length > 1 ? w / (pts.length - 1) : 0;
+      const xy = pts.map((v, i) => [pts.length > 1 ? i * step : w / 2, h - ((v - min) / span) * (h - 8) - 4]);
+      const path = xy.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+      const area = path + ` L${w} ${h} L0 ${h} Z`;
+      return { path, area, w, h, last: pts[pts.length - 1] };
+    },
+
+    // ===== Student Profile: failure-by-phase pie =====
+    studentProfilePie(w = 180, h = 180) {
+      const profile = this.studentProfile();
+      if (!profile) return null;
+      const data = Object.keys(profile.phaseFails).map(p => ({ phase: p, count: profile.phaseFails[p] }));
+      if (!data.length) return null;
+      const total = data.reduce((s, d) => s + d.count, 0);
+      const cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2 - 10;
+      const colors = ['var(--red)', 'var(--amber)', 'var(--blue)', 'var(--green)', 'var(--hud)'];
+      let cumAngle = -Math.PI / 2;
+      const slices = data.map((d, i) => {
+        const angle = (d.count / total) * Math.PI * 2;
+        const x1 = cx + Math.cos(cumAngle) * r;
+        const y1 = cy + Math.sin(cumAngle) * r;
+        cumAngle += angle;
+        const x2 = cx + Math.cos(cumAngle) * r;
+        const y2 = cy + Math.sin(cumAngle) * r;
+        const large = angle > Math.PI ? 1 : 0;
+        return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${colors[i % colors.length]}" stroke="var(--bg)" stroke-width="1.5"><title>${d.phase}: ${d.count}</title></path>`;
+      }).join('');
+      return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;max-width:${w}px">${slices}</svg>`;
+    },
+
+    // ===== Admin Broadcast: send =====
+    async sendBroadcast() {
+      if (!this.bcTitle.trim() || !this.bcMessage.trim()) { this.toastMsg('Title and message required'); return; }
+      this.bcBusy = true;
+      try {
+        await Store.addBroadcast({
+          title: this.bcTitle.trim(),
+          message: this.bcMessage.trim(),
+          targetRole: this.bcTargetRole,
+          senderName: this.user ? (this.user.displayName || this.user.email) : this.role,
+          fileName: this.bcFileName || null
+        });
+        this.bcSent = true;
+        this.bcTitle = ''; this.bcMessage = ''; this.bcTargetRole = 'all'; this.bcFileName = '';
+        this.toastMsg('Broadcast sent', 'success');
+        setTimeout(() => { this.bcSent = false; }, 2000);
+      } catch (e) {
+        this.toastMsg('Failed to send: ' + (e.message || e), 'error');
+      } finally { this.bcBusy = false; }
+    },
+
+    // ===== AI Feedback Hub: launch AI feedback for scoped evals =====
+    async launchHubFeedback() {
+      if (!this.hubStudentId) { this.toastMsg('Select a student first'); return; }
+      const student = this.students.find(s => s.id === this.hubStudentId);
+      if (!student) return;
+      const evals = this.hubEvals();
+      const perf = buildPerformance(student, evals);
+      perf.scope = this.hubScope;
+      if (this.hubScope === 'phase') perf.scopePhase = this.hubPhase;
+      if (this.hubScope === 'trip') perf.scopeTrip = this.hubTrip;
+      this.aiStudentId = this.hubStudentId;
+      this.tab = 'ai';
+      this.$nextTick(() => this.runAIForStudent());
+    }
   },
   mounted() {
     // Restore the saved theme preference (default dark) and apply it.
