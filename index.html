@@ -204,7 +204,7 @@
   .meter{height:8px;background:rgba(8,14,20,.7);border-radius:5px;overflow:hidden;margin-top:10px}
   .meter-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--amber) 55%,var(--red));border-radius:5px;transition:width .25s}
 </style>
-  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-Cj72RxWW.js"></script>
+  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-BH3A7k9J.js"></script>
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-vue-CxFK-cW8.js">
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-firebase-BIFz2zAf.js">
 </head>
@@ -797,7 +797,7 @@
                 <path :d="paTrendChart().area" fill="rgba(57,208,196,.15)"></path>
                 <path :d="paTrendChart().path" fill="none" stroke="var(--accent)" stroke-width="2"></path>
               </svg>
-              <div class="muted" style="margin-top:6px">{{progressAnalyticsEvals().length}} evaluation(s)</div>
+              <div class="muted" style="margin-top:6px">{{progressAnalyticsEvals.length}} evaluation(s)</div>
             </div>
             <div v-else class="muted">Need 2+ evaluations for a trend.</div>
           </div>
@@ -1017,7 +1017,7 @@
         </div>
         <div class="card" v-if="hubStudentId">
           <h3>Scope Preview</h3>
-          <p class="muted">{{hubEvals().length}} evaluation(s) in scope</p>
+          <p class="muted">{{hubEvals.length}} evaluation(s) in scope</p>
         </div>
       </section>
     </main>
