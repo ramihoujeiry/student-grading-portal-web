@@ -10,7 +10,7 @@
  * The SW aggressively skips waiting and claims clients on every deploy
  * so an old SW never persists across versions.
  * ========================================================================= */
-const CACHE = 'grading-portal-v' + "mtoebmay";
+const CACHE = 'grading-portal-v' + "mtof2u2o";
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 1 day
 
 // Only pre-cache stable assets. Everything else is cache-on-fetch.
