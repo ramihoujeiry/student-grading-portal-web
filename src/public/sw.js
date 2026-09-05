@@ -2,19 +2,18 @@
  * sw.js — service worker for the Student Grading Portal PWA (built output).
  *
  * Served from /student-grading-portal-web/sw.js. Strategy:
- *   - App shell + static assets: cache-first (with network fallback on miss).
- *   - Large hashed JS/CSS chunks: cache-first too (immutable, content-hashed).
- *   - RAG index (faa_index.json) + any API / chat endpoint: network-first,
- *     never served stale.
+ *   - HTML (index.html, navigation): NETWORK-FIRST — always get fresh.
+ *     This prevents stale app shell from breaking new deploys.
+ *   - Static assets (JS/CSS/images): cache-first with short TTL.
+ *   - RAG index + API endpoints: network-first, never cached.
  *
- * Bump the CACHE name on every deploy (paired with main.js __APP_VERSION__)
- * so users never run stale JS.
+ * The SW aggressively skips waiting and claims clients on every deploy
+ * so an old SW never persists across versions.
  * ========================================================================= */
 const CACHE = 'grading-portal-v' + __APP_VERSION__;
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 1 day
 
-// The core shell to pre-cache on install. Vite emits hashed names, so instead
-// of hard-coding them we cache-on-fetch (stale-while-revalidate below). The
-// manifest + icons are stable and worth pre-caching.
+// Only pre-cache stable assets. Everything else is cache-on-fetch.
 const PRECACHE = [
   './',
   'index.html',
@@ -25,6 +24,10 @@ const PRECACHE = [
 
 function isNoCache(url) {
   return /faa_index\.json|faaRag\.js|v1\/chat|api/i.test(url);
+}
+
+function isHTML(url) {
+  return url.includes('.html') || url.endsWith('/') || /\/[^.]*$/.test(url.split('?')[0]);
 }
 
 self.addEventListener('install', e => {
@@ -41,32 +44,61 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = e.request.url || '';
-  // CROSS-ORIGIN API CALLS (Firebase/Firestore/Google/proxied AI) MUST bypass
-  // the service worker entirely. The SW can't satisfy Firebase's realtime
-  // Listen channel (long-poll/XHR stream); intercepting it throws
-  // "A ServiceWorker intercepted the request and encountered an unexpected error"
-  // and breaks live data. Let the browser handle these natively.
+
+  // CROSS-ORIGIN: bypass entirely (Firebase, APIs, AI proxy)
   if (url.includes('googleapis.com') || url.includes('googleusercontent.com') ||
       url.includes('firebaseio.com') || url.includes('gstatic.com') ||
-      url.startsWith('http') && !url.includes(self.location.host)) {
-    return; // no respondWith -> browser does a normal network request
-  }
-  // Never serve a stale RAG index / API from cache -- go straight to network.
-  if (isNoCache(url)) {
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then(r => r || caches.match('./'))));
+      (url.startsWith('http') && !url.includes(self.location.host))) {
     return;
   }
-  // Cache-first for static assets; populate the cache as new hashed chunks arrive.
+
+  // Never cache RAG/API
+  if (isNoCache(url)) {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
+
+  // HTML: network-first (always fresh app shell)
+  if (isHTML(url)) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res && res.status === 200) {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, copy));
+        }
+        return res;
+      }).catch(() => caches.match(e.request).then(r => r || caches.match('index.html')))
+    );
+    return;
+  }
+
+  // Static assets: cache-first with TTL check
   e.respondWith(
     caches.match(e.request).then(cached => {
-      const network = fetch(e.request).then(res => {
+      if (cached) {
+        // Check TTL
+        const dateHeader = cached.headers.get('date');
+        if (dateHeader) {
+          const age = Date.now() - new Date(dateHeader).getTime();
+          if (age > CACHE_TTL) {
+            // Stale — fetch fresh in background
+            fetch(e.request).then(res => {
+              if (res && res.status === 200) {
+                caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+              }
+            }).catch(() => {});
+          }
+        }
+        return cached;
+      }
+      // Not in cache — fetch and cache
+      return fetch(e.request).then(res => {
         if (res && res.status === 200 && res.type === 'basic') {
           const copy = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, copy));
         }
         return res;
-      }).catch(() => cached);
-      return cached || network;
+      }).catch(() => new Response('Offline', { status: 503 }));
     })
   );
 });

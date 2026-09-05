@@ -241,6 +241,7 @@ export const Store = {
 
   // ---- update names (rename) ----
   async updateStudentName(id, name) { await updateDoc(doc(dbFs, COL.students, id), { name }); },
+  async updateStudentYears(id, activeYears) { await updateDoc(doc(dbFs, COL.students, id), { activeYears }); },
   async updateInstructorName(id, name) { await updateDoc(doc(dbFs, COL.instructors, id), { name }); },
   async updateAircraftName(id, name) { await updateDoc(doc(dbFs, COL.aircraft, id), { name }); },
 

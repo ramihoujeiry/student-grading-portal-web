@@ -278,18 +278,15 @@
       <button class="tab-btn" :class="{active:tab==='evaluations'}" v-if="!isViewer" :aria-current="tab==='evaluations'?'page':null" @click="setTab('evaluations')">Evaluations</button>
       <button class="tab-btn" :class="{active:tab==='announcements'}" :aria-current="tab==='announcements'?'page':null" @click="setTab('announcements')">Announcements</button>
       <button class="tab-btn" :class="{active:tab==='analytics'}" :aria-current="tab==='analytics'?'page':null" @click="setTab('analytics')">Analytics</button>
-      <button class="tab-btn" :class="{active:tab==='progress'}" :aria-current="tab==='progress'?'page':null" @click="setTab('progress')">Training Progress</button>
       <button class="tab-btn" :class="{active:tab==='studentAnalytics'}" :aria-current="tab==='studentAnalytics'?'page':null" @click="setTab('studentAnalytics')">Student Analytics</button>
       <button class="tab-btn" :class="{active:tab==='studentHours'}" :aria-current="tab==='studentHours'?'page':null" @click="setTab('studentHours')">Student Hours</button>
       <button class="tab-btn" :class="{active:tab==='progressAnalytics'}" :aria-current="tab==='progressAnalytics'?'page':null" @click="setTab('progressAnalytics')">Progress Analytics</button>
       <button class="tab-btn" :class="{active:tab==='failedItems'}" :aria-current="tab==='failedItems'?'page':null" @click="setTab('failedItems')">Failed Items</button>
-      <button class="tab-btn" :class="{active:tab==='studentProfile'}" :aria-current="tab==='studentProfile'?'page':null" @click="setTab('studentProfile')">Student Profile</button>
       <button class="tab-btn" :class="{active:tab==='tripHistory'}" :aria-current="tab==='tripHistory'?'page':null" @click="setTab('tripHistory')">Trip History</button>
       <button class="tab-btn" :class="{active:tab==='adminBroadcast'}" v-if="isAdmin" :aria-current="tab==='adminBroadcast'?'page':null" @click="setTab('adminBroadcast')">Admin Broadcast</button>
       <button class="tab-btn" :class="{active:tab==='aiHub'}" :aria-current="tab==='aiHub'?'page':null" @click="setTab('aiHub')">AI Feedback Hub</button>
       <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" :aria-current="tab==='admin'?'page':null" @click="setTab('admin')">Users</button>
       <span class="tab-sep" aria-hidden="true"></span>
-      <button class="tab-btn" :class="{active:tab==='ai'}" :aria-current="tab==='ai'?'page':null" @click="setTab('ai')">AI Feedback</button>
       <button class="tab-btn" :class="{active:tab==='ask'}" :aria-current="tab==='ask'?'page':null" @click="setTab('ask')">Ask Data</button>
       <span class="tab-sep" aria-hidden="true"></span>
       <button class="tab-btn" :class="{active:tab==='settings'}" :aria-current="tab==='settings'?'page':null" @click="setTab('settings')">Settings</button>
@@ -368,6 +365,7 @@
               <span class="pill" :class="s.active?'good':'pending'">{{s.active?'Active':'Inactive'}}</span>
               <span class="muted">{{(s.activeYears||[]).join(', ')}}</span>
               <span class="spacer" style="flex:1"></span>
+              <button class="btn sm ghost" v-if="isAdmin" @click.stop="editStudentYear(s)">Edit Year</button>
               <button class="btn sm ghost" v-if="isAdmin" @click.stop="toggleStudentActive(s)">{{s.active?'Deactivate':'Activate'}}</button>
               <button class="btn sm danger" v-if="isAdmin" @click.stop="deleteStudent(s)">Delete</button>
             </div>
@@ -456,7 +454,7 @@
         <ul class="list">
           <li v-for="e in evalsSortedByDate" :key="e.id" class="clickable" @click="openEval(e)">
             <div class="row nowrap">
-              <strong>{{studentName(e.studentId)}} · {{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
+              <strong>{{e.studentName}} · {{e.aircraftType}} {{e.phaseName}} {{e.tripNumber}}</strong>
               <span class="muted">{{fmt(e.date)}} · {{e.instructorName}}</span>
               <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
               <span class="pill" :class="statusColor(e.overallMifStatus)">{{statusLabel(e.overallMifStatus)}}</span>
@@ -651,32 +649,6 @@
         </div>
       </section>
 
-      <!-- AI FEEDBACK -->
-      <section v-show="tab==='ai'">
-        <div class="card">
-          <h3>AI Performance Feedback</h3>
-          <div v-if="ragReady === true" class="pill good wrap" style="margin-bottom:10px">📚 Manuals loaded (FAA / UH-1 / Robinson FTG) — debriefs will cite them</div>
-          <div v-if="ragReady === false" class="pill pending" style="margin-bottom:10px">⚠️ Manual index not loaded. Serve the app over http:// (not file://) and ensure faa-rag/faa_index.json is present.</div>
-          <label>Student
-            <select v-model="aiStudentId" aria-label="AI feedback student">
-            <option value="">Select a student…</option>
-            <option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option>
-          </select></label>
-          <div style="margin-top:12px" class="row">
-            <button class="btn" @click="runAIForStudent">Generate Analysis</button>
-            <button class="btn ghost" :disabled="!aiResult" @click="copyAI">Copy</button>
-          </div>
-          <div v-if="aiLoading" class="muted" style="margin-top:10px">Analyzing…</div>
-          <div v-if="aiResult" class="mannote" style="margin-top:12px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:340px;overflow:auto">{{aiResult}}</div>
-          <div v-if="aiResult && aiRagStatus==='ok'" class="pill good" style="margin-top:10px">📚 Manuals cited (FAA / UH-1 / Robinson FTG)</div>
-          <div v-if="aiResult && aiRagStatus==='failed'" class="pill pending" style="margin-top:10px">⚠️ Manual index not loaded — debrief is ungrounded. Check faa-rag/faa_index.json is served.</div>
-          <div v-if="!aiResult && !aiLoading" class="muted" style="margin-top:10px">
-            Picks a student and asks the live AI model for a coaching debrief (trend, consistency,
-            weak maneuvers, readiness) from their evaluations. Falls back to an offline summary if offline.
-          </div>
-        </div>
-      </section>
-
       <!-- ASK DATA -->
       <section v-show="tab==='ask'">
         <div class="card">
@@ -692,36 +664,6 @@
           <div v-if="askResult" class="mannote" style="margin-top:12px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:420px;overflow:auto">{{askResult}}</div>
         </div>
       </section>
-      <!-- TRAINING PROGRESS -->
-      <section v-show="tab==='progress'">
-        <div class="topbar"><h2 style="margin:0">Training Progress · {{activeYearResolved}}</h2></div>
-        <p class="muted" style="margin:4px 2px 12px">All students: current phase, aircraft, trips, average grade, last flight. Ports Android TrainingProgressActivity.</p>
-        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
-          <div style="flex:2 1 240px;min-width:200px"><label>Search by name</label><input v-model="tpSearch" aria-label="Training progress search" placeholder="Student name…" /></div>
-          <div style="flex:1 1 160px;min-width:140px"><label>Aircraft
-            <select v-model="tpAircraft" aria-label="Training progress aircraft"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></div>
-          <button class="btn sm ghost" @click="tpSearch='';tpAircraft='All Aircraft'">Clear</button>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
-          <div class="card clickable" v-for="p in trainingProgress" :key="p.id" @click="openTrainingProgressStudent({id:p.id,name:p.name})">
-            <div class="row" style="align-items:center">
-              <strong style="font-size:15px">{{p.name}}</strong>
-              <span class="spacer" style="flex:1"></span>
-              <span class="pill" :class="p.failCount>0?'bad':'good'">{{p.failCount>0?p.failCount+' fail(s)':'On track'}}</span>
-            </div>
-            <div class="row nowrap" style="margin-top:8px;gap:8px">
-              <span class="muted">{{p.currentPhase}}</span>
-              <span class="muted">{{p.aircraft}}</span>
-              <span class="muted">{{p.completedTrips}} trip(s)</span>
-              <span class="pill" :class="gradeColor(p.avgGrade)">{{p.avgGrade?p.avgGrade.toFixed(1):'—'}}</span>
-            </div>
-            <div class="meter" style="margin-top:10px" :aria-label="p.progressPct+' percent complete'" role="img"><div class="meter-fill" :style="{width:p.progressPct+'%'}"></div></div>
-            <div class="muted" style="margin-top:6px">Last flight: {{p.lastFlight?fmt(p.lastFlight):'—'}}</div>
-          </div>
-        </div>
-        <div v-if="!trainingProgress.length" class="muted">No students found.</div>
-      </section>
-
       <!-- STUDENT ANALYTICS -->
       <section v-show="tab==='studentAnalytics'">
         <div class="topbar"><h2 style="margin:0">Student Analytics · {{activeYearResolved}}</h2></div>
@@ -794,7 +736,7 @@
                 <path :d="paTrendChart().area" fill="rgba(57,208,196,.15)"></path>
                 <path :d="paTrendChart().path" fill="none" stroke="var(--accent)" stroke-width="2"></path>
               </svg>
-              <div class="muted" style="margin-top:6px">{{progressAnalyticsEvals().length}} evaluation(s)</div>
+              <div class="muted" style="margin-top:6px">{{progressAnalyticsEvals.length}} evaluation(s)</div>
             </div>
             <div v-else class="muted">Need 2+ evaluations for a trend.</div>
           </div>
@@ -859,73 +801,6 @@
             <li v-if="!failedItemsData.failedManeuvers.length" class="muted">No failed maneuvers.</li>
           </ul>
         </div>
-      </section>
-
-      <!-- STUDENT PROFILE -->
-      <section v-show="tab==='studentProfile'">
-        <div class="topbar"><h2 style="margin:0">Student Profile</h2></div>
-        <p class="muted" style="margin:4px 2px 12px">Single-student dashboard: grade trend, failure-by-phase, strengths & weaknesses. Ports Android StudentProfileActivity.</p>
-        <div class="card" style="margin-bottom:12px">
-          <div style="flex:2 1 240px"><label>Student
-            <select v-model="spStudentId" aria-label="Student profile select"><option value="">Select a student…</option><option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option></select></div>
-        </div>
-        <div v-if="studentProfile">
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
-            <div class="card">
-              <h3>{{studentProfile.student.name}}</h3>
-              <div class="row nowrap" style="margin-top:8px;gap:8px">
-                <span class="pill good">{{studentProfile.totalTrips}} trips</span>
-                <span class="pill" :class="studentProfile.totalFails>0?'bad':'good'">{{studentProfile.totalFails}} fails</span>
-                <span class="pill" :class="gradeColor(studentProfile.avg)">{{studentProfile.avg?studentProfile.avg.toFixed(1):'—'}}</span>
-              </div>
-              <div class="muted" style="margin-top:8px">Readiness: <b>{{studentProfile.perf.readiness}}</b> · Trend: <b>{{studentProfile.perf.trend}}</b></div>
-            </div>
-            <div class="card">
-              <h3>Grade Trend</h3>
-              <svg v-if="studentProfileTrendChart()" :viewBox="'0 0 '+studentProfileTrendChart().w+' '+studentProfileTrendChart().h" style="width:100%;height:60px" preserveAspectRatio="none">
-                <path :d="studentProfileTrendChart().area" fill="rgba(57,208,196,.15)"></path>
-                <path :d="studentProfileTrendChart().path" fill="none" stroke="var(--accent)" stroke-width="2"></path>
-              </svg>
-              <div v-else class="muted">Need 2+ evaluations for a trend.</div>
-            </div>
-            <div class="card">
-              <h3>Failures by Phase</h3>
-              <div v-if="studentProfilePie()" v-html="studentProfilePie()"></div>
-              <div v-else class="muted">No failures recorded.</div>
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:12px">
-            <div class="card">
-              <h3>Strengths</h3>
-              <div v-if="studentProfile.strengths.length">
-                <span class="pill good" v-for="s in studentProfile.strengths" :key="s" style="margin:3px">{{s}}</span>
-              </div>
-              <div v-else class="muted">No clear strengths yet.</div>
-            </div>
-            <div class="card">
-              <h3>Weaknesses</h3>
-              <div v-if="studentProfile.weaknesses.length">
-                <span class="pill bad" v-for="w in studentProfile.weaknesses" :key="w" style="margin:3px">{{w}}</span>
-              </div>
-              <div v-else class="muted">No weak maneuvers.</div>
-            </div>
-          </div>
-          <div class="card" style="margin-top:12px">
-            <h3>Evaluations</h3>
-            <ul class="list">
-              <li v-for="e in studentProfile.evals" :key="e.id" class="clickable" @click="openEval(e)">
-                <div class="row nowrap">
-                  <strong>{{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
-                  <span class="muted">{{fmt(e.date)}}</span>
-                  <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade?e.finalGrade.toFixed(1):'—'}}</span>
-                  <span class="pill" :class="statusColor(e.overallMifStatus)">{{statusLabel(e.overallMifStatus)}}</span>
-                </div>
-              </li>
-            </ul>
-          </div>
-          <div style="margin-top:12px"><button class="btn sm" @click="aiStudentId=spStudentId;setTab('ai')">Open in AI Feedback →</button></div>
-        </div>
-        <div v-else class="muted">Select a student to view their profile.</div>
       </section>
 
       <!-- TRIP HISTORY -->
@@ -1003,18 +878,24 @@
         <p class="muted" style="margin:4px 2px 12px">Select a student and scope, then launch the AI feedback report. Ports Android AIFeedbackHubActivity.</p>
         <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
           <div style="flex:2 1 200px;min-width:180px"><label>Student
-            <select v-model="hubStudentId" aria-label="Hub student"><option value="">Select a student…</option><option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Scope
-            <select v-model="hubScope" aria-label="Hub scope"><option value="all">All</option><option value="phase">By Phase</option><option value="trip">By Trip</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px" v-if="hubScope==='phase'"><label>Phase
-            <select v-model="hubPhase" aria-label="Hub phase"><option>All Phases</option><option v-for="p in phaseOptions" :key="p" :value="p">{{p}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px" v-if="hubScope==='trip'"><label>Trip
-            <select v-model="hubTrip" aria-label="Hub trip"><option>All Trips</option><option v-for="st in ['S1','S2','S3','S4','S5','S6','S7','S8']" :key="st" :value="st">{{st}}</option></select></div>
-          <button class="btn sm" @click="launchHubFeedback">Launch AI Feedback</button>
+            <select v-model="aiStudentId" aria-label="Hub student"><option value="">Select a student…</option><option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option></select></div>
+          <button class="btn sm" @click="runAIForStudent">Generate AI Feedback</button>
         </div>
-        <div class="card" v-if="hubStudentId">
-          <h3>Scope Preview</h3>
-          <p class="muted">{{hubEvals().length}} evaluation(s) in scope</p>
+        <div class="card" v-if="aiStudentId" style="margin-top:12px">
+          <h3>AI Feedback</h3>
+          <div v-if="ragReady === true" class="pill good wrap" style="margin-bottom:10px">📚 Manuals loaded (FAA / UH-1 / Robinson FTG) — debriefs will cite them</div>
+          <div v-if="ragReady === false" class="pill pending" style="margin-bottom:10px">⚠️ Manual index not loaded. Serve the app over http:// (not file://) and ensure faa-rag/faa_index.json is present.</div>
+          <div v-if="aiLoading" class="muted" style="margin-top:10px">Analyzing…</div>
+          <div v-if="aiResult" class="mannote" style="margin-top:12px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:340px;overflow:auto">{{aiResult}}</div>
+          <div v-if="aiResult && aiRagStatus==='ok'" class="pill good" style="margin-top:10px">📚 Manuals cited (FAA / UH-1 / Robinson FTG)</div>
+          <div v-if="aiResult && aiRagStatus==='failed'" class="pill pending" style="margin-top:10px">⚠️ Manual index not loaded — debrief is ungrounded. Check faa-rag/faa_index.json is served.</div>
+          <div v-if="!aiResult && !aiLoading" class="muted" style="margin-top:10px">
+            Picks a student and asks the live AI model for a coaching debrief (trend, consistency,
+            weak maneuvers, readiness) from their evaluations.
+          </div>
+          <div style="margin-top:12px" class="row">
+            <button class="btn ghost" :disabled="!aiResult" @click="copyAI">Copy</button>
+          </div>
         </div>
       </section>
     </main>

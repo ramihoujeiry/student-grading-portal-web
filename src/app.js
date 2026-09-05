@@ -592,6 +592,29 @@ export const app = createApp({
     deleteAircraft(a) { this.openConfirm({ title: 'Delete aircraft', message: 'Delete ' + a.name + '?', confirmText: 'Delete', onOk: async () => { await Store.deleteAircraft(a.id); } }); },
     // ---- edit (rename) methods ----
     editStudent(s) { this.openInput({ title: 'Edit student', label: 'Student name', value: s.name || '', onOk: async (v) => { await Store.updateStudentName(s.id, v); this.toastMsg('Student updated'); } }); },
+    editStudentYear(s) {
+      const years = this.years || [];
+      const current = (s.activeYears || []).join(', ');
+      this.openForm({
+        title: 'Edit scholar year — ' + s.name,
+        fields: [
+          { key: 'mode', label: 'Mode: "add" (add a year), "set" (replace all), or "remove" (remove one)', value: 'add' },
+          { key: 'year', label: 'Year (e.g. ' + (years[0] || '2026-2027') + ')', value: years[0] || '' }
+        ],
+        onOk: async (v) => {
+          const mode = (v.mode || 'add').trim().toLowerCase();
+          const yr = (v.year || '').trim();
+          if (!yr) { this.toastMsg('Year required', 'error'); return; }
+          const cur = s.activeYears || [];
+          let updated;
+          if (mode === 'set') updated = [yr];
+          else if (mode === 'remove') updated = cur.filter(y => y !== yr);
+          else updated = cur.includes(yr) ? cur : [...cur, yr];
+          await Store.updateStudentYears(s.id, updated);
+          this.toastMsg('Year updated');
+        }
+      });
+    },
     editInstructor(i) { this.openInput({ title: 'Edit instructor', label: 'Instructor name', value: i.name || '', onOk: async (v) => { await Store.updateInstructorName(i.id, v); this.toastMsg('Instructor updated'); } }); },
     editAircraft(a) { this.openInput({ title: 'Edit aircraft', label: 'Aircraft type', value: a.name || '', onOk: async (v) => { await Store.updateAircraftName(a.id, v); this.toastMsg('Aircraft updated'); } }); },
 
@@ -868,7 +891,13 @@ export const app = createApp({
       this.evalForm.tripNumber = '';
       this.suggestTrip();
     },
-    studentName(id) { const s = this.students.find(x => x.id === id); return s ? s.name : '?'; },
+    studentName(id) {
+      const s = this.students.find(x => x.id === id);
+      if (s) return s.name;
+      // fallback: find the name from evaluations (handles deleted/missing student docs)
+      const e = this.evaluations.find(x => x.studentId === id);
+      return e ? e.studentName : id;
+    },
 
     /* ---- detail views ---- */
     openEval(e) { this.selectedEval = e; },
@@ -1193,11 +1222,11 @@ export const app = createApp({
 
     /* ---- Print/PDF the currently filtered evaluation list (export) ---- */
     printEvalList() {
-      const evs = this.evalsByStudentInYear; // grouped map studentId -> [eval]
+      const evs = this.evalsByStudentInYear;
       const esc = (s) => (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const rows = [];
-      Object.keys(evs).forEach(sid => evs[sid].forEach(e => {
-        rows.push('<tr><td>' + esc(this.studentName(sid)) + '</td><td>' + esc(e.aircraftType) +
+      Object.values(evs).forEach(arr => arr.forEach(e => {
+        rows.push('<tr><td>' + esc(e.studentName) + '</td><td>' + esc(e.aircraftType) +
           '</td><td>' + esc(e.phaseName + ' ' + e.tripNumber) + '</td><td>' + esc(this.fmt(e.date)) +
           '</td><td>' + esc(e.instructorName || '') + '</td><td>' + (e.finalGrade != null ? Number(e.finalGrade).toFixed(1) : '-') +
           '</td><td>' + esc(e.overallMifStatus || '') + '</td></tr>');
@@ -1597,17 +1626,17 @@ export const app = createApp({
     },
 
     // ===== Training Progress: open student profile tab =====
-    openTrainingProgressStudent(s) { this.spStudentId = s.id; this.tab = 'studentProfile'; },
+    openTrainingProgressStudent(s) { this.thStudent = s.name; this.tab = 'tripHistory'; },
 
     // ===== Student Analytics: open student profile =====
-    openStudentAnalyticsStudent(s) { this.spStudentId = s.id; this.tab = 'studentProfile'; },
+    openStudentAnalyticsStudent(s) { this.thStudent = s.name; this.tab = 'tripHistory'; },
 
     // ===== Student Hours: open student profile =====
-    openStudentHoursStudent(s) { this.spStudentId = s.id; this.tab = 'studentProfile'; },
+    openStudentHoursStudent(s) { this.thStudent = s.name; this.tab = 'tripHistory'; },
 
     // ===== Progress Analytics: radar chart data (skill proficiency by maneuver) =====
     progressRadarData() {
-      const evs = this.progressAnalyticsEvals();
+      const evs = this.progressAnalyticsEvals;
       const tally = {};
       evs.forEach(e => (e.maneuverGrades || []).forEach(m => {
         if (m.studentGrade == null || m.studentGrade === 0) return;
@@ -1622,7 +1651,7 @@ export const app = createApp({
 
     // ===== Progress Analytics: trend chart =====
     paTrendChart(w = 280, h = 80) {
-      const evs = this.progressAnalyticsEvals();
+      const evs = this.progressAnalyticsEvals;
       if (evs.length < 2) return null;
       const pts = evs.map(e => e.finalGrade || 0);
       let min = Math.min(...pts), max = Math.max(...pts);
@@ -1637,7 +1666,7 @@ export const app = createApp({
 
     // ===== Progress Analytics: pie chart data (failures by phase) =====
     progressFailureByPhase() {
-      const evs = this.progressAnalyticsEvals().filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD);
+      const evs = this.progressAnalyticsEvals.filter(e => e.overallMifStatus === STATUS_BELOW_STANDARD);
       const tally = {};
       evs.forEach(e => { tally[e.phaseName] = (tally[e.phaseName] || 0) + 1; });
       return Object.keys(tally).map(p => ({ phase: p, count: tally[p] })).sort((a, b) => b.count - a.count);
@@ -1695,7 +1724,7 @@ export const app = createApp({
 
     // ===== Student Profile: trend chart (reuse existing pattern) =====
     studentProfileTrendChart(w = 300, h = 80) {
-      const profile = this.studentProfile();
+      const profile = this.studentProfile;
       if (!profile || profile.evals.length < 2) return null;
       const pts = profile.evals.map(e => e.finalGrade || 0);
       let min = Math.min(...pts), max = Math.max(...pts);
@@ -1710,7 +1739,7 @@ export const app = createApp({
 
     // ===== Student Profile: failure-by-phase pie =====
     studentProfilePie(w = 180, h = 180) {
-      const profile = this.studentProfile();
+      const profile = this.studentProfile;
       if (!profile) return null;
       const data = Object.keys(profile.phaseFails).map(p => ({ phase: p, count: profile.phaseFails[p] }));
       if (!data.length) return null;
@@ -1759,13 +1788,13 @@ export const app = createApp({
       if (!this.hubStudentId) { this.toastMsg('Select a student first'); return; }
       const student = this.students.find(s => s.id === this.hubStudentId);
       if (!student) return;
-      const evals = this.hubEvals();
+      const evals = this.hubEvals;
       const perf = buildPerformance(student, evals);
       perf.scope = this.hubScope;
       if (this.hubScope === 'phase') perf.scopePhase = this.hubPhase;
       if (this.hubScope === 'trip') perf.scopeTrip = this.hubTrip;
       this.aiStudentId = this.hubStudentId;
-      this.tab = 'ai';
+      this.tab = 'aiHub';
       this.$nextTick(() => this.runAIForStudent());
     }
   },
