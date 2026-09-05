@@ -1807,7 +1807,7 @@ export const app = createApp({
     this._applyDensity(this.uiDensity);
     // Load the rolling local usage-analytics log (audit item 9).
     this.loadAnalytics();
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=65').catch(() => {});
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=66').catch(() => {});
     // Warm the RAG index on load so the AI tab can show live status immediately.
     // Also drive the header AI badge (audit item 13): reflect live vs offline-template.
     // RAG index is loaded lazily (dynamic import in store.getRag) only when a
