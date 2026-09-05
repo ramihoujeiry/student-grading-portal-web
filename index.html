@@ -204,7 +204,7 @@
   .meter{height:8px;background:rgba(8,14,20,.7);border-radius:5px;overflow:hidden;margin-top:10px}
   .meter-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--amber) 55%,var(--red));border-radius:5px;transition:width .25s}
 </style>
-  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-Ci-Tu2AA.js"></script>
+  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-wN7-tray.js"></script>
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-vue-CxFK-cW8.js">
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-firebase-BIFz2zAf.js">
 </head>
@@ -285,7 +285,7 @@
 
 
 
-      <button class="tab-btn" :class="{active:tab==='tripHistory'}" :aria-current="tab==='tripHistory'?'page':null" @click="setTab('tripHistory')">Trip History</button>
+
       <button class="tab-btn" :class="{active:tab==='adminBroadcast'}" v-if="isAdmin" :aria-current="tab==='adminBroadcast'?'page':null" @click="setTab('adminBroadcast')">Admin Broadcast</button>
       <button class="tab-btn" :class="{active:tab==='aiHub'}" :aria-current="tab==='aiHub'?'page':null" @click="setTab('aiHub')">AI Feedback Hub</button>
       <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" :aria-current="tab==='admin'?'page':null" @click="setTab('admin')">Users</button>
@@ -691,33 +691,7 @@
       </section>
 
 
-      <!-- TRIP HISTORY -->
-      <section v-show="tab==='tripHistory'">
-        <div class="topbar"><h2 style="margin:0">Trip History</h2></div>
-        <p class="muted" style="margin:4px 2px 12px">Full searchable/filterable list of evaluations. Ports Android TripHistoryActivity.</p>
-        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
-          <div style="flex:2 1 240px;min-width:200px"><label>Search</label><input v-model="thSearch" aria-label="Trip history search" placeholder="student, aircraft, phase, instructor, trip…" /></div>
-          <div style="flex:1 1 160px;min-width:140px"><label>Student
-            <select v-model="thStudent" aria-label="Trip history student"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Aircraft
-            <select v-model="thAircraft" aria-label="Trip history aircraft"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Phase
-            <select v-model="thPhase" aria-label="Trip history phase"><option>All Phases</option><option v-for="p in phaseOptions" :key="p" :value="p">{{p}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Flight Year
-            <select v-model="thYear" aria-label="Trip history year"><option>All Years</option><option v-for="y in years" :key="y" :value="y">{{y}}</option></select></div>
-          <button class="btn sm ghost" @click="thSearch='';thStudent='All Cadets';thAircraft='All Aircraft';thPhase='All Phases';thYear='All Years'">Clear</button>
-        </div>
-        <ul class="list">
-          <li v-for="e in tripHistory" :key="e.id" class="clickable" @click="openEval(e)">
-            <div class="row nowrap">
-              <strong>{{e.studentName}} · {{e.aircraftType}} {{e.phaseName}} {{e.tripNumber}}</strong>
-              <span class="muted">{{fmt(e.date)}} · {{e.instructorName}}</span>
-              <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade?e.finalGrade.toFixed(1):'—'}}</span>
-              <span class="pill" :class="statusColor(e.overallMifStatus)">{{statusLabel(e.overallMifStatus)}}</span>
-            </div>
-          </li>
-          <li v-if="!tripHistory.length" class="muted">No evaluations match the filters.</li>
-        </ul>
+
       </section>
 
       <!-- ADMIN BROADCAST -->
