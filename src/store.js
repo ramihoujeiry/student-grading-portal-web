@@ -17,7 +17,7 @@
  * Exported symbols (consumed by app.js / main.js):
  *   FIREBASE_CONFIG, FIREBASE_READY, Auth, Store, COL,
  *   STATUS_MEETS_STANDARD, STATUS_BELOW_STANDARD, STATUS_PENDING, GRADE_SCORE,
- *   LAN_AI_ENABLED, LAN_AI_ENDPOINT, LAN_AI_MODEL, LAN_AI_KEY,
+ *   LAN_AI_ENABLED, LAN_AI_ENDPOINT, LAN_AI_MODEL,
  *   getAIConfig, callAIModel, callAIModelWithPrompt,
  *   buildPerformance, buildAIPrompt,
  *   buildSingleEvalData, buildSingleEvalPrompt,
@@ -106,14 +106,6 @@ function toEpochSec(v) {
 export const LAN_AI_ENABLED = true;
 export const LAN_AI_ENDPOINT = 'https://raspberrypi.tail3a08db.ts.net/v1/chat/completions';
 export const LAN_AI_MODEL = 'tencent/hy3:free';
-/* Shared secret for the Pi AI proxy. The Pi's ai_proxy.py (see README "AI proxy
-   shared secret") rejects requests whose Authorization header does not match
-   Bearer <secret> once PROXY_SHARED_SECRET is set on the Pi. Without it, the
-   Funnel-exposed endpoint is usable by anyone who finds the URL (it ships in
-   the public JS bundle). Paste the SAME secret you set on the Pi here — it is
-   not a Firebase key and only gates the proxy. A 'PASTE_' placeholder sends
-   no header so the app keeps working until the secret is configured. */
-export const LAN_AI_KEY = 'PASTE_PROXY_SHARED_SECRET';
 
 /* ---------- lazy RAG access ---------------------------------------------- */
 /* The FAA / UH-1 / Robinson FTG index is big (~220KB) and only needed when a
@@ -588,12 +580,9 @@ async function getAIConfig() {
       }
     } catch (e) { /* fall through to LAN default */ }
   }
-  // 2) LAN default: Hermes gateway proxy on the Pi (shared secret, not an
-  //    API key — see LAN_AI_KEY above). Firestore config/ai overrides this
-  //    entirely when set, which is the preferred place for endpoint+secret.
+  // 2) LAN default: Hermes gateway proxy on the Pi (no key in client)
   if (LAN_AI_ENABLED) {
-    const key = (typeof LAN_AI_KEY === 'string' && LAN_AI_KEY && !LAN_AI_KEY.includes('PASTE')) ? LAN_AI_KEY : '';
-    return { endpoint: LAN_AI_ENDPOINT, model: LAN_AI_MODEL, apiKey: key };
+    return { endpoint: LAN_AI_ENDPOINT, model: LAN_AI_MODEL, apiKey: '' };
   }
   return null;
 }

@@ -57,21 +57,13 @@ python -m http.server 8123
 - `src/public/` — PWA assets served as-is: `sw.js` (offline service worker),
   `manifest.webmanifest`, `icons/`.
 - `firestore.rules` — security rules (role-based)
-- `ai_proxy_shared_secret.py` — helper to add the shared-secret gate to the Pi's `ai_proxy.py`
 - Root `index.html` / `assets/` — the built site deployed to GitHub Pages (see "Deploy" below)
 
 ## Deploy
 `npm run build` emits to `dist/`; copy its contents to the repo root (or configure Pages to
 serve `dist/`) so GitHub Pages serves the bundled app at `/student-grading-portal-web/`.
 
-## AI proxy shared secret
-The AI debrief calls the Pi's OpenAI-compatible proxy through Tailscale Funnel. To stop
-strangers from using it (the URL is public in the JS bundle), add a shared secret:
-
-1. On the Pi: `python3 ai_proxy_shared_secret.py /home/pi/.hermes/ai_proxy.py --secret '<SECRET>'`
-   then restart the proxy (`sudo systemctl restart ai-proxy`, or relaunch it).
-2. In the web app: either paste the same secret into `src/firebase-config.js`-style constant
-   `LAN_AI_KEY` in `src/store.js`, or (preferred) set Firestore `config/ai` to
-   `{ enabled: true, endpoint: "https://raspberrypi.tail3a08db.ts.net/v1/chat/completions",
-   model: "...", apiKey: "<SECRET>" }` — signed-in users read it; the app sends it as
-   `Authorization: Bearer <SECRET>` automatically.
+## AI feedback (Pi proxy)
+The AI debrief calls the Pi's OpenAI-compatible proxy through Tailscale Funnel
+(`LAN_AI_ENDPOINT` in `src/store.js`). No secret is required — the proxy is reachable
+because Tailscale Funnel makes it public, and the app sends plain JSON requests.
