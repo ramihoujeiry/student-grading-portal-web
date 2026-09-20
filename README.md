@@ -50,10 +50,28 @@ python -m http.server 8123
 ```
 
 ## Files
-- `index.html` — app shell + tabs + auth screen
-- `app.js` — Vue 3 SPA logic (auth, CRUD, grading math, AI feedback)
-- `store.js` — Firebase data layer + grading/AI math (ported from the Android app)
-- `seed.js` — sample data used to populate an empty project the first time an admin signs in
-- `firebase-config.js` — Firebase web config (paste your apiKey here)
+- `src/` — the app (Vite project root): `src/index.html` (shell + tabs + auth screen),
+  `src/app.js` (Vue 3 SPA logic), `src/store.js` (Firebase data layer + grading/AI math
+  ported from the Android app), `src/seed.js` (sample data for first admin sign-in),
+  `src/firebase-config.js` (paste your apiKey here), `src/main.js` (entry).
+- `src/public/` — PWA assets served as-is: `sw.js` (offline service worker),
+  `manifest.webmanifest`, `icons/`.
 - `firestore.rules` — security rules (role-based)
-- `sw.js` / `manifest.webmanifest` — installable + offline PWA
+- `ai_proxy_shared_secret.py` — helper to add the shared-secret gate to the Pi's `ai_proxy.py`
+- Root `index.html` / `assets/` — the built site deployed to GitHub Pages (see "Deploy" below)
+
+## Deploy
+`npm run build` emits to `dist/`; copy its contents to the repo root (or configure Pages to
+serve `dist/`) so GitHub Pages serves the bundled app at `/student-grading-portal-web/`.
+
+## AI proxy shared secret
+The AI debrief calls the Pi's OpenAI-compatible proxy through Tailscale Funnel. To stop
+strangers from using it (the URL is public in the JS bundle), add a shared secret:
+
+1. On the Pi: `python3 ai_proxy_shared_secret.py /home/pi/.hermes/ai_proxy.py --secret '<SECRET>'`
+   then restart the proxy (`sudo systemctl restart ai-proxy`, or relaunch it).
+2. In the web app: either paste the same secret into `src/firebase-config.js`-style constant
+   `LAN_AI_KEY` in `src/store.js`, or (preferred) set Firestore `config/ai` to
+   `{ enabled: true, endpoint: "https://raspberrypi.tail3a08db.ts.net/v1/chat/completions",
+   model: "...", apiKey: "<SECRET>" }` — signed-in users read it; the app sends it as
+   `Authorization: Bearer <SECRET>` automatically.

@@ -731,17 +731,35 @@ export const app = createApp({
       if (clash) { this.overwriteClash = clash; this.overwritePending = ev; }
       else await this.persistEval(ev);
     },
-    // Next sortie auto-suggestion (Android fetchSuggestedTrip): after the student's highest
-    // S# in this aircraft+phase, suggest S(n+1); S1 if none.
+    // Next sortie auto-suggestion (Android fetchSuggestedTrip): after the student's
+    // LAST graded trip in this aircraft+phase, suggest the NEXT trip (last graded = 5
+    // -> shows 6). The instructor can still freely change it. The student's existing
+    // naming style is preserved (S5 -> S6, T-01 -> T-02, 12 -> 13, "TRIP 3" -> "TRIP 4")
+    // by incrementing the trailing digits of the highest graded trip and keeping the
+    // prefix + zero-padding. If the student has no trips in this phase yet, suggest the
+    // MIF table's first stage, else S1. A suggestion that falls beyond the stage list
+    // (e.g. last graded is S8) still renders via the dynamic <option> in the template.
     suggestTrip() {
       const { studentId, aircraftType, phaseName } = this.evalForm;
       if (!studentId || !aircraftType || !phaseName) return;
-      const nums = this.evaluations
-        .filter(e => e.studentId === studentId && e.aircraftType === aircraftType && e.phaseName === phaseName)
-        .map(e => parseInt(String(e.tripNumber || '').replace(/[^0-9]/g, ''), 10))
-        .filter(n => !isNaN(n));
-      const next = (nums.length ? Math.max(...nums) : 0) + 1;
-      this.evalForm.tripNumber = 'S' + next;
+      const evs = this.evaluations
+        .filter(e => e.studentId === studentId && e.aircraftType === aircraftType && e.phaseName === phaseName);
+      let best = null, bestN = -1;
+      evs.forEach(e => {
+        const s = String(e.tripNumber || '').trim();
+        const m = s.match(/^(.*?)(\d+)$/);   // any prefix + trailing digits
+        if (m) {
+          const n = parseInt(m[2], 10);
+          if (!isNaN(n) && n > bestN) { bestN = n; best = m; }
+        }
+      });
+      if (!best) {
+        const stages = (this.currentTable && this.currentTable.stages) || [];
+        this.evalForm.tripNumber = stages.length ? stages[0] : 'S1';
+        return;
+      }
+      // Increment the numeric tail; preserve prefix and zero-padding width.
+      this.evalForm.tripNumber = best[1] + String(bestN + 1).padStart(best[2].length, '0');
     },
     // Copy the most recent evaluation's maneuver grades for this student+aircraft+phase
     // as a starting point (last-trip prefill). Still fully editable. (audit item 5)
@@ -1121,15 +1139,44 @@ export const app = createApp({
        shows a preview + error report, and (on confirm) bulk-saves to Firestore. */
     openImport() { this.importCsv = { open: true, text: '', parsed: null, error: '' }; },
     closeImport() { this.importCsv = { open: false, text: '', parsed: null, error: '' }; },
+    /* Quote-aware CSV row parser (RFC 4180). The export path wraps every field
+       in double quotes and escapes embedded quotes as "", so an import that
+       naive-splits on commas silently mangles rows whose notes/maneuvers
+       contain commas ("Hover, pedal turns"). This parser mirrors the export:
+       fields may be quoted or bare, "" is a literal quote, CRLF/CR/LF all end
+       a record. */
+    parseCsvRows(text) {
+      const rows = [];
+      let row = [], field = '', inQ = false, i = 0;
+      const s = String(text || '');
+      while (i < s.length) {
+        const c = s[i];
+        if (inQ) {
+          if (c === '"') {
+            if (s[i + 1] === '"') { field += '"'; i += 2; }  // escaped quote
+            else { inQ = false; i++; }                        // closing quote
+          } else { field += c; i++; }
+        } else if (c === '"' && field === '') {
+          inQ = true; i++;                                    // opening quote (field start only)
+        } else if (c === ',') { row.push(field); field = ''; i++; }
+        else if (c === '\n' || c === '\r') {
+          if (c === '\r' && s[i + 1] === '\n') i++;
+          row.push(field); field = '';
+          rows.push(row); row = [];
+          i++;
+        } else { field += c; i++; }
+      }
+      // Flush the final record (no trailing newline in the file).
+      if (field !== '' || row.length) { row.push(field); rows.push(row); }
+      // Drop fully-empty rows (blank lines / trailing newline).
+      return rows.filter(r => !(r.length === 1 && r[0].trim() === ''));
+    },
     // Re-parse the textarea whenever it changes (live validation/preview).
     parseImportCsv() {
       const raw = (this.importCsv.text || '').trim();
       if (!raw) { this.importCsv.parsed = null; this.importCsv.error = ''; return; }
       try {
-        const lines = raw.split(String.fromCharCode(10)); // split on LF
-        const rows = lines.map(r => r.split(','));
-        // tolerate CRLF; drop fully-empty trailing rows
-        while (rows.length && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === '') rows.pop();
+        const rows = this.parseCsvRows(raw); // quote-aware RFC 4180 parser (handles commas in notes/maneuvers)
         if (rows.length < 2) { this.importCsv.error = 'Need a header row plus at least one data row.'; this.importCsv.parsed = null; return; }
         const header = rows[0].map(h => h.trim().toLowerCase());
         const idx = {};
