@@ -929,6 +929,9 @@
           <label>Trip number <span class="muted" style="text-transform:none;letter-spacing:0">· Sortie number</span>
           <select v-model="evalForm.tripNumber" @change="onEvalContextChange" aria-label="Evaluation trip number">
             <option v-for="st in (currentTable ? currentTable.stages : [])" :key="st" :value="st">{{st}}</option>
+            <!-- Auto-suggested trip may fall beyond the stage list (e.g. last graded is S8
+                 -> suggestion S9). Render it anyway so the suggestion is visible & selectable. -->
+            <option v-if="evalForm.tripNumber && !((currentTable && currentTable.stages) || []).includes(evalForm.tripNumber)" :value="evalForm.tripNumber">{{evalForm.tripNumber}}</option>
           </select></label>
         </div>
       </div>
