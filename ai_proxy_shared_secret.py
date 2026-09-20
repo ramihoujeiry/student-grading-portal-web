@@ -50,6 +50,8 @@ def gate_method(indent: str) -> str:
         "    path = (self.path or '').split('?')[0]",
         "    if path == '/healthz':",
         "        return True  # liveness probe stays unauthenticated",
+        "    if (self.command or '').upper() == 'OPTIONS':",
+        "        return True  # CORS preflights never carry Authorization - never gate them",
         "    if not _PROXY_SHARED_SECRET:",
         "        return True  # no secret configured -> gate disabled",
         "    if self.headers.get('Authorization', '') == 'Bearer ' + _PROXY_SHARED_SECRET:",
@@ -163,7 +165,8 @@ def main() -> int:
         if body_indent is None:
             body_indent = indent
         if re.match(r'^\s*def\s+do_\w+\s*\(', line):
-            do_defs.append(i)
+            # never gate do_OPTIONS: browser preflights carry no Authorization
+            do_defs.append(None if 'do_OPTIONS' in line else i)
     if body_indent is None:
         body_indent = class_indent + '    '
     if not do_defs:
@@ -174,7 +177,7 @@ def main() -> int:
     backup = args.proxy_path + '.bak-' + time.strftime('%Y%m%d-%H%M%S')
     shutil.copy2(args.proxy_path, backup)
 
-    has_options = any(re.match(r'^\s*def\s+do_OPTIONS\s*\(', lines[i]) for i in do_defs)
+    has_options = any(re.match(r'^\s*def\s+do_OPTIONS\s*\(', lines[j]) for j in range(class_idx + 1, class_end))
 
     out = []
     for i, line in enumerate(lines):
