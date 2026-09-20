@@ -3,8 +3,13 @@
 AND make it browser-CORS-friendly.
 
 Run ON THE PI (safe to re-run — it upgrades any previous version of the patch):
-    python3 ai_proxy_shared_secret.py /home/pi/.hermes/ai_proxy.py --secret 'YOUR-SECRET'
-    sudo systemctl restart ai-proxy
+    python3 ai_proxy_shared_secret.py /home/pi/.hermes/ai_proxy.py              # generates a strong secret
+    python3 ai_proxy_shared_secret.py /home/pi/.hermes/ai_proxy.py --secret '<long random value>'
+    sudo systemctl restart ai-proxy   # or relaunch the nohup process, see "Next" below
+
+The secret set here must be EXACTLY the same value as Firestore config/ai -> apiKey.
+Obvious placeholders (PASTE-YOUR-SECRET, THE-SECRET-FROM-FIRESTORE, ...) and short
+secrets (<16 chars) are REJECTED so they can never end up guarding the gate.
 
 What it does:
   1. Backs up ai_proxy.py (timestamped .bak-<date>) next to it.
@@ -120,11 +125,66 @@ def fix_allow_headers(src: str):
     return pattern.sub(repl, src), count
 
 
+PLACEHOLDER_HINTS = (
+    'PASTE', 'YOUR-', 'REPLACE', 'PLACEHOLDER', 'EXAMPLE',
+    'FROM-FIRESTORE', 'CHANGE-ME', 'CHANGEME', 'TODO',
+)
+
+
+def looks_like_placeholder(secret: str) -> bool:
+    u = secret.strip().upper()
+    return any(h in u for h in PLACEHOLDER_HINTS)
+
+
+def generate_secret() -> str:
+    import secrets
+    return secrets.token_hex(24)  # 48 hex chars, ~192 bits
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description='Gate ai_proxy.py behind a shared secret (run ON THE PI).')
     ap.add_argument('proxy_path', help='path to ai_proxy.py on the Pi')
-    ap.add_argument('--secret', required=True, help='shared secret (same value goes into Firestore config/ai apiKey)')
+    ap.add_argument('--secret', default=None,
+                    help='shared secret; OMIT it and a strong one is generated and printed for you '
+                         '(same value goes into Firestore config/ai apiKey)')
+    ap.add_argument('--generate', action='store_true',
+                    help='generate a strong secret even if --secret was also given')
     args = ap.parse_args()
+
+    if args.generate:
+        if args.secret:
+            print('ERROR: pass either --secret or --generate, not both.')
+            return 2
+        secret = generate_secret()
+        print('=' * 64)
+        print('GENERATED SECRET — copy this line now, you need it in step 3:')
+        print('')
+        print('    %s' % secret)
+        print('')
+        print('This exact value must go into Firestore config/ai -> apiKey.')
+        print('=' * 64)
+    elif args.secret:
+        secret = args.secret.strip()
+        if looks_like_placeholder(secret):
+            print('ERROR: "%s" looks like a placeholder copied from instructions, not a real secret.' % secret)
+            print('Using it would leave the gate wide open — anyone guessing that text gets in.')
+            print('Fix: run again WITHOUT --secret and the script will generate a strong one,')
+            print('then paste the printed value into Firestore config/ai -> apiKey.')
+            return 2
+        if len(secret) < 16:
+            print('ERROR: that secret is only %d characters — too short to resist guessing.' % len(secret))
+            print('Fix: run again WITHOUT --secret to generate a strong one (or use `openssl rand -hex 24`).')
+            return 2
+    else:
+        secret = generate_secret()
+        print('=' * 64)
+        print('GENERATED SECRET — copy this line now, you need it in step 3:')
+        print('')
+        print('    %s' % secret)
+        print('')
+        print('This exact value must go into Firestore config/ai -> apiKey.')
+        print('=' * 64)
 
     try:
         with open(args.proxy_path, encoding='utf-8') as f:
@@ -132,6 +192,11 @@ def main() -> int:
     except FileNotFoundError:
         print('ERROR: %s not found — check the path.' % args.proxy_path, file=sys.stderr)
         return 1
+
+    # Remember any previously baked-in secret so we can warn when it changes.
+    m_prev = re.search(
+        r"_PROXY_SHARED_SECRET = _os\.environ\.get\('PROXY_SHARED_SECRET',\s*'([^']*)'\)", src)
+    previous_secret = m_prev.group(1) if m_prev else None
 
     # Upgrade path: cleanly remove any earlier version of this patch first.
     src = strip_previous_patch(src)
@@ -182,7 +247,7 @@ def main() -> int:
     out = []
     for i, line in enumerate(lines):
         if i == class_idx:
-            out.append(SECRET_BLOCK % {'secret': args.secret})
+            out.append(SECRET_BLOCK % {'secret': secret})
             out.append(line)
             out.append(gate_method(body_indent))
             continue
@@ -227,16 +292,24 @@ def main() -> int:
     if not has_options:
         print('No do_OPTIONS existed — a preflight handler was added.')
     print('')
+    if previous_secret and previous_secret.strip() and previous_secret != secret:
+        print('NOTE: this REPLACED the previous secret baked into the file.')
+        print('Make sure Firestore config/ai -> apiKey is updated to the new value,')
+        print('otherwise the app will keep getting 401 unauthorized.')
+    print('')
     print('Next:')
-    print('  1. sudo systemctl restart ai-proxy')
+    print('  1. Restart the proxy:')
+    print('     sudo systemctl restart ai-proxy    # if the systemd unit exists')
+    print('     # otherwise:  pkill -f ai_proxy.py ; sleep 1 ; nohup /usr/bin/python3 %s > /home/pi/.hermes/ai_proxy.log 2>&1 &' % args.proxy_path)
     print('  2. Preflight check (should list Authorization):')
     print('     curl -s -i -X OPTIONS https://raspberrypi.tail3a08db.ts.net/v1/chat/completions \\')
     print('       -H "Origin: https://ramihoujeiry.github.io" \\')
     print('       -H "Access-Control-Request-Method: POST" \\')
     print('       -H "Access-Control-Request-Headers: authorization, content-type" | grep -i "access-control\\|HTTP/"')
-    print('  3. Secret check (should print 200):')
+    print('  3. Secret check — run from your LAPTOP/phone, NOT from the Pi itself')
+    print('     (the Pi calling its own funnel URL can hang; expect HTTP 200 or a JSON reply):')
     print('     curl -s -o /dev/null -w "%%{http_code}\\n" -X POST https://raspberrypi.tail3a08db.ts.net/v1/chat/completions \\')
-    print('       -H "Authorization: Bearer %s"' % args.secret)
+    print('       -H "Authorization: Bearer %s"' % secret)
     print('  4. Health (should print {"ok":true}):')
     print('     curl -s https://raspberrypi.tail3a08db.ts.net/healthz')
     return 0
