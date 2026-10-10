@@ -150,6 +150,18 @@ export const app = createApp({
     currentTable() {
       return this.mifTables.find(t => t.aircraftType === this.evalForm.aircraftType && t.phaseName === this.evalForm.phaseName) || null;
     },
+    // Includes both the MIF table stages AND the auto-suggested trip (if it falls
+    // beyond the stage list, e.g. last graded S5 -> suggested S6). Using a computed
+    // ensures the option is always rendered via v-for so Vue binds the select's
+    // v-model correctly — fixes the issue where the suggested trip appears but is
+    // not highlighted/selected in the dropdown.
+    tripOptions() {
+      const stages = (this.currentTable && this.currentTable.stages) || [];
+      const suggested = this.evalForm.tripNumber;
+      if (!suggested) return stages;
+      if (stages.includes(suggested)) return stages;
+      return [...stages, suggested];
+    },
     // active only — inactive students/instructors must not appear in the New Evaluation pickers (mirrors Android)
     activeStudents() { return (this.students || []).filter(s => s.active !== false); },
     activeInstructors() { return (this.instructors || []).filter(i => i.active !== false); },
