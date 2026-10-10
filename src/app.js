@@ -111,7 +111,18 @@ export const app = createApp({
     // Lightweight, privacy-respecting usage analytics (audit item 9): log a tab
     // open event locally. No PII, no network — just an anonymous event counter
     // used to surface "what got used" in the dashboard activity card.
-    tab(t) { this.logEvent('tab:' + t); }
+    tab(t) { this.logEvent('tab:' + t); },
+    // Auto-suggest the next trip number whenever the aircraft/phase/student
+    // selection changes. This mirrors the @change handlers on the selects but
+    // also covers the case where the change event does not fire (e.g. keyboard
+    // navigation or programmatic selection).
+    evalForm(val, oldVal) {
+      if (!val || !oldVal) return;
+      const { studentId, aircraftType, phaseName } = val;
+      const old = oldVal || {};
+      if (studentId === old.studentId && aircraftType === old.aircraftType && phaseName === old.phaseName) return;
+      this.suggestTrip();
+    }
   },
   computed: {
     loggedIn() { return !!this.user; },
