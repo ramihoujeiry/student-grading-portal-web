@@ -111,18 +111,7 @@ export const app = createApp({
     // Lightweight, privacy-respecting usage analytics (audit item 9): log a tab
     // open event locally. No PII, no network — just an anonymous event counter
     // used to surface "what got used" in the dashboard activity card.
-    tab(t) { this.logEvent('tab:' + t); },
-    // Auto-suggest the next trip number whenever the aircraft/phase/student
-    // selection changes. This mirrors the @change handlers on the selects but
-    // also covers the case where the change event does not fire (e.g. keyboard
-    // navigation or programmatic selection).
-    evalForm(val, oldVal) {
-      if (!val || !oldVal) return;
-      const { studentId, aircraftType, phaseName } = val;
-      const old = oldVal || {};
-      if (studentId === old.studentId && aircraftType === old.aircraftType && phaseName === old.phaseName) return;
-      this.suggestTrip();
-    }
+    tab(t) { this.logEvent('tab:' + t); }
   },
   computed: {
     loggedIn() { return !!this.user; },
@@ -150,11 +139,10 @@ export const app = createApp({
     currentTable() {
       return this.mifTables.find(t => t.aircraftType === this.evalForm.aircraftType && t.phaseName === this.evalForm.phaseName) || null;
     },
-    // Includes both the MIF table stages AND the auto-suggested trip (if it falls
-    // beyond the stage list, e.g. last graded S5 -> suggested S6). Using a computed
-    // ensures the option is always rendered via v-for so Vue binds the select's
-    // v-model correctly — fixes the issue where the suggested trip appears but is
-    // not highlighted/selected in the dropdown.
+    // MIF table stages + the auto-suggested trip (if it falls beyond the stage
+    // list, e.g. last graded S5 -> suggested S6). Rendering every option through
+    // a single v-for keeps the option list in sync with v-model so the suggested
+    // trip is actually SELECTED in the dropdown, not just present.
     tripOptions() {
       const stages = (this.currentTable && this.currentTable.stages) || [];
       const suggested = this.evalForm.tripNumber;
