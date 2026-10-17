@@ -55,6 +55,19 @@ const server = http.createServer(async (req, res) => {
     }
 
 
+    // Alias /node_modules/** -> the repository's installed dependencies so the
+    // fixture importmap ("vue" -> /node_modules/vue/dist/vue.esm-bundler.js)
+    // resolves against the real package instead of a duplicated copy.
+    if (urlPath.startsWith('/node_modules/')) {
+      const nmRoot = normalize(join(repoRoot, 'node_modules'));
+      const filePath = normalize(join(nmRoot, urlPath.slice('/node_modules/'.length)));
+      if (!filePath.startsWith(nmRoot)) { res.writeHead(403); res.end('forbidden'); return; }
+      const info = await stat(filePath).catch(() => null);
+      if (!info || !info.isFile()) { res.writeHead(404); res.end('not found'); return; }
+      await sendFile(res, filePath);
+      return;
+    }
+
     // Live-parity app fixture: /app.html serves tests/fixture/app-fixture.html
     // with the REAL src/index.html body injected at the APP_TEMPLATE marker,
     // so Playwright exercises the authentic in-DOM Vue template + app.js.

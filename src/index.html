@@ -906,12 +906,12 @@
     <div class="modal full">
       <h2>New Evaluation</h2>
       <label>Aircraft
-      <select v-model="evalForm.aircraftType" @change="onEvalContextChange; suggestTrip" aria-label="Evaluation aircraft">
+      <select v-model="evalForm.aircraftType" @change="onEvalContextFieldChange()" aria-label="Evaluation aircraft">
         <option value="">— select aircraft —</option>
         <option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option>
       </select></label>
       <label>Student
-      <select v-model="evalForm.studentId" @change="suggestTrip" aria-label="Evaluation student"><option value="">— select student —</option><option v-for="s in activeStudents" :key="s.id" :value="s.id">{{s.name}}</option></select></label>
+      <select v-model="evalForm.studentId" @change="onEvalContextFieldChange()" aria-label="Evaluation student"><option value="">— select student —</option><option v-for="s in activeStudents" :key="s.id" :value="s.id">{{s.name}}</option></select></label>
       <label>Instructor
       <select v-model="evalForm.instructorName" aria-label="Evaluation instructor">
         <option value="">— select instructor —</option>
@@ -920,14 +920,15 @@
       <div class="row" style="gap:10px">
         <div style="flex:1">
           <label>Phase
-          <select v-model="evalForm.phaseName" @change="onEvalContextChange; suggestTrip" aria-label="Evaluation phase">
+          <select v-model="evalForm.phaseName" @change="onEvalContextFieldChange()" aria-label="Evaluation phase">
             <option value="">— select phase —</option>
             <option v-for="t in mifTables.filter(x=>x.aircraftType===evalForm.aircraftType)" :key="t.id" :value="t.phaseName">{{t.phaseName}}</option>
           </select></label>
         </div>
         <div style="flex:1">
           <label>Trip number <span class="muted" style="text-transform:none;letter-spacing:0">· Sortie number</span>
-          <select v-model="evalForm.tripNumber" @change="onEvalContextChange" aria-label="Evaluation trip number">
+          <select v-model="evalForm.tripNumber" @change="onEvalContextChange()" aria-label="Evaluation trip number">
+            <option value="">— select trip —</option>
             <option v-for="st in tripOptions" :key="st" :value="st">{{st}}</option>
           </select></label>
         </div>
@@ -972,7 +973,11 @@
       </div>
       <div v-else class="muted">Select an aircraft + phase that has a MIF table.</div>
       <label>Trip Notes</label>
-      <textarea v-model="evalForm.tripNotes" placeholder="Coach comments, safety items…"></textarea>
+      <!-- Uncontrolled on purpose: v-model here wrote to the reactive form on every
+           keystroke, which re-rendered the entire app (all sections + grade rows) and
+           made typing lag. The value is committed on idle (300ms), blur, and before
+           save/print -- see onTripNotesInput / flushTripNotes in app.js. -->
+      <textarea ref="tripNotesEl" @input="onTripNotesInput" @blur="flushTripNotes" placeholder="Coach comments, safety items…"></textarea>
       <div class="modal-actions">
         <button class="btn" :disabled="saving" @click="saveEval">{{ saving ? 'Saving…' : 'Save Evaluation' }}</button>
         <button class="btn ghost" @click="printFormEval">Print PDF</button>

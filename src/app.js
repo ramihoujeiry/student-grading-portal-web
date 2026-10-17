@@ -37,6 +37,10 @@ export const app = createApp({
 
       // ui
       evalForm: blankEval(),
+      // 'new' = trip number is auto-suggested as the context is picked;
+      // 'edit' = an existing evaluation is open and its trip number must never
+      // be rewritten by the auto-suggestion.
+      evalFormMode: 'new',
       durationH: '01', durationM: '00',   // duration picker mirrors Android HH:MM
       showEvalModal: false,
       saving: false,         // in-flight save guard (blocks double-save on slow connection)
@@ -686,6 +690,7 @@ export const app = createApp({
     /* ---- evaluations ---- */
     openNewEval() {
       this.evalForm = blankEval();
+      this.evalFormMode = 'new';
       // NOTE: do NOT auto-select student/aircraft/phase/instructor. The original Android app
       // requires the user to explicitly pick these four (MainActivity.prepareSave blocks save
       // until all are chosen). Leaving them unselected lets the saveEval() guard enforce that.
@@ -693,15 +698,13 @@ export const app = createApp({
       this.evalForm.duration = '01:00';
       this.onEvalDateChange(); // auto flight year from date
       this.showEvalModal = true;
-      // When the user picks an aircraft+phase, load its MIF table / maneuvers and auto-suggest the next trip.
-      const load = () => {
-        const t = this.mifTables.find(x => x.aircraftType === this.evalForm.aircraftType && x.phaseName === this.evalForm.phaseName);
-        if (t) {
-          this.loadManeuversForForm();
-          this.suggestTrip();
-        }
-      };
-      this.$nextTick(load);
+      // The next-trip suggestion is driven by onEvalContextFieldChange(), which the
+      // aircraft/student/phase <select>s call on @change. It cannot be done once here:
+      // those pickers start empty by design, so suggestTrip() would bail out immediately.
+      this.$nextTick(() => {
+        this.loadManeuversForForm();
+        this.setTripNotes('');
+      });
     },
     loadManeuversForForm() {
       const t = this.currentTable;
@@ -723,6 +726,63 @@ export const app = createApp({
     onEvalContextChange() {
       this.$nextTick(() => this.loadManeuversForForm());
     },
+    // Fired by the aircraft / student / phase pickers in the New Evaluation form.
+    // (The previous @change="onEvalContextChange; suggestTrip" was an inline *statement*,
+    // so Vue only evaluated those function references and never CALLED them -- which is
+    // why picking student + aircraft + phase left the trip number empty.)
+    // Runs inside $nextTick so v-model has committed the new value first, then
+    // re-suggests the trip and reloads the per-stage required MIFs.
+    onEvalContextFieldChange() {
+      this.$nextTick(() => {
+        if (this.evalFormMode === 'new') {
+          // A phase belongs to one aircraft's MIF table. If the instructor switched
+          // aircraft, drop a phase/trip that has no table any more, otherwise the
+          // suggestion would be computed against a stale sheet.
+          if (this.evalForm.aircraftType && this.evalForm.phaseName) {
+            const hasTable = this.mifTables.some(t => t.aircraftType === this.evalForm.aircraftType && t.phaseName === this.evalForm.phaseName);
+            if (!hasTable) { this.evalForm.phaseName = ''; this.evalForm.tripNumber = ''; }
+          }
+          this.suggestTrip();
+        }
+        this.loadManeuversForForm();
+      });
+    },
+    /* ---- trip notes (textarea) ----
+     * The New Evaluation modal is one large in-DOM template, so binding the notes
+     * textarea with v-model made every keystroke a reactive write that re-rendered
+     * the whole app tree (every section + every grade row). That is what made typing
+     * instructor notes feel sluggish on slow devices.
+     * The textarea is now uncontrolled: input is buffered on a NON-reactive field and
+     * committed to evalForm after a short idle period, or immediately on blur/save. */
+    onTripNotesInput(ev) {
+      this._tripNotesDraft = ev && ev.target ? ev.target.value : '';
+      clearTimeout(this._tripNotesTimer);
+      this._tripNotesTimer = setTimeout(() => {
+        this._tripNotesTimer = null;
+        this.evalForm.tripNotes = this._tripNotesDraft;
+      }, 300);
+    },
+    // Push the textarea's current value into the reactive form model now.
+    flushTripNotes() {
+      if (this._tripNotesTimer) { clearTimeout(this._tripNotesTimer); this._tripNotesTimer = null; }
+      const el = this.$refs.tripNotesEl;
+      const v = (el && typeof el.value === 'string') ? el.value : (this._tripNotesDraft || '');
+      if (this.evalForm.tripNotes !== v) this.evalForm.tripNotes = v;
+      this._tripNotesDraft = v;
+      return v;
+    },
+    // Set the notes programmatically (new evaluation / edit / clone) for both the
+    // live textarea and the reactive form model.
+    setTripNotes(v) {
+      const s = v == null ? '' : String(v);
+      this.evalForm.tripNotes = s;
+      this._tripNotesDraft = s;
+      if (this._tripNotesTimer) { clearTimeout(this._tripNotesTimer); this._tripNotesTimer = null; }
+      this.$nextTick(() => {
+        const el = this.$refs.tripNotesEl;
+        if (el) el.value = s;
+      });
+    },
     async saveEval() {
       // Block double-save: on a slow connection an instructor can tap Save several times
       // before Firestore confirms, and each tap created a duplicate trip. This guard makes
@@ -735,6 +795,8 @@ export const app = createApp({
         this.toastMsg('Please fill in all required fields (student, aircraft, phase, instructor)');
         return;
       }
+      // Commit any notes still sitting in the debounce buffer before building the doc.
+      this.flushTripNotes();
       const ev = this.buildEvalFromForm();
       // Warn if this student already has an evaluation for this exact trip (would overwrite).
       // Re-check live in case one slipped in during a previous slow save.
@@ -862,6 +924,7 @@ export const app = createApp({
     // Build a print-ready eval object from the live New-Evaluation form (so it can be printed/previewed
     // before saving), then open the Android-style PDF view.
     printFormEval() {
+      this.flushTripNotes();
       const fg = calcFinalGrade(this.evalForm.maneuverGrades);
       const st = calcMifStatus(this.evalForm.maneuverGrades);
       const student = this.students.find(s => s.id === this.evalForm.studentId);
@@ -885,6 +948,8 @@ export const app = createApp({
     deleteEval(e) { this.openConfirm({ title: 'Delete evaluation', message: 'Delete this evaluation? This cannot be undone.', confirmText: 'Delete', onOk: async () => { await Store.deleteEvaluation(e); } }); },
     // ---- edit / clone existing evaluation ----
     editTrip(e) {
+      // Editing must never auto-suggest a trip number (see onEvalContextFieldChange).
+      this.evalFormMode = 'edit';
       this.evalForm = {
         id: e.id || '',
         aircraftType: e.aircraftType || '',
@@ -904,6 +969,7 @@ export const app = createApp({
       this.durationM = parts[1] || '00';
       this.onEvalDateChange();
       this.showEvalModal = true;
+      this.setTripNotes(this.evalForm.tripNotes);
       const load = () => {
         const t = this.mifTables.find(x => x.aircraftType === this.evalForm.aircraftType && x.phaseName === this.evalForm.phaseName);
         if (t) {

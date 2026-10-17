@@ -197,11 +197,13 @@ test('dashboard computeds produce arrays/numbers without throwing on empty data'
     vm.students = []; vm.evaluations = []; vm.analytics = [];
     return {
       readiness: Array.isArray(vm.classReadiness),
-      activity: typeof vm.recentActivity,
+      // recentActivity is a method (dashboard activity card), so call it and
+      // assert it yields a usable array rather than typeof-ing the function.
+      activity: Array.isArray(vm.recentActivity()),
       stats: vm.stats ? Object.keys(vm.stats).length : -1,
     };
   });
   expect(r.readiness).toBe(true);
-  expect(['object', 'undefined']).toContain(r.activity);
+  expect(r.activity).toBe(true);
   expect(r.stats).toBeGreaterThan(0);
 });
