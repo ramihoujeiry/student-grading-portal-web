@@ -398,15 +398,34 @@ export const app = createApp({
       const y = this.activeYearResolved;
       const q = (this.saSearch || '').trim().toLowerCase();
       const byStudent = {};
-      this.evaluations.forEach(e => { if (e.flightYear === y) (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e); });
+      this.evaluations.forEach(e => {
+        if (e.flightYear !== y) return;
+        // Evaluations saved/imported without a studentId would otherwise be dropped,
+        // and the student showed "0 trips" even though their trips existed. Resolve
+        // the id from the stored name before bucketing.
+        const name = (e.studentName || '').trim().toLowerCase();
+        if (!e.studentId && name) {
+          const match = this.students.find(s => (s.name || '').trim().toLowerCase() === name);
+          if (match) { (byStudent[match.id] = byStudent[match.id] || []).push(e); return; }
+        }
+        (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e);
+      });
       const out = [];
       this.students.forEach(s => {
         if (s.active === false) return;
         if (q && !(s.name || '').toLowerCase().includes(q)) return;
         const evals = byStudent[s.id] || [];
-        const avg = evals.length ? (evals.reduce((sum, e) => sum + (e.finalGrade || 0), 0) / evals.length) : 0;
-        const hours = evals.reduce((sum, e) => sum + this.parseHours(e.duration), 0);
-        out.push({ id: s.id, name: s.name, tripCount: evals.length, avgGrade: avg, totalHours: hours });
+        // Second pass: evaluations that carry this student's name but a stale/other id.
+        const lower = (s.name || '').trim().toLowerCase();
+        const extra = lower
+          ? this.evaluations.filter(e => e.flightYear === y
+              && (e.studentName || '').trim().toLowerCase() === lower
+              && e.studentId !== s.id && !evals.includes(e))
+          : [];
+        const list = evals.concat(extra);
+        const avg = list.length ? (list.reduce((sum, e) => sum + (e.finalGrade || 0), 0) / list.length) : 0;
+        const hours = list.reduce((sum, e) => sum + this.parseHours(e.duration), 0);
+        out.push({ id: s.id, name: s.name, tripCount: list.length, avgGrade: avg, totalHours: hours });
       });
       return out.sort((a, b) => (b.tripCount - a.tripCount) || (a.name || '').localeCompare(b.name || ''));
     },
@@ -1185,18 +1204,27 @@ export const app = createApp({
     deleteUser(u) { this.openConfirm({ title: 'Remove user', message: 'Delete user ' + u.name + '? This removes their access.', confirmText: 'Delete', onOk: async () => { await Store.deleteUser(u); this.toastMsg('User removed'); } }); },
     filterAnnouncements(list) { return list.filter(a => a.targetRole === 'all' || a.targetRole === this.role || this.role === 'admin'); },
 
-    /* ---- CSV export (mirrors Android CsvExporter) ---- */
+    /* ---- CSV export (mirrors Android CsvExporter) ----
+       One column per maneuver, in the order the maneuvers first appear across the
+       exported evaluations (the MIF sheet order), so a spreadsheet can sort/filter
+       on a single maneuver instead of parsing a "name: grade" blob. */
     exportCSV() {
-      const rows = [['Student', 'Aircraft', 'Phase', 'Trip', 'Date', 'Instructor', 'Duration(h)', 'FinalGrade', 'MIF Status', 'FlightYear', 'TripNotes', 'Maneuvers']];
-      this.evalsSortedByDate.slice().reverse().forEach(e => {
-        const maneuvers = (e.maneuverGrades || []).filter(m => m && m.studentGrade != null && m.studentGrade !== 0)
-          .map(m => m.name + ': ' + m.studentGrade).join(', ');
+      const evals = this.evalsSortedByDate.slice().reverse();
+      const maneuverNames = [];
+      const seen = new Set();
+      evals.forEach(e => (e.maneuverGrades || []).forEach(m => {
+        if (m && m.name && !seen.has(m.name)) { seen.add(m.name); maneuverNames.push(m.name); }
+      }));
+      const rows = [['Student', 'Aircraft', 'Phase', 'Trip', 'Date', 'Instructor', 'Duration(h)', 'FinalGrade', 'MIF Status', 'FlightYear', 'TripNotes', ...maneuverNames]];
+      evals.forEach(e => {
+        const grades = {};
+        (e.maneuverGrades || []).forEach(m => { if (m && m.name) grades[m.name] = m.studentGrade; });
         rows.push([
           e.studentName || '', e.aircraftType || '', e.phaseName || '', e.tripNumber || '',
           this.fmt(e.date) || '', e.instructorName || '', e.duration || '',
           e.finalGrade != null ? e.finalGrade.toFixed(1) : '', e.overallMifStatus || '', e.flightYear || '',
           (e.tripNotes || '').replace(/[\n\r]+/g, ' '),
-          maneuvers
+          ...maneuverNames.map(n => (grades[n] != null ? grades[n] : ''))
         ]);
       });
       const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
