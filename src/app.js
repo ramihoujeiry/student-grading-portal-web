@@ -227,10 +227,29 @@ export const app = createApp({
     perStudentAnalytics() {
       const out = [];
       const byStudent = {};
-      this.evaluations.forEach(e => { (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e); });
+      this.evaluations.forEach(e => {
+        // Match by studentId OR by studentName (handles re-added students whose
+        // old evals still reference a deleted student doc ID)
+        const sid = e.studentId;
+        const sname = (e.studentName || '').trim().toLowerCase();
+        // Try to resolve to a known student by name fallback
+        if (!sid && sname) {
+          const match = this.students.find(s => (s.name || '').trim().toLowerCase() === sname);
+          if (match) { (byStudent[match.id] = byStudent[match.id] || []).push(e); return; }
+        }
+        (byStudent[sid] = byStudent[sid] || []).push(e);
+      });
       this.students.forEach(s => {
         if (this.analyticsStudent && s.id !== this.analyticsStudent) return;
-        const evals = (byStudent[s.id] || []).slice().sort((a, b) => (a.date || 0) - (b.date || 0));
+        const evalsById = byStudent[s.id] || [];
+        // Also gather evals whose studentName matches this student (name fallback)
+        const nameKey = (s.name || '').trim().toLowerCase();
+        const evalsByName = nameKey ? this.evaluations.filter(e =>
+          (e.studentName || '').trim().toLowerCase() === nameKey &&
+          e.studentId !== s.id &&
+          !(byStudent[s.id] || []).includes(e)
+        ) : [];
+        const evals = [...evalsById, ...evalsByName].slice().sort((a, b) => (a.date || 0) - (b.date || 0));
         const perf = buildPerformance(s, evals);
         out.push({
           id: s.id, name: s.name, active: s.active,
@@ -250,11 +269,27 @@ export const app = createApp({
     failedItems() {
       const out = [];
       const byStudent = {};
-      this.evaluations.forEach(e => { (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e); });
+      this.evaluations.forEach(e => {
+        const sid = e.studentId;
+        const sname = (e.studentName || '').trim().toLowerCase();
+        if (!sid && sname) {
+          const match = this.students.find(s => (s.name || '').trim().toLowerCase() === sname);
+          if (match) { (byStudent[match.id] = byStudent[match.id] || []).push(e); return; }
+        }
+        (byStudent[sid] = byStudent[sid] || []).push(e);
+      });
       this.students.forEach(s => {
         if (this.analyticsStudent && s.id !== this.analyticsStudent) return;
-        const tally = {}; // maneuver -> {count, required}
-        (byStudent[s.id] || []).forEach(e => (e.maneuverGrades || []).forEach(m => {
+        const evalsById = byStudent[s.id] || [];
+        const nameKey = (s.name || '').trim().toLowerCase();
+        const evalsByName = nameKey ? this.evaluations.filter(e =>
+          (e.studentName || '').trim().toLowerCase() === nameKey &&
+          e.studentId !== s.id &&
+          !(byStudent[s.id] || []).includes(e)
+        ) : [];
+        const evals = [...evalsById, ...evalsByName];
+        const tally = {};
+        evals.forEach(e => (e.maneuverGrades || []).forEach(m => {
           if (m.studentGrade != null && m.studentGrade !== 0 && m.requiredMif != null && m.studentGrade < m.requiredMif) {
             if (!tally[m.name]) tally[m.name] = { count: 0, required: m.requiredMif };
             tally[m.name].count++;
@@ -383,12 +418,30 @@ export const app = createApp({
       const y = this.activeYearResolved;
       const q = (this.saSearch || '').trim().toLowerCase();
       const byStudent = {};
-      this.evaluations.forEach(e => { if (e.flightYear === y) (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e); });
+      this.evaluations.forEach(e => {
+        if (e.flightYear !== y) return;
+        // Match by studentId OR by studentName fallback (handles re-added students)
+        const sid = e.studentId;
+        const sname = (e.studentName || '').trim().toLowerCase();
+        if (!sid && sname) {
+          const match = this.students.find(s => (s.name || '').trim().toLowerCase() === sname);
+          if (match) { (byStudent[match.id] = byStudent[match.id] || []).push(e); return; }
+        }
+        (byStudent[sid] = byStudent[sid] || []).push(e);
+      });
       const out = [];
       this.students.forEach(s => {
         if (s.active === false) return;
         if (q && !(s.name || '').toLowerCase().includes(q)) return;
-        const evals = byStudent[s.id] || [];
+        const evalsById = byStudent[s.id] || [];
+        // Also gather evals whose studentName matches this student
+        const nameKey = (s.name || '').trim().toLowerCase();
+        const evalsByName = nameKey ? this.evaluations.filter(e =>
+          (e.studentName || '').trim().toLowerCase() === nameKey &&
+          e.studentId !== s.id &&
+          !(byStudent[s.id] || []).includes(e)
+        ) : [];
+        const evals = [...evalsById, ...evalsByName];
         const avg = evals.length ? (evals.reduce((sum, e) => sum + (e.finalGrade || 0), 0) / evals.length) : 0;
         const hours = evals.reduce((sum, e) => sum + this.parseHours(e.duration), 0);
         out.push({ id: s.id, name: s.name, tripCount: evals.length, avgGrade: avg, totalHours: hours });
@@ -855,6 +908,10 @@ export const app = createApp({
     },
     deleteEval(e) { this.openConfirm({ title: 'Delete evaluation', message: 'Delete this evaluation? This cannot be undone.', confirmText: 'Delete', onOk: async () => { await Store.deleteEvaluation(e); } }); },
     // ---- edit / clone existing evaluation ----
+    editEval(e) {
+      this.selectedEval = null;
+      this.editTrip(e);
+    },
     editTrip(e) {
       this.evalForm = {
         id: e.id || '',
@@ -903,7 +960,14 @@ export const app = createApp({
     openEval(e) { this.selectedEval = e; },
     openStudent(s) { this.selectedStudent = s; this.aiForStudent = null; },
     closeDetail() { this.selectedEval = null; this.selectedStudent = null; this.aiForStudent = null; },
-    evalForStudent(sid) { return this.evaluations.filter(e => e.studentId === sid).slice().sort((a, b) => (b.date || 0) - (a.date || 0)); },
+    evalForStudent(sid, sname) {
+      // Match by studentId OR by studentName fallback
+      const nameKey = (sname || '').trim().toLowerCase();
+      return this.evaluations.filter(e =>
+        e.studentId === sid ||
+        (nameKey && (e.studentName || '').trim().toLowerCase() === nameKey)
+      ).slice().sort((a, b) => (b.date || 0) - (a.date || 0));
+    },
 
     /* ---- AI feedback for a student profile ---- */
     async runAIForStudent() {
@@ -916,7 +980,12 @@ export const app = createApp({
       this.aiResult = '';
       this.aiRagStatus = '';
       this.logEvent('ai:used');
-      const evals = this.evaluations.filter(e => e.studentId === student.id);
+      // Gather evals by studentId AND by name fallback (handles re-added students)
+      const nameKey = (student.name || '').trim().toLowerCase();
+      const evals = this.evaluations.filter(e =>
+        e.studentId === student.id ||
+        (nameKey && (e.studentName || '').trim().toLowerCase() === nameKey)
+      );
       const data = buildPerformance(student, evals);
       // Warm the RAG index so the grounding badge is accurate, then call the live model.
       let ragOk = false;
@@ -1092,16 +1161,24 @@ export const app = createApp({
 
     /* ---- CSV export (mirrors Android CsvExporter) ---- */
     exportCSV() {
-      const rows = [['Student', 'Aircraft', 'Phase', 'Trip', 'Date', 'Instructor', 'Duration(h)', 'FinalGrade', 'MIF Status', 'FlightYear', 'TripNotes', 'Maneuvers']];
-      this.evalsSortedByDate.slice().reverse().forEach(e => {
-        const maneuvers = (e.maneuverGrades || []).filter(m => m && m.studentGrade != null && m.studentGrade !== 0)
-          .map(m => m.name + ': ' + m.studentGrade).join(', ');
+      const evals = this.evalsSortedByDate.slice().reverse();
+      // Collect unique maneuver names in the order they appear in evaluations (MIF table order)
+      const maneuverNames = [];
+      const seen = new Set();
+      evals.forEach(e => (e.maneuverGrades || []).forEach(m => {
+        if (m.name && !seen.has(m.name)) { seen.add(m.name); maneuverNames.push(m.name); }
+      }));
+      const header = ['Student', 'Aircraft', 'Phase', 'Trip', 'Date', 'Instructor', 'Duration(h)', 'FinalGrade', 'MIF Status', 'FlightYear', 'TripNotes', ...maneuverNames];
+      const rows = [header];
+      evals.forEach(e => {
+        const gradeMap = {};
+        (e.maneuverGrades || []).forEach(m => { gradeMap[m.name] = m.studentGrade; });
         rows.push([
           e.studentName || '', e.aircraftType || '', e.phaseName || '', e.tripNumber || '',
           this.fmt(e.date) || '', e.instructorName || '', e.duration || '',
           e.finalGrade != null ? e.finalGrade.toFixed(1) : '', e.overallMifStatus || '', e.flightYear || '',
           (e.tripNotes || '').replace(/[\n\r]+/g, ' '),
-          maneuvers
+          ...maneuverNames.map(n => gradeMap[n] != null ? gradeMap[n] : '')
         ]);
       });
       const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
@@ -1629,7 +1706,12 @@ export const app = createApp({
     openTrainingProgressStudent(s) { this.thStudent = s.name; this.tab = 'tripHistory'; },
 
     // ===== Student Analytics: open student profile =====
-    openStudentAnalyticsStudent(s) { this.thStudent = s.name; this.tab = 'tripHistory'; },
+    openStudentAnalyticsStudent(s) {
+      // Trip History tab was removed; land on Evaluations filtered to this cadet.
+      this.evStudent = s.name;
+      this.evYear = 'All Years';
+      this.tab = 'evaluations';
+    },
 
     // ===== Student Hours: open student profile =====
     openStudentHoursStudent(s) { this.thStudent = s.name; this.tab = 'tripHistory'; },
@@ -1807,7 +1889,7 @@ export const app = createApp({
     this._applyDensity(this.uiDensity);
     // Load the rolling local usage-analytics log (audit item 9).
     this.loadAnalytics();
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=66').catch(() => {});
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=70').catch(() => {});
     // Warm the RAG index on load so the AI tab can show live status immediately.
     // Also drive the header AI badge (audit item 13): reflect live vs offline-template.
     // RAG index is loaded lazily (dynamic import in store.getRag) only when a

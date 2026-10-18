@@ -99,13 +99,15 @@ function toEpochSec(v) {
 
 /* ---------- AI backend (LAN default = Hermes gateway proxy on the Pi) ------ */
 /* The Pi (pi@192.168.1.200) runs ai_proxy.py exposing an OpenAI-compatible
-   /v1/chat/completions endpoint that forwards to OpenRouter using the key
-   stored in /home/pi/.hermes/.env (key never reaches the browser). Used when
-   no Firestore config/ai doc is set. For cloud use, set config/ai (admin-
-   only write) and this LAN default is ignored. */
+   /v1/chat/completions endpoint that forwards to the Nous Portal inference API
+   using Hermes' own Nous Portal credential (never reaches the browser). The
+   proxy resolves the Portal's current free-model list and substitutes
+   automatically, so the model below is a preference, not a hard requirement.
+   Used when no Firestore config/ai doc is set. For cloud use, set config/ai
+   (admin-only write) and this LAN default is ignored. */
 export const LAN_AI_ENABLED = true;
 export const LAN_AI_ENDPOINT = 'https://raspberrypi.tail3a08db.ts.net/v1/chat/completions';
-export const LAN_AI_MODEL = 'tencent/hy3:free';
+export const LAN_AI_MODEL = 'meituan/longcat-2.5-preview:free';
 
 /* ---------- lazy RAG access ---------------------------------------------- */
 /* The FAA / UH-1 / Robinson FTG index is big (~220KB) and only needed when a
@@ -631,9 +633,8 @@ async function buildAIPrompt(data) {
       if (faa) user += faa;
     }
   } catch (e) { console.warn('FAA RAG attach skipped:', e && e.message); }
-  // Hard safety net: keep the total user payload small so the Pi proxy's argv
-  // limit is never exceeded (HTTP 502 "Argument list too long"). Truncate mid-
-  // word at the budget and append a marker.
+  // Hard safety net: keep the total user payload small. Truncate mid-word at
+  // the budget and append a marker.
   const USER_MAX = 4000;
   if (user.length > USER_MAX) user = user.slice(0, USER_MAX) + '\n…[truncated]';
   return { system: sys, user };

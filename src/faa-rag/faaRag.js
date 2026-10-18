@@ -100,10 +100,10 @@ async function buildFaaContext(data) {
     return { label: (p.page ? 'p.' + p.page : ''), body: p.text || '' };
   }
 
-  // Hard budget so the prompt payload stays well under the Pi proxy's ARG_MAX
-  // (the proxy shells out to python with the prompt as a CLI arg; a huge RAG
-  // block previously triggered "Argument list too long" → HTTP 502). Keep it
-  // SMALL — the Pi's argv limit is low, so we stay around ~2.5 KB here.
+  // Hard budget so the grounded prompt block stays small. The proxy forwards the
+  // whole prompt in the request body (it no longer shells out to a CLI, so there
+  // is no argv limit), but a compact block keeps latency and cost down. Keep it
+  // SMALL — around ~2.5 KB here.
   const MAX_CHARS = 2500;
   const PER_WEAK = 1;      // passages per weak maneuver
   const PER_GENERAL = 1;   // passages per always-included general topic

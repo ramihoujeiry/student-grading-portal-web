@@ -279,10 +279,10 @@
       <button class="tab-btn" :class="{active:tab==='announcements'}" :aria-current="tab==='announcements'?'page':null" @click="setTab('announcements')">Announcements</button>
       <button class="tab-btn" :class="{active:tab==='analytics'}" :aria-current="tab==='analytics'?'page':null" @click="setTab('analytics')">Analytics</button>
       <button class="tab-btn" :class="{active:tab==='studentAnalytics'}" :aria-current="tab==='studentAnalytics'?'page':null" @click="setTab('studentAnalytics')">Student Analytics</button>
-      <button class="tab-btn" :class="{active:tab==='studentHours'}" :aria-current="tab==='studentHours'?'page':null" @click="setTab('studentHours')">Student Hours</button>
-      <button class="tab-btn" :class="{active:tab==='progressAnalytics'}" :aria-current="tab==='progressAnalytics'?'page':null" @click="setTab('progressAnalytics')">Progress Analytics</button>
-      <button class="tab-btn" :class="{active:tab==='failedItems'}" :aria-current="tab==='failedItems'?'page':null" @click="setTab('failedItems')">Failed Items</button>
-      <button class="tab-btn" :class="{active:tab==='tripHistory'}" :aria-current="tab==='tripHistory'?'page':null" @click="setTab('tripHistory')">Trip History</button>
+
+
+
+
       <button class="tab-btn" :class="{active:tab==='adminBroadcast'}" v-if="isAdmin" :aria-current="tab==='adminBroadcast'?'page':null" @click="setTab('adminBroadcast')">Admin Broadcast</button>
       <button class="tab-btn" :class="{active:tab==='aiHub'}" :aria-current="tab==='aiHub'?'page':null" @click="setTab('aiHub')">AI Feedback Hub</button>
       <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" :aria-current="tab==='admin'?'page':null" @click="setTab('admin')">Users</button>
@@ -687,149 +687,8 @@
         <div v-if="!studentAnalytics.length" class="muted">No students with evaluations for {{activeYearResolved}}.</div>
       </section>
 
-      <!-- STUDENT HOURS -->
-      <section v-show="tab==='studentHours'">
-        <div class="topbar"><h2 style="margin:0">Student Hours</h2></div>
-        <p class="muted" style="margin:4px 2px 12px">Per-student total hours and trip count. Multi-select filters for student, aircraft, and flight year. Ports Android StudentHoursActivity.</p>
-        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
-          <div style="flex:2 1 240px;min-width:200px"><label>Students (multi-select)
-            <select v-model="shStudents" multiple aria-label="Student hours students" style="min-height:80px"><option value="">All Students</option><option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option></select></div>
-          <div style="flex:1 1 160px;min-width:140px"><label>Aircraft
-            <select v-model="shAircraft" aria-label="Student hours aircraft"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Flight Year
-            <select v-model="shYear" aria-label="Student hours year"><option>All Years</option><option v-for="y in years" :key="y" :value="y">{{y}}</option></select></div>
-          <button class="btn sm ghost" @click="shStudents=[];shAircraft='All Aircraft';shYear='All Years'">Clear</button>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
-          <div class="card clickable" v-for="h in studentHours" :key="h.id" @click="openStudentHoursStudent({id:h.id,name:h.name})">
-            <div class="row" style="align-items:center">
-              <strong style="font-size:15px">{{h.name}}</strong>
-              <span class="spacer" style="flex:1"></span>
-              <span class="pill good">{{h.totalHours.toFixed(1)}} h</span>
-            </div>
-            <div class="muted" style="margin-top:8px">{{h.tripCount}} trip(s)</div>
-          </div>
-        </div>
-        <div v-if="!studentHours.length" class="muted">No data for the selected filters.</div>
-      </section>
 
-      <!-- PROGRESS ANALYTICS -->
-      <section v-show="tab==='progressAnalytics'">
-        <div class="topbar"><h2 style="margin:0">Progress Analytics</h2></div>
-        <p class="muted" style="margin:4px 2px 12px">Grade trend, skill proficiency radar, and failures by phase. Ports Android ProgressAnalyticsActivity.</p>
-        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
-          <div style="flex:1 1 160px;min-width:140px"><label>Student
-            <select v-model="paStudent" aria-label="Progress analytics student"><option value="">All Students</option><option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Phase
-            <select v-model="paPhase" aria-label="Progress analytics phase"><option>All Phases</option><option v-for="p in phaseOptions" :key="p" :value="p">{{p}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Aircraft
-            <select v-model="paAircraft" aria-label="Progress analytics aircraft"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Flight Year
-            <select v-model="paYear" aria-label="Progress analytics year"><option>All Years</option><option v-for="y in years" :key="y" :value="y">{{y}}</option></select></div>
-          <button class="btn sm ghost" @click="paStudent='';paPhase='All Phases';paAircraft='All Aircraft';paYear='All Years'">Clear</button>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
-          <div class="card">
-            <h3>Grade Trend</h3>
-            <div v-if="paTrendChart()">
-              <svg :viewBox="'0 0 '+paTrendChart().w+' '+paTrendChart().h" style="width:100%;height:80px" preserveAspectRatio="none">
-                <path :d="paTrendChart().area" fill="rgba(57,208,196,.15)"></path>
-                <path :d="paTrendChart().path" fill="none" stroke="var(--accent)" stroke-width="2"></path>
-              </svg>
-              <div class="muted" style="margin-top:6px">{{progressAnalyticsEvals.length}} evaluation(s)</div>
-            </div>
-            <div v-else class="muted">Need 2+ evaluations for a trend.</div>
-          </div>
-          <div class="card">
-            <h3>Skill Proficiency (Radar)</h3>
-            <div v-if="radarChart()" v-html="radarChart()"></div>
-            <div v-else class="muted">No maneuver data in scope.</div>
-          </div>
-          <div class="card">
-            <h3>Failures by Phase</h3>
-            <div v-if="pieChart()" v-html="pieChart()"></div>
-            <div v-else class="muted">No failures in scope.</div>
-          </div>
-        </div>
-      </section>
 
-      <!-- FAILED ITEMS -->
-      <section v-show="tab==='failedItems'">
-        <div class="topbar"><h2 style="margin:0">Failed Items</h2></div>
-        <p class="muted" style="margin:4px 2px 12px">Failed trips and maneuvers below required MIF. Ports Android FailedItemsActivity.</p>
-        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
-          <div style="flex:1 1 160px;min-width:140px"><label>Student
-            <select v-model="fiStudent" aria-label="Failed items student"><option value="">All Students</option><option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Phase
-            <select v-model="fiPhase" aria-label="Failed items phase"><option>All Phases</option><option v-for="p in phaseOptions" :key="p" :value="p">{{p}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Trip
-            <select v-model="fiTrip" aria-label="Failed items trip"><option>All Trips</option><option v-for="st in ['S1','S2','S3','S4','S5','S6','S7','S8']" :key="st" :value="st">{{st}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Flight Year
-            <select v-model="fiYear" aria-label="Failed items year"><option>All Years</option><option v-for="y in years" :key="y" :value="y">{{y}}</option></select></div>
-          <button class="btn sm ghost" @click="fiStudent='';fiPhase='All Phases';fiTrip='All Trips';fiYear='All Years'">Clear</button>
-        </div>
-        <div class="seg" role="group" aria-label="Failed items sub-tab" style="margin-bottom:12px">
-          <button class="seg-btn" :class="{on:fiSubTab==='trips'}" @click="fiSubTab='trips'">Failed Trips</button>
-          <button class="seg-btn" :class="{on:fiSubTab==='maneuvers'}" @click="fiSubTab='maneuvers'">Failed Maneuvers</button>
-        </div>
-        <div v-if="fiSubTab==='trips'">
-          <div class="card" style="margin-bottom:12px">
-            <strong>Total Failed Trips:</strong> <span class="pill bad">{{failedItemsData.totalFailed}}</span>
-            <span class="muted" style="margin-left:10px">Most-failed maneuver: <b>{{failedItemsData.mostFailed}}</b></span>
-          </div>
-          <ul class="list">
-            <li v-for="e in failedItemsData.failedTrips" :key="e.id" class="clickable" @click="openEval(e)">
-              <div class="row nowrap">
-                <strong>{{e.studentName}} · {{e.aircraftType}} {{e.phaseName}} {{e.tripNumber}}</strong>
-                <span class="muted">{{fmt(e.date)}}</span>
-                <span class="pill bad">{{e.finalGrade?e.finalGrade.toFixed(1):'—'}}</span>
-              </div>
-            </li>
-            <li v-if="!failedItemsData.failedTrips.length" class="muted">No failed trips.</li>
-          </ul>
-        </div>
-        <div v-if="fiSubTab==='maneuvers'">
-          <ul class="list">
-            <li v-for="m in failedItemsData.failedManeuvers" :key="m.name">
-              <div class="row nowrap">
-                <strong>{{m.name}}</strong>
-                <span class="spacer" style="flex:1"></span>
-                <span class="pill bad">{{m.count}}× failed</span>
-                <span class="muted">req MIF {{m.required}}</span>
-              </div>
-            </li>
-            <li v-if="!failedItemsData.failedManeuvers.length" class="muted">No failed maneuvers.</li>
-          </ul>
-        </div>
-      </section>
-
-      <!-- TRIP HISTORY -->
-      <section v-show="tab==='tripHistory'">
-        <div class="topbar"><h2 style="margin:0">Trip History</h2></div>
-        <p class="muted" style="margin:4px 2px 12px">Full searchable/filterable list of evaluations. Ports Android TripHistoryActivity.</p>
-        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
-          <div style="flex:2 1 240px;min-width:200px"><label>Search</label><input v-model="thSearch" aria-label="Trip history search" placeholder="student, aircraft, phase, instructor, trip…" /></div>
-          <div style="flex:1 1 160px;min-width:140px"><label>Student
-            <select v-model="thStudent" aria-label="Trip history student"><option>All Cadets</option><option v-for="s in students" :key="s.id" :value="s.name">{{s.name}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Aircraft
-            <select v-model="thAircraft" aria-label="Trip history aircraft"><option>All Aircraft</option><option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Phase
-            <select v-model="thPhase" aria-label="Trip history phase"><option>All Phases</option><option v-for="p in phaseOptions" :key="p" :value="p">{{p}}</option></select></div>
-          <div style="flex:1 1 140px;min-width:120px"><label>Flight Year
-            <select v-model="thYear" aria-label="Trip history year"><option>All Years</option><option v-for="y in years" :key="y" :value="y">{{y}}</option></select></div>
-          <button class="btn sm ghost" @click="thSearch='';thStudent='All Cadets';thAircraft='All Aircraft';thPhase='All Phases';thYear='All Years'">Clear</button>
-        </div>
-        <ul class="list">
-          <li v-for="e in tripHistory" :key="e.id" class="clickable" @click="openEval(e)">
-            <div class="row nowrap">
-              <strong>{{e.studentName}} · {{e.aircraftType}} {{e.phaseName}} {{e.tripNumber}}</strong>
-              <span class="muted">{{fmt(e.date)}} · {{e.instructorName}}</span>
-              <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade?e.finalGrade.toFixed(1):'—'}}</span>
-              <span class="pill" :class="statusColor(e.overallMifStatus)">{{statusLabel(e.overallMifStatus)}}</span>
-            </div>
-          </li>
-          <li v-if="!tripHistory.length" class="muted">No evaluations match the filters.</li>
-        </ul>
       </section>
 
       <!-- ADMIN BROADCAST -->
@@ -1092,6 +951,7 @@
         <h2 style="margin:0">{{selectedEval.studentName}}</h2>
         <span class="spacer" style="flex:1"></span>
         <button class="btn sm ghost" @click="printEval(selectedEval)">Print PDF</button>
+        <button class="btn sm ghost" v-if="isAdmin" @click="editEval(selectedEval)">Edit</button>
         <button class="btn sm danger" v-if="isAdmin" @click="deleteEval(selectedEval); closeDetail()">Delete</button>
       </div>
       <div class="muted" style="margin:4px 0 12px">{{selectedEval.aircraftType}} · {{selectedEval.phaseName}} {{selectedEval.tripNumber}} · {{fmt(selectedEval.date)}} · {{selectedEval.instructorName}} · {{selectedEval.duration}} h</div>
