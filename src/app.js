@@ -37,6 +37,10 @@ export const app = createApp({
 
       // ui
       evalForm: blankEval(),
+      // 'new' = trip number is auto-suggested as the context is picked;
+      // 'edit' = an existing evaluation is open and its trip number must never
+      // be rewritten by the auto-suggestion.
+      evalFormMode: 'new',
       durationH: '01', durationM: '00',   // duration picker mirrors Android HH:MM
       showEvalModal: false,
       saving: false,         // in-flight save guard (blocks double-save on slow connection)
@@ -138,6 +142,17 @@ export const app = createApp({
     },
     currentTable() {
       return this.mifTables.find(t => t.aircraftType === this.evalForm.aircraftType && t.phaseName === this.evalForm.phaseName) || null;
+    },
+    // MIF table stages + the auto-suggested trip (if it falls beyond the stage
+    // list, e.g. last graded S5 -> suggested S6). Rendering every option through
+    // a single v-for keeps the option list in sync with v-model so the suggested
+    // trip is actually SELECTED in the dropdown, not just present.
+    tripOptions() {
+      const stages = (this.currentTable && this.currentTable.stages) || [];
+      const suggested = this.evalForm.tripNumber;
+      if (!suggested) return stages;
+      if (stages.includes(suggested)) return stages;
+      return [...stages, suggested];
     },
     // active only — inactive students/instructors must not appear in the New Evaluation pickers (mirrors Android)
     activeStudents() { return (this.students || []).filter(s => s.active !== false); },
@@ -420,31 +435,32 @@ export const app = createApp({
       const byStudent = {};
       this.evaluations.forEach(e => {
         if (e.flightYear !== y) return;
-        // Match by studentId OR by studentName fallback (handles re-added students)
-        const sid = e.studentId;
-        const sname = (e.studentName || '').trim().toLowerCase();
-        if (!sid && sname) {
-          const match = this.students.find(s => (s.name || '').trim().toLowerCase() === sname);
+        // Evaluations saved/imported without a studentId would otherwise be dropped,
+        // and the student showed "0 trips" even though their trips existed. Resolve
+        // the id from the stored name before bucketing.
+        const name = (e.studentName || '').trim().toLowerCase();
+        if (!e.studentId && name) {
+          const match = this.students.find(s => (s.name || '').trim().toLowerCase() === name);
           if (match) { (byStudent[match.id] = byStudent[match.id] || []).push(e); return; }
         }
-        (byStudent[sid] = byStudent[sid] || []).push(e);
+        (byStudent[e.studentId] = byStudent[e.studentId] || []).push(e);
       });
       const out = [];
       this.students.forEach(s => {
         if (s.active === false) return;
         if (q && !(s.name || '').toLowerCase().includes(q)) return;
-        const evalsById = byStudent[s.id] || [];
-        // Also gather evals whose studentName matches this student
-        const nameKey = (s.name || '').trim().toLowerCase();
-        const evalsByName = nameKey ? this.evaluations.filter(e =>
-          (e.studentName || '').trim().toLowerCase() === nameKey &&
-          e.studentId !== s.id &&
-          !(byStudent[s.id] || []).includes(e)
-        ) : [];
-        const evals = [...evalsById, ...evalsByName];
-        const avg = evals.length ? (evals.reduce((sum, e) => sum + (e.finalGrade || 0), 0) / evals.length) : 0;
-        const hours = evals.reduce((sum, e) => sum + this.parseHours(e.duration), 0);
-        out.push({ id: s.id, name: s.name, tripCount: evals.length, avgGrade: avg, totalHours: hours });
+        const evals = byStudent[s.id] || [];
+        // Second pass: evaluations that carry this student's name but a stale/other id.
+        const lower = (s.name || '').trim().toLowerCase();
+        const extra = lower
+          ? this.evaluations.filter(e => e.flightYear === y
+              && (e.studentName || '').trim().toLowerCase() === lower
+              && e.studentId !== s.id && !evals.includes(e))
+          : [];
+        const list = evals.concat(extra);
+        const avg = list.length ? (list.reduce((sum, e) => sum + (e.finalGrade || 0), 0) / list.length) : 0;
+        const hours = list.reduce((sum, e) => sum + this.parseHours(e.duration), 0);
+        out.push({ id: s.id, name: s.name, tripCount: list.length, avgGrade: avg, totalHours: hours });
       });
       return out.sort((a, b) => (b.tripCount - a.tripCount) || (a.name || '').localeCompare(b.name || ''));
     },
@@ -728,6 +744,7 @@ export const app = createApp({
     /* ---- evaluations ---- */
     openNewEval() {
       this.evalForm = blankEval();
+      this.evalFormMode = 'new';
       // NOTE: do NOT auto-select student/aircraft/phase/instructor. The original Android app
       // requires the user to explicitly pick these four (MainActivity.prepareSave blocks save
       // until all are chosen). Leaving them unselected lets the saveEval() guard enforce that.
@@ -735,15 +752,13 @@ export const app = createApp({
       this.evalForm.duration = '01:00';
       this.onEvalDateChange(); // auto flight year from date
       this.showEvalModal = true;
-      // When the user picks an aircraft+phase, load its MIF table / maneuvers and auto-suggest the next trip.
-      const load = () => {
-        const t = this.mifTables.find(x => x.aircraftType === this.evalForm.aircraftType && x.phaseName === this.evalForm.phaseName);
-        if (t) {
-          this.loadManeuversForForm();
-          this.suggestTrip();
-        }
-      };
-      this.$nextTick(load);
+      // The next-trip suggestion is driven by onEvalContextFieldChange(), which the
+      // aircraft/student/phase <select>s call on @change. It cannot be done once here:
+      // those pickers start empty by design, so suggestTrip() would bail out immediately.
+      this.$nextTick(() => {
+        this.loadManeuversForForm();
+        this.setTripNotes('');
+      });
     },
     loadManeuversForForm() {
       const t = this.currentTable;
@@ -765,6 +780,63 @@ export const app = createApp({
     onEvalContextChange() {
       this.$nextTick(() => this.loadManeuversForForm());
     },
+    // Fired by the aircraft / student / phase pickers in the New Evaluation form.
+    // (The previous @change="onEvalContextChange; suggestTrip" was an inline *statement*,
+    // so Vue only evaluated those function references and never CALLED them -- which is
+    // why picking student + aircraft + phase left the trip number empty.)
+    // Runs inside $nextTick so v-model has committed the new value first, then
+    // re-suggests the trip and reloads the per-stage required MIFs.
+    onEvalContextFieldChange() {
+      this.$nextTick(() => {
+        if (this.evalFormMode === 'new') {
+          // A phase belongs to one aircraft's MIF table. If the instructor switched
+          // aircraft, drop a phase/trip that has no table any more, otherwise the
+          // suggestion would be computed against a stale sheet.
+          if (this.evalForm.aircraftType && this.evalForm.phaseName) {
+            const hasTable = this.mifTables.some(t => t.aircraftType === this.evalForm.aircraftType && t.phaseName === this.evalForm.phaseName);
+            if (!hasTable) { this.evalForm.phaseName = ''; this.evalForm.tripNumber = ''; }
+          }
+          this.suggestTrip();
+        }
+        this.loadManeuversForForm();
+      });
+    },
+    /* ---- trip notes (textarea) ----
+     * The New Evaluation modal is one large in-DOM template, so binding the notes
+     * textarea with v-model made every keystroke a reactive write that re-rendered
+     * the whole app tree (every section + every grade row). That is what made typing
+     * instructor notes feel sluggish on slow devices.
+     * The textarea is now uncontrolled: input is buffered on a NON-reactive field and
+     * committed to evalForm after a short idle period, or immediately on blur/save. */
+    onTripNotesInput(ev) {
+      this._tripNotesDraft = ev && ev.target ? ev.target.value : '';
+      clearTimeout(this._tripNotesTimer);
+      this._tripNotesTimer = setTimeout(() => {
+        this._tripNotesTimer = null;
+        this.evalForm.tripNotes = this._tripNotesDraft;
+      }, 300);
+    },
+    // Push the textarea's current value into the reactive form model now.
+    flushTripNotes() {
+      if (this._tripNotesTimer) { clearTimeout(this._tripNotesTimer); this._tripNotesTimer = null; }
+      const el = this.$refs.tripNotesEl;
+      const v = (el && typeof el.value === 'string') ? el.value : (this._tripNotesDraft || '');
+      if (this.evalForm.tripNotes !== v) this.evalForm.tripNotes = v;
+      this._tripNotesDraft = v;
+      return v;
+    },
+    // Set the notes programmatically (new evaluation / edit / clone) for both the
+    // live textarea and the reactive form model.
+    setTripNotes(v) {
+      const s = v == null ? '' : String(v);
+      this.evalForm.tripNotes = s;
+      this._tripNotesDraft = s;
+      if (this._tripNotesTimer) { clearTimeout(this._tripNotesTimer); this._tripNotesTimer = null; }
+      this.$nextTick(() => {
+        const el = this.$refs.tripNotesEl;
+        if (el) el.value = s;
+      });
+    },
     async saveEval() {
       // Block double-save: on a slow connection an instructor can tap Save several times
       // before Firestore confirms, and each tap created a duplicate trip. This guard makes
@@ -777,6 +849,8 @@ export const app = createApp({
         this.toastMsg('Please fill in all required fields (student, aircraft, phase, instructor)');
         return;
       }
+      // Commit any notes still sitting in the debounce buffer before building the doc.
+      this.flushTripNotes();
       const ev = this.buildEvalFromForm();
       // Warn if this student already has an evaluation for this exact trip (would overwrite).
       // Re-check live in case one slipped in during a previous slow save.
@@ -784,17 +858,35 @@ export const app = createApp({
       if (clash) { this.overwriteClash = clash; this.overwritePending = ev; }
       else await this.persistEval(ev);
     },
-    // Next sortie auto-suggestion (Android fetchSuggestedTrip): after the student's highest
-    // S# in this aircraft+phase, suggest S(n+1); S1 if none.
+    // Next sortie auto-suggestion (Android fetchSuggestedTrip): after the student's
+    // LAST graded trip in this aircraft+phase, suggest the NEXT trip (last graded = 5
+    // -> shows 6). The instructor can still freely change it. The student's existing
+    // naming style is preserved (S5 -> S6, T-01 -> T-02, 12 -> 13, "TRIP 3" -> "TRIP 4")
+    // by incrementing the trailing digits of the highest graded trip and keeping the
+    // prefix + zero-padding. If the student has no trips in this phase yet, suggest the
+    // MIF table's first stage, else S1. A suggestion that falls beyond the stage list
+    // (e.g. last graded is S8) still renders via the dynamic <option> in the template.
     suggestTrip() {
       const { studentId, aircraftType, phaseName } = this.evalForm;
       if (!studentId || !aircraftType || !phaseName) return;
-      const nums = this.evaluations
-        .filter(e => e.studentId === studentId && e.aircraftType === aircraftType && e.phaseName === phaseName)
-        .map(e => parseInt(String(e.tripNumber || '').replace(/[^0-9]/g, ''), 10))
-        .filter(n => !isNaN(n));
-      const next = (nums.length ? Math.max(...nums) : 0) + 1;
-      this.evalForm.tripNumber = 'S' + next;
+      const evs = this.evaluations
+        .filter(e => e.studentId === studentId && e.aircraftType === aircraftType && e.phaseName === phaseName);
+      let best = null, bestN = -1;
+      evs.forEach(e => {
+        const s = String(e.tripNumber || '').trim();
+        const m = s.match(/^(.*?)(\d+)$/);   // any prefix + trailing digits
+        if (m) {
+          const n = parseInt(m[2], 10);
+          if (!isNaN(n) && n > bestN) { bestN = n; best = m; }
+        }
+      });
+      if (!best) {
+        const stages = (this.currentTable && this.currentTable.stages) || [];
+        this.evalForm.tripNumber = stages.length ? stages[0] : 'S1';
+        return;
+      }
+      // Increment the numeric tail; preserve prefix and zero-padding width.
+      this.evalForm.tripNumber = best[1] + String(bestN + 1).padStart(best[2].length, '0');
     },
     // Copy the most recent evaluation's maneuver grades for this student+aircraft+phase
     // as a starting point (last-trip prefill). Still fully editable. (audit item 5)
@@ -886,6 +978,7 @@ export const app = createApp({
     // Build a print-ready eval object from the live New-Evaluation form (so it can be printed/previewed
     // before saving), then open the Android-style PDF view.
     printFormEval() {
+      this.flushTripNotes();
       const fg = calcFinalGrade(this.evalForm.maneuverGrades);
       const st = calcMifStatus(this.evalForm.maneuverGrades);
       const student = this.students.find(s => s.id === this.evalForm.studentId);
@@ -913,6 +1006,8 @@ export const app = createApp({
       this.editTrip(e);
     },
     editTrip(e) {
+      // Editing must never auto-suggest a trip number (see onEvalContextFieldChange).
+      this.evalFormMode = 'edit';
       this.evalForm = {
         id: e.id || '',
         aircraftType: e.aircraftType || '',
@@ -932,6 +1027,7 @@ export const app = createApp({
       this.durationM = parts[1] || '00';
       this.onEvalDateChange();
       this.showEvalModal = true;
+      this.setTripNotes(this.evalForm.tripNotes);
       const load = () => {
         const t = this.mifTables.find(x => x.aircraftType === this.evalForm.aircraftType && x.phaseName === this.evalForm.phaseName);
         if (t) {
@@ -1159,26 +1255,27 @@ export const app = createApp({
     deleteUser(u) { this.openConfirm({ title: 'Remove user', message: 'Delete user ' + u.name + '? This removes their access.', confirmText: 'Delete', onOk: async () => { await Store.deleteUser(u); this.toastMsg('User removed'); } }); },
     filterAnnouncements(list) { return list.filter(a => a.targetRole === 'all' || a.targetRole === this.role || this.role === 'admin'); },
 
-    /* ---- CSV export (mirrors Android CsvExporter) ---- */
+    /* ---- CSV export (mirrors Android CsvExporter) ----
+       One column per maneuver, in the order the maneuvers first appear across the
+       exported evaluations (the MIF sheet order), so a spreadsheet can sort/filter
+       on a single maneuver instead of parsing a "name: grade" blob. */
     exportCSV() {
       const evals = this.evalsSortedByDate.slice().reverse();
-      // Collect unique maneuver names in the order they appear in evaluations (MIF table order)
       const maneuverNames = [];
       const seen = new Set();
       evals.forEach(e => (e.maneuverGrades || []).forEach(m => {
-        if (m.name && !seen.has(m.name)) { seen.add(m.name); maneuverNames.push(m.name); }
+        if (m && m.name && !seen.has(m.name)) { seen.add(m.name); maneuverNames.push(m.name); }
       }));
-      const header = ['Student', 'Aircraft', 'Phase', 'Trip', 'Date', 'Instructor', 'Duration(h)', 'FinalGrade', 'MIF Status', 'FlightYear', 'TripNotes', ...maneuverNames];
-      const rows = [header];
+      const rows = [['Student', 'Aircraft', 'Phase', 'Trip', 'Date', 'Instructor', 'Duration(h)', 'FinalGrade', 'MIF Status', 'FlightYear', 'TripNotes', ...maneuverNames]];
       evals.forEach(e => {
-        const gradeMap = {};
-        (e.maneuverGrades || []).forEach(m => { gradeMap[m.name] = m.studentGrade; });
+        const grades = {};
+        (e.maneuverGrades || []).forEach(m => { if (m && m.name) grades[m.name] = m.studentGrade; });
         rows.push([
           e.studentName || '', e.aircraftType || '', e.phaseName || '', e.tripNumber || '',
           this.fmt(e.date) || '', e.instructorName || '', e.duration || '',
           e.finalGrade != null ? e.finalGrade.toFixed(1) : '', e.overallMifStatus || '', e.flightYear || '',
           (e.tripNotes || '').replace(/[\n\r]+/g, ' '),
-          ...maneuverNames.map(n => gradeMap[n] != null ? gradeMap[n] : '')
+          ...maneuverNames.map(n => (grades[n] != null ? grades[n] : ''))
         ]);
       });
       const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
@@ -1198,15 +1295,44 @@ export const app = createApp({
        shows a preview + error report, and (on confirm) bulk-saves to Firestore. */
     openImport() { this.importCsv = { open: true, text: '', parsed: null, error: '' }; },
     closeImport() { this.importCsv = { open: false, text: '', parsed: null, error: '' }; },
+    /* Quote-aware CSV row parser (RFC 4180). The export path wraps every field
+       in double quotes and escapes embedded quotes as "", so an import that
+       naive-splits on commas silently mangles rows whose notes/maneuvers
+       contain commas ("Hover, pedal turns"). This parser mirrors the export:
+       fields may be quoted or bare, "" is a literal quote, CRLF/CR/LF all end
+       a record. */
+    parseCsvRows(text) {
+      const rows = [];
+      let row = [], field = '', inQ = false, i = 0;
+      const s = String(text || '');
+      while (i < s.length) {
+        const c = s[i];
+        if (inQ) {
+          if (c === '"') {
+            if (s[i + 1] === '"') { field += '"'; i += 2; }  // escaped quote
+            else { inQ = false; i++; }                        // closing quote
+          } else { field += c; i++; }
+        } else if (c === '"' && field === '') {
+          inQ = true; i++;                                    // opening quote (field start only)
+        } else if (c === ',') { row.push(field); field = ''; i++; }
+        else if (c === '\n' || c === '\r') {
+          if (c === '\r' && s[i + 1] === '\n') i++;
+          row.push(field); field = '';
+          rows.push(row); row = [];
+          i++;
+        } else { field += c; i++; }
+      }
+      // Flush the final record (no trailing newline in the file).
+      if (field !== '' || row.length) { row.push(field); rows.push(row); }
+      // Drop fully-empty rows (blank lines / trailing newline).
+      return rows.filter(r => !(r.length === 1 && r[0].trim() === ''));
+    },
     // Re-parse the textarea whenever it changes (live validation/preview).
     parseImportCsv() {
       const raw = (this.importCsv.text || '').trim();
       if (!raw) { this.importCsv.parsed = null; this.importCsv.error = ''; return; }
       try {
-        const lines = raw.split(String.fromCharCode(10)); // split on LF
-        const rows = lines.map(r => r.split(','));
-        // tolerate CRLF; drop fully-empty trailing rows
-        while (rows.length && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === '') rows.pop();
+        const rows = this.parseCsvRows(raw); // quote-aware RFC 4180 parser (handles commas in notes/maneuvers)
         if (rows.length < 2) { this.importCsv.error = 'Need a header row plus at least one data row.'; this.importCsv.parsed = null; return; }
         const header = rows[0].map(h => h.trim().toLowerCase());
         const idx = {};

@@ -50,10 +50,20 @@ python -m http.server 8123
 ```
 
 ## Files
-- `index.html` — app shell + tabs + auth screen
-- `app.js` — Vue 3 SPA logic (auth, CRUD, grading math, AI feedback)
-- `store.js` — Firebase data layer + grading/AI math (ported from the Android app)
-- `seed.js` — sample data used to populate an empty project the first time an admin signs in
-- `firebase-config.js` — Firebase web config (paste your apiKey here)
+- `src/` — the app (Vite project root): `src/index.html` (shell + tabs + auth screen),
+  `src/app.js` (Vue 3 SPA logic), `src/store.js` (Firebase data layer + grading/AI math
+  ported from the Android app), `src/seed.js` (sample data for first admin sign-in),
+  `src/firebase-config.js` (paste your apiKey here), `src/main.js` (entry).
+- `src/public/` — PWA assets served as-is: `sw.js` (offline service worker),
+  `manifest.webmanifest`, `icons/`.
 - `firestore.rules` — security rules (role-based)
-- `sw.js` / `manifest.webmanifest` — installable + offline PWA
+- Root `index.html` / `assets/` — the built site deployed to GitHub Pages (see "Deploy" below)
+
+## Deploy
+`npm run build` emits to `dist/`; copy its contents to the repo root (or configure Pages to
+serve `dist/`) so GitHub Pages serves the bundled app at `/student-grading-portal-web/`.
+
+## AI feedback (Pi proxy)
+The AI debrief calls the Pi's OpenAI-compatible proxy through Tailscale Funnel
+(`LAN_AI_ENDPOINT` in `src/store.js`). No secret is required — the proxy is reachable
+because Tailscale Funnel makes it public, and the app sends plain JSON requests.

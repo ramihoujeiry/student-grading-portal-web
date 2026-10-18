@@ -204,9 +204,9 @@
   .meter{height:8px;background:rgba(8,14,20,.7);border-radius:5px;overflow:hidden;margin-top:10px}
   .meter-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--amber) 55%,var(--red));border-radius:5px;transition:width .25s}
 </style>
-  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-BfU1UPz6.js"></script>
+  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-DjuhvQF-.js"></script>
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-vue-CxFK-cW8.js">
-  <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-firebase-CAVvKspe.js">
+  <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-firebase-BIFz2zAf.js">
 </head>
 <body>
 <div id="app" v-cloak>
@@ -281,9 +281,11 @@
       <button class="tab-btn" :class="{active:tab==='evaluations'}" v-if="!isViewer" :aria-current="tab==='evaluations'?'page':null" @click="setTab('evaluations')">Evaluations</button>
       <button class="tab-btn" :class="{active:tab==='announcements'}" :aria-current="tab==='announcements'?'page':null" @click="setTab('announcements')">Announcements</button>
       <button class="tab-btn" :class="{active:tab==='analytics'}" :aria-current="tab==='analytics'?'page':null" @click="setTab('analytics')">Analytics</button>
+      <button class="tab-btn" :class="{active:tab==='studentAnalytics'}" :aria-current="tab==='studentAnalytics'?'page':null" @click="setTab('studentAnalytics')">Student Analytics</button>
+      <button class="tab-btn" :class="{active:tab==='adminBroadcast'}" v-if="isAdmin" :aria-current="tab==='adminBroadcast'?'page':null" @click="setTab('adminBroadcast')">Admin Broadcast</button>
+      <button class="tab-btn" :class="{active:tab==='aiHub'}" :aria-current="tab==='aiHub'?'page':null" @click="setTab('aiHub')">AI Feedback Hub</button>
       <button class="tab-btn" :class="{active:tab==='admin'}" v-if="isAdmin" :aria-current="tab==='admin'?'page':null" @click="setTab('admin')">Users</button>
       <span class="tab-sep" aria-hidden="true"></span>
-      <button class="tab-btn" :class="{active:tab==='ai'}" :aria-current="tab==='ai'?'page':null" @click="setTab('ai')">AI Feedback</button>
       <button class="tab-btn" :class="{active:tab==='ask'}" :aria-current="tab==='ask'?'page':null" @click="setTab('ask')">Ask Data</button>
       <span class="tab-sep" aria-hidden="true"></span>
       <button class="tab-btn" :class="{active:tab==='settings'}" :aria-current="tab==='settings'?'page':null" @click="setTab('settings')">Settings</button>
@@ -362,6 +364,7 @@
               <span class="pill" :class="s.active?'good':'pending'">{{s.active?'Active':'Inactive'}}</span>
               <span class="muted">{{(s.activeYears||[]).join(', ')}}</span>
               <span class="spacer" style="flex:1"></span>
+              <button class="btn sm ghost" v-if="isAdmin" @click.stop="editStudentYear(s)">Edit Year</button>
               <button class="btn sm ghost" v-if="isAdmin" @click.stop="toggleStudentActive(s)">{{s.active?'Deactivate':'Activate'}}</button>
               <button class="btn sm danger" v-if="isAdmin" @click.stop="deleteStudent(s)">Delete</button>
             </div>
@@ -450,7 +453,7 @@
         <ul class="list">
           <li v-for="e in evalsSortedByDate" :key="e.id" class="clickable" @click="openEval(e)">
             <div class="row nowrap">
-              <strong>{{studentName(e.studentId)}} · {{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
+              <strong>{{e.studentName}} · {{e.aircraftType}} {{e.phaseName}} {{e.tripNumber}}</strong>
               <span class="muted">{{fmt(e.date)}} · {{e.instructorName}}</span>
               <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
               <span class="pill" :class="statusColor(e.overallMifStatus)">{{statusLabel(e.overallMifStatus)}}</span>
@@ -645,32 +648,6 @@
         </div>
       </section>
 
-      <!-- AI FEEDBACK -->
-      <section v-show="tab==='ai'">
-        <div class="card">
-          <h3>AI Performance Feedback</h3>
-          <div v-if="ragReady === true" class="pill good wrap" style="margin-bottom:10px">📚 Manuals loaded (FAA / UH-1 / Robinson FTG) — debriefs will cite them</div>
-          <div v-if="ragReady === false" class="pill pending" style="margin-bottom:10px">⚠️ Manual index not loaded. Serve the app over http:// (not file://) and ensure faa-rag/faa_index.json is present.</div>
-          <label>Student
-            <select v-model="aiStudentId" aria-label="AI feedback student">
-            <option value="">Select a student…</option>
-            <option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option>
-          </select></label>
-          <div style="margin-top:12px" class="row">
-            <button class="btn" @click="runAIForStudent">Generate Analysis</button>
-            <button class="btn ghost" :disabled="!aiResult" @click="copyAI">Copy</button>
-          </div>
-          <div v-if="aiLoading" class="muted" style="margin-top:10px">Analyzing…</div>
-          <div v-if="aiResult" class="mannote" style="margin-top:12px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:340px;overflow:auto">{{aiResult}}</div>
-          <div v-if="aiResult && aiRagStatus==='ok'" class="pill good" style="margin-top:10px">📚 Manuals cited (FAA / UH-1 / Robinson FTG)</div>
-          <div v-if="aiResult && aiRagStatus==='failed'" class="pill pending" style="margin-top:10px">⚠️ Manual index not loaded — debrief is ungrounded. Check faa-rag/faa_index.json is served.</div>
-          <div v-if="!aiResult && !aiLoading" class="muted" style="margin-top:10px">
-            Picks a student and asks the live AI model for a coaching debrief (trend, consistency,
-            weak maneuvers, readiness) from their evaluations. Falls back to an offline summary if offline.
-          </div>
-        </div>
-      </section>
-
       <!-- ASK DATA -->
       <section v-show="tab==='ask'">
         <div class="card">
@@ -686,6 +663,95 @@
           <div v-if="askResult" class="mannote" style="margin-top:12px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:420px;overflow:auto">{{askResult}}</div>
         </div>
       </section>
+      <!-- STUDENT ANALYTICS -->
+      <section v-show="tab==='studentAnalytics'">
+        <div class="topbar"><h2 style="margin:0">Student Analytics · {{activeYearResolved}}</h2></div>
+        <p class="muted" style="margin:4px 2px 12px">Aggregate trip count, average grade, total flight hours per student. Ports Android StudentAnalyticsActivity.</p>
+        <div class="card" style="margin-bottom:12px">
+          <div style="flex:2 1 240px"><label>Search by name</label><input v-model="saSearch" aria-label="Student analytics search" placeholder="Student name…" /></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+          <div class="card clickable" v-for="a in studentAnalytics" :key="a.id" @click="openStudentAnalyticsStudent({id:a.id,name:a.name})">
+            <div class="row" style="align-items:center">
+              <strong style="font-size:15px">{{a.name}}</strong>
+              <span class="spacer" style="flex:1"></span>
+              <span class="pill" :class="gradeColor(a.avgGrade)">{{a.avgGrade?a.avgGrade.toFixed(1):'—'}}</span>
+            </div>
+            <div class="row nowrap" style="margin-top:8px;gap:8px">
+              <span class="muted">Trips: {{a.tripCount}}</span>
+              <span class="muted">Hours: {{a.totalHours.toFixed(1)}}</span>
+            </div>
+          </div>
+        </div>
+        <div v-if="!studentAnalytics.length" class="muted">No students with evaluations for {{activeYearResolved}}.</div>
+      </section>
+
+      <!-- ADMIN BROADCAST -->
+      <section v-show="tab==='adminBroadcast'" v-if="isAdmin">
+        <div class="topbar"><h2 style="margin:0">Admin Broadcast</h2></div>
+        <p class="muted" style="margin:4px 2px 12px">Compose and send a message to target roles. Ports Android AdminBroadcastActivity.</p>
+        <div class="card">
+          <h3>Compose Broadcast</h3>
+          <label>Title</label>
+          <input v-model="bcTitle" aria-label="Broadcast title" placeholder="Announcement title…" />
+          <label>Message</label>
+          <textarea v-model="bcMessage" rows="4" aria-label="Broadcast message" placeholder="Message to recipients…"></textarea>
+          <label>Target Role</label>
+          <select v-model="bcTargetRole" aria-label="Broadcast target">
+            <option value="all">All</option>
+            <option value="instructor">Instructors</option>
+            <option value="admin">Admins</option>
+          </select>
+          <label>File Attachment (name only — stored as metadata)</label>
+          <input v-model="bcFileName" aria-label="Broadcast file name" placeholder="optional file name…" />
+          <div class="row" style="margin-top:12px">
+            <button class="btn" :disabled="bcBusy" @click="sendBroadcast">{{bcBusy?'Sending…':'Send Broadcast'}}</button>
+            <span v-if="bcSent" class="pill good">Sent!</span>
+          </div>
+        </div>
+        <h3 style="margin:18px 2px 8px">Sent Broadcasts</h3>
+        <ul class="list">
+          <li v-for="b in broadcasts" :key="b.id">
+            <div class="row">
+              <strong>{{b.title}}</strong>
+              <span class="pill" :class="b.targetRole==='all'?'ok':'pending'">{{b.targetRole}}</span>
+              <span class="spacer" style="flex:1"></span>
+              <span class="muted">{{fmt(b.createdAt)}}</span>
+              <button class="btn sm danger" @click="deleteBroadcast(b)">Delete</button>
+            </div>
+            <div style="margin-top:6px">{{b.message}}</div>
+            <div class="muted" style="margin-top:4px">From: {{b.senderName}}</div>
+          </li>
+          <li v-if="!broadcasts.length" class="muted">No broadcasts sent yet.</li>
+        </ul>
+      </section>
+
+      <!-- AI FEEDBACK HUB -->
+      <section v-show="tab==='aiHub'">
+        <div class="topbar"><h2 style="margin:0">AI Feedback Hub</h2></div>
+        <p class="muted" style="margin:4px 2px 12px">Select a student and scope, then launch the AI feedback report. Ports Android AIFeedbackHubActivity.</p>
+        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+          <div style="flex:2 1 200px;min-width:180px"><label>Student
+            <select v-model="aiStudentId" aria-label="Hub student"><option value="">Select a student…</option><option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option></select></div>
+          <button class="btn sm" @click="runAIForStudent">Generate AI Feedback</button>
+        </div>
+        <div class="card" v-if="aiStudentId" style="margin-top:12px">
+          <h3>AI Feedback</h3>
+          <div v-if="ragReady === true" class="pill good wrap" style="margin-bottom:10px">📚 Manuals loaded (FAA / UH-1 / Robinson FTG) — debriefs will cite them</div>
+          <div v-if="ragReady === false" class="pill pending" style="margin-bottom:10px">⚠️ Manual index not loaded. Serve the app over http:// (not file://) and ensure faa-rag/faa_index.json is present.</div>
+          <div v-if="aiLoading" class="muted" style="margin-top:10px">Analyzing…</div>
+          <div v-if="aiResult" class="mannote" style="margin-top:12px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:340px;overflow:auto">{{aiResult}}</div>
+          <div v-if="aiResult && aiRagStatus==='ok'" class="pill good" style="margin-top:10px">📚 Manuals cited (FAA / UH-1 / Robinson FTG)</div>
+          <div v-if="aiResult && aiRagStatus==='failed'" class="pill pending" style="margin-top:10px">⚠️ Manual index not loaded — debrief is ungrounded. Check faa-rag/faa_index.json is served.</div>
+          <div v-if="!aiResult && !aiLoading" class="muted" style="margin-top:10px">
+            Picks a student and asks the live AI model for a coaching debrief (trend, consistency,
+            weak maneuvers, readiness) from their evaluations.
+          </div>
+          <div style="margin-top:12px" class="row">
+            <button class="btn ghost" :disabled="!aiResult" @click="copyAI">Copy</button>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -694,12 +760,12 @@
     <div class="modal full">
       <h2>New Evaluation</h2>
       <label>Aircraft
-      <select v-model="evalForm.aircraftType" @change="onEvalContextChange; suggestTrip" aria-label="Evaluation aircraft">
+      <select v-model="evalForm.aircraftType" @change="onEvalContextFieldChange()" aria-label="Evaluation aircraft">
         <option value="">— select aircraft —</option>
         <option v-for="a in aircraft" :key="a.id" :value="a.name">{{a.name}}</option>
       </select></label>
       <label>Student
-      <select v-model="evalForm.studentId" @change="suggestTrip" aria-label="Evaluation student"><option value="">— select student —</option><option v-for="s in activeStudents" :key="s.id" :value="s.id">{{s.name}}</option></select></label>
+      <select v-model="evalForm.studentId" @change="onEvalContextFieldChange()" aria-label="Evaluation student"><option value="">— select student —</option><option v-for="s in activeStudents" :key="s.id" :value="s.id">{{s.name}}</option></select></label>
       <label>Instructor
       <select v-model="evalForm.instructorName" aria-label="Evaluation instructor">
         <option value="">— select instructor —</option>
@@ -708,15 +774,16 @@
       <div class="row" style="gap:10px">
         <div style="flex:1">
           <label>Phase
-          <select v-model="evalForm.phaseName" @change="onEvalContextChange; suggestTrip" aria-label="Evaluation phase">
+          <select v-model="evalForm.phaseName" @change="onEvalContextFieldChange()" aria-label="Evaluation phase">
             <option value="">— select phase —</option>
             <option v-for="t in mifTables.filter(x=>x.aircraftType===evalForm.aircraftType)" :key="t.id" :value="t.phaseName">{{t.phaseName}}</option>
           </select></label>
         </div>
         <div style="flex:1">
           <label>Trip number <span class="muted" style="text-transform:none;letter-spacing:0">· Sortie number</span>
-          <select v-model="evalForm.tripNumber" @change="onEvalContextChange" aria-label="Evaluation trip number">
-            <option v-for="st in (currentTable ? currentTable.stages : [])" :key="st" :value="st">{{st}}</option>
+          <select v-model="evalForm.tripNumber" @change="onEvalContextChange()" aria-label="Evaluation trip number">
+            <option value="">— select trip —</option>
+            <option v-for="st in tripOptions" :key="st" :value="st">{{st}}</option>
           </select></label>
         </div>
       </div>
@@ -760,7 +827,11 @@
       </div>
       <div v-else class="muted">Select an aircraft + phase that has a MIF table.</div>
       <label>Trip Notes</label>
-      <textarea v-model="evalForm.tripNotes" placeholder="Coach comments, safety items…"></textarea>
+      <!-- Uncontrolled on purpose: v-model here wrote to the reactive form on every
+           keystroke, which re-rendered the entire app (all sections + grade rows) and
+           made typing lag. The value is committed on idle (300ms), blur, and before
+           save/print -- see onTripNotesInput / flushTripNotes in app.js. -->
+      <textarea ref="tripNotesEl" @input="onTripNotesInput" @blur="flushTripNotes" placeholder="Coach comments, safety items…"></textarea>
       <div class="modal-actions">
         <button class="btn" :disabled="saving" @click="saveEval">{{ saving ? 'Saving…' : 'Save Evaluation' }}</button>
         <button class="btn ghost" @click="printFormEval">Print PDF</button>
@@ -793,7 +864,7 @@
       <h2 style="margin-top:0">Import evaluations from CSV</h2>
       <p class="muted" style="margin:4px 2px 10px">Paste the CSV produced by <b>Export CSV</b> (or match its header). Rows are validated against known students/aircraft; matching student+phase+trip rows overwrite the existing evaluation. Unknown students/aircraft are skipped with a warning.</p>
       <label>CSV data</label>
-      <textarea class="csv-input" v-model="importCsv.text" @input="parseImportCsv" placeholder="Student,Aircraft,Phase,Trip,Date,Instructor,Duration(h),FinalGrade,MIF Status,FlightYear,TripNotes&#10;Jane Doe,R44-2,CONTACT,S3,2026-08-01,Capt. Smith,1.2,82,BELOW STANDARD,2026-2027,"></textarea>
+      <textarea class="csv-input" v-model="importCsv.text" @input="parseImportCsv" placeholder="Student,Aircraft,Phase,Trip,Date,Instructor,Duration(h),FinalGrade,MIF Status,FlightYear,TripNotes,Maneuvers&#10;Jane Doe,R44-2,CONTACT,S3,2026-08-01,Capt. Smith,1.2,82,BELOW STANDARD,2026-2027,,[]"></textarea>
       <div v-if="importCsv.error" class="import-err">{{importCsv.error}}</div>
       <div v-if="importCsv.parsed && importCsv.parsed.total" class="import-ok">
         {{importCsv.parsed.total}} row(s) ready to import
@@ -880,6 +951,7 @@
         <h2 style="margin:0">{{selectedEval.studentName}}</h2>
         <span class="spacer" style="flex:1"></span>
         <button class="btn sm ghost" @click="printEval(selectedEval)">Print PDF</button>
+        <button class="btn sm ghost" v-if="isAdmin" @click="editTrip(selectedEval); closeDetail()">Edit</button>
         <button class="btn sm danger" v-if="isAdmin" @click="deleteEval(selectedEval); closeDetail()">Delete</button>
       </div>
       <div class="muted" style="margin:4px 0 12px">{{selectedEval.aircraftType}} · {{selectedEval.phaseName}} {{selectedEval.tripNumber}} · {{fmt(selectedEval.date)}} · {{selectedEval.instructorName}} · {{selectedEval.duration}} h</div>
