@@ -40,16 +40,22 @@
   .role-badge.instructor{background:rgba(90,169,255,.12);border-color:rgba(90,169,255,.4);color:var(--blue)}
   .role-badge.viewer{background:rgba(124,147,168,.12);border-color:rgba(124,147,168,.4);color:var(--muted)}
   .btn-logout{background:transparent;border:1px solid var(--glass-line);color:var(--hud);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
-  nav.tabs{display:flex;flex-wrap:wrap;gap:6px;background:rgba(10,18,26,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-    border-bottom:1px solid var(--glass-line);padding:8px;padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}
-  nav.tabs .tab-btn{flex:1 1 auto;min-width:84px;background:rgba(22,34,47,.6);border:1px solid var(--line);color:var(--muted);
-    padding:9px 10px;font-size:12px;font-weight:600;cursor:pointer;border-radius:9px;white-space:nowrap;text-align:center;transition:all .15s}
+  /* Single-row, horizontally scrollable tab strip: the 12 tabs stay on one line
+     instead of wrapping into a tall block that pushes content off screen. */
+  nav.tabs{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
+    background:rgba(10,18,26,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--glass-line);padding:8px;padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right));
+    scrollbar-width:thin;scrollbar-color:var(--hud-dim) transparent}
+  nav.tabs::-webkit-scrollbar{height:4px}
+  nav.tabs::-webkit-scrollbar-thumb{background:var(--hud-dim);border-radius:4px}
+  nav.tabs .tab-btn{flex:0 0 auto;min-width:0;background:rgba(22,34,47,.6);border:1px solid var(--line);color:var(--muted);
+    padding:9px 12px;font-size:12px;font-weight:600;cursor:pointer;border-radius:9px;white-space:nowrap;text-align:center;transition:all .15s}
   /* Visual group separators between nav clusters (admin | data | AI) on wider screens. */
   nav.tabs .tab-sep{flex:0 0 1px;align-self:stretch;width:1px;background:var(--glass-line);margin:2px 2px}
-  /* On narrow phones the tab row scrolls horizontally instead of wrapping into a tall block. */
+  /* Narrow phones: same single scrolling row, slightly tighter tabs. */
   @media (max-width:560px){
-    nav.tabs{flex-wrap:wrap}
-    nav.tabs .tab-btn{flex:1 1 auto;min-width:72px}
+    nav.tabs{gap:5px;padding:6px 8px}
+    nav.tabs .tab-btn{flex:0 0 auto;padding:8px 10px;font-size:11px}
     nav.tabs .tab-sep{display:none}
   }
   /* Keyboard skip-link: hidden until focused, then jumps to main content (a11y). */
@@ -65,7 +71,11 @@
     box-shadow:0 6px 22px rgba(0,0,0,.4),inset 0 1px 0 rgba(57,208,196,.06)}
   .card h3{margin:0 0 8px;font-size:13px;color:var(--hud);text-transform:uppercase;letter-spacing:.5px;opacity:.85}
   .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .row.nowrap{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow-x:auto}
+  .row.nowrap{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
+  /* Inside a horizontal chip row a long label ellipsizes instead of pushing the
+     row's actions out of reach. */
+  .row.nowrap > strong{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row.nowrap > .muted,.row.nowrap > .pill{flex:0 0 auto}
   .muted{color:var(--muted);font-size:12px}
   .btn{background:linear-gradient(180deg,var(--hud),var(--hud-dim));color:#04181a;border:none;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:700;cursor:pointer;
     box-shadow:0 0 12px rgba(57,208,196,.25);transition:filter .15s}
@@ -94,6 +104,11 @@
   @media (max-width:640px){
     .card>table{display:block;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
   }
+  /* Inline-editable MIF table: compact cells/inputs so a row stays one line high. */
+  table.mif-edit td{padding:5px 6px;vertical-align:middle}
+  table.mif-edit th,table.mif-edit td{white-space:nowrap}
+  table.mif-edit .mif-input{min-height:34px;height:34px;padding:4px 8px;font-size:14px;border-radius:7px}
+  table.mif-edit .mif-input[type=number]{text-align:center;font-family:var(--mono)}
   th,td{text-align:left;padding:9px 8px;border-bottom:1px solid rgba(57,208,196,.1)}
   th{color:var(--hud);font-size:11px;text-transform:uppercase;letter-spacing:.4px;opacity:.8}
   .list{list-style:none;margin:0;padding:0}
@@ -134,8 +149,15 @@
   .topbar > .spacer{flex:1}
   .topbar > .btn,.topbar > select{flex:0 0 auto}
   .modal h2{margin-top:4px}
-  .grade-pick{flex-direction:row;gap:5px;display:flex}
-  .grade-pick .gx{font-size:13px;line-height:1;min-width:30px;min-height:40px;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--bg2);border:1px solid var(--line);color:var(--text);font-weight:700;cursor:pointer}
+  .grade-pick{flex-direction:row;gap:5px;display:flex;flex-wrap:wrap}
+  /* Each grade button shows the scale number AND the score it maps to, so a
+     bare "3" is never ambiguous. */
+  .grade-pick .gx{font-size:13px;line-height:1;min-width:46px;min-height:44px;width:46px;height:44px;padding:2px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:6px;background:var(--bg2);border:1px solid var(--line);color:var(--text);font-weight:700;cursor:pointer}
+  .grade-pick .gx .gx-p{font-size:9px;font-weight:600;opacity:.6;letter-spacing:.3px}
+  .grade-pick .gx.on .gx-p{opacity:.85}
+  .grade-pick .gx.na{width:auto;min-width:50px;padding:2px 10px;font-size:11px;font-weight:700;letter-spacing:.4px}
+  .grade-pick .gx.na:disabled{opacity:.35;cursor:not-allowed}
+  .grade-legend{font-size:11px;line-height:1.45;margin:-2px 2px 8px}
   .preview{display:flex;gap:14px;align-items:center;margin:12px 0;border-top:1px solid var(--glass-line);padding-top:12px}
   .preview .big{font-size:28px;font-weight:800;color:var(--hud);text-shadow:0 0 12px rgba(57,208,196,.3)}
   .toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:rgba(10,18,26,.92);color:var(--text);
@@ -185,12 +207,33 @@
   .warn-box{background:rgba(255,176,32,.1);border:1px solid var(--amber);color:var(--amber);border-radius:9px;padding:10px;font-size:12px;margin-top:14px;line-height:1.5}
   .warn-box.danger{background:rgba(255,93,93,.12);border-color:var(--red);color:var(--red)}
   .warn-box b{font-weight:800}
+  .link-btn{display:block;margin:10px auto 0;background:none;border:none;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer;padding:4px}
+  .link-btn:hover{color:var(--hud)}
+  .link-btn:disabled{opacity:.5;cursor:not-allowed}
+  /* Boot / connecting state (auth state not resolved yet) */
+  .boot{display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px;text-align:center}
+  .boot-spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--hud);animation:bootspin .8s linear infinite}
+  @keyframes bootspin{to{transform:rotate(360deg)}}
 
   /* Segmented control (Settings: theme + density toggles) */
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
   .seg-btn{background:rgba(22,34,47,.6);border:none;color:var(--muted);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
   .seg-btn:hover{color:var(--text)}
   .seg-btn.on{background:linear-gradient(180deg,var(--hud),var(--hud-dim));color:#04181a}
+  /* Larger-text preference (Settings → Text size). Scales the readable UI text
+     without touching layout widths. */
+  html.text-lg .muted,html.text-lg .pill,html.text-lg .stat .l,html.text-lg .card h3{font-size:13px}
+  html.text-lg table{font-size:14.5px}
+  html.text-lg .btn,html.text-lg .btn.sm{font-size:13.5px}
+  html.text-lg input,html.text-lg select,html.text-lg textarea{font-size:17px}
+  html.text-lg nav.tabs .tab-btn{font-size:13px}
+  html.text-lg .stat .n{font-size:27px}
+  html.text-lg header.app h1{font-size:16px}
+  html.text-lg label{font-size:12px}
+  html.text-lg .grade-legend{font-size:12px}
+  /* MIF row actions: reorder + delete, compact enough to stay one line high. */
+  .mif-actions{display:flex;gap:4px}
+  .mif-actions .btn{padding:4px 7px;min-height:30px;line-height:1}
   /* Feedback icon button in the tab bar */
   .btn-logout.ghost.icon{border:none;background:transparent;color:var(--hud);font-size:15px;padding:6px 10px}
   /* Compact density: tighten card/list spacing for small phone screens at the ramp */
@@ -204,15 +247,23 @@
   .meter{height:8px;background:rgba(8,14,20,.7);border-radius:5px;overflow:hidden;margin-top:10px}
   .meter-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--amber) 55%,var(--red));border-radius:5px;transition:width .25s}
 </style>
-  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-5UdOxyg_.js"></script>
+  <script type="module" crossorigin src="/student-grading-portal-web/assets/index-bhLiCWPL.js"></script>
   <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-vue-CxFK-cW8.js">
-  <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-firebase-BIFz2zAf.js">
+  <link rel="modulepreload" crossorigin href="/student-grading-portal-web/assets/vendor-firebase-v5RLiGsw.js">
 </head>
 <body>
 <div id="app" v-cloak>
 
+  <!-- ===== BOOT / LOADING SCREEN ===== -->
+  <div class="auth-wrap" v-if="!loggedIn && booting" role="status" aria-live="polite">
+    <div class="boot">
+      <div class="boot-spin" aria-hidden="true"></div>
+      <div class="muted">Connecting to the grading portal…</div>
+    </div>
+  </div>
+
   <!-- ===== AUTH SCREEN ===== -->
-  <div class="auth-wrap" v-if="!loggedIn">
+  <div class="auth-wrap" v-if="!loggedIn && !booting">
     <div class="auth-card">
       <h1>Student Grading Portal</h1>
       <div class="sub">Flight-training grading · sign in to continue</div>
@@ -243,6 +294,9 @@
         <button class="btn" style="width:100%;margin-top:14px" :disabled="authBusy" v-else @click="doRegister">
           {{authBusy?'Creating…':'Create account'}}
         </button>
+        <button class="link-btn" v-if="authMode==='login'" :disabled="resetBusy || authBusy" @click="doForgotPassword">
+          {{resetBusy ? 'Sending reset email…' : 'Forgot password?'}}
+        </button>
         <div class="muted" style="margin-top:10px;text-align:center" v-if="authMode==='register'">
           New accounts start as <b>pending</b> and need an admin to grant a role. A verification email is sent.
         </div>
@@ -262,6 +316,9 @@
           <option v-if="!years.length" value="">—</option>
         </select>
       </label>
+      <span class="ai-badge" :class="aiBadge" role="status" :title="aiBadge==='live' ? 'An AI endpoint is configured — AI debriefs run live' : aiBadge==='offline' ? 'No AI endpoint configured or the last call failed — debriefs may fail' : 'Checking the AI endpoint…'">
+        <span class="dot" aria-hidden="true"></span>{{ aiBadge==='live' ? 'AI ready' : aiBadge==='offline' ? 'AI unavailable' : 'AI…' }}
+      </span>
       <span class="role-badge" :class="role">{{role}}</span>
       <button class="btn-logout" @click="doLogout" aria-label="Sign out">Sign out</button>
     </header>
@@ -298,12 +355,12 @@
         <div class="stats" style="margin-top:12px">
           <div class="stat"><div class="n">{{stats.students}}</div><div class="l">Students</div></div>
           <div class="stat"><div class="n">{{stats.instructors}}</div><div class="l">Instructors</div></div>
-          <div class="stat"><div class="n">{{stats.evals}}</div><div class="l">Evaluations</div></div>
+          <div class="stat"><div class="n">{{stats.evals}}</div><div class="l">Evals in view</div></div>
           <div class="stat"><div class="n" :class="gradeColor(stats.avg)">{{stats.avg}}</div><div class="l">Avg Grade</div></div>
           <div class="stat"><div class="n good">{{stats.meets}}</div><div class="l">Meets Std</div></div>
           <div class="stat"><div class="n bad">{{stats.below}}</div><div class="l">Below Std</div></div>
           <div class="stat"><div class="n">{{dashTotalHours.toFixed(1)}}</div><div class="l">Total Hours</div></div>
-          <div class="stat"><div class="n">{{dashFilteredEvals.length}}</div><div class="l">Filtered</div></div>
+          <div class="stat"><div class="n" :class="stats.meetsPct!==null && stats.meetsPct>=80 ? 'good' : ''">{{stats.meetsPct===null?'—':stats.meetsPct+'%'}}</div><div class="l">% Meets</div></div>
         </div>
 
         <!-- Dashboard filters (scope the stats, readiness board and recent feed) -->
@@ -315,6 +372,7 @@
           <div style="flex:1 1 130px;min-width:120px"><label>From</label><input type="date" v-model="dashStart" aria-label="Dashboard from date" /></div>
           <div style="flex:1 1 130px;min-width:120px"><label>To</label><input type="date" v-model="dashEnd" aria-label="Dashboard to date" /></div>
           <button class="btn sm ghost" @click="dashStudent='All Cadets';dashAircraft='All Aircraft';dashStart='';dashEnd=''">Clear</button>
+          <div class="muted" style="flex:1 0 100%;margin-top:-2px">The tiles above follow these filters.</div>
         </div>
 
         <!-- Class Readiness board: per-student verdict using the same engine as AI Feedback -->
@@ -341,7 +399,7 @@
           <button class="btn sm ghost" v-if="!isViewer" @click="setTab('evaluations')">View all</button></div>
         <ul class="list">
           <li v-for="e in dashRecent" :key="e.id" class="clickable" @click="openEval(e)">
-            <div class="row nowrap">
+            <div class="row">
               <strong>{{e.studentName}} · {{e.aircraftType}} {{e.phaseName}} {{e.tripNumber}}</strong>
               <span class="muted">{{fmt(e.date)}}</span>
               <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
@@ -386,6 +444,7 @@
               <button class="btn sm danger" v-if="isAdmin" @click="deleteInstructor(i)">Delete</button>
             </div>
           </li>
+          <li v-if="!instructors.length" class="muted">No instructors yet. Use “+ Add” to create one.</li>
         </ul>
       </section>
 
@@ -405,7 +464,11 @@
       <!-- MIF TABLES -->
       <section v-show="tab==='mif'">
         <div class="topbar"><h2 style="margin:0">MIF Tables</h2><span class="spacer"></span>
-          <span class="muted" style="font-size:12px">Read-only — managed from the admin app</span></div>
+          <span class="muted" v-if="mifPending > 0" style="font-size:12px" role="status">Saving…</span>
+          <span class="muted" v-else-if="mifSaved" style="font-size:12px;color:var(--green)" role="status">✓ Saved</span>
+          <span class="muted" v-if="!isAdmin" style="font-size:12px">Read-only — ask an admin to edit</span>
+          <button class="btn sm" v-if="isAdmin" @click="addMifTable">+ Add table</button></div>
+        <p class="muted" v-if="isAdmin" style="margin:0 2px 10px">Edit any cell directly — changes save as soon as you leave the field.</p>
         <div v-for="(tables, ac) in tablesByAircraft" :key="ac">
           <h3 style="color:var(--text);text-transform:none;letter-spacing:0">{{ac}}</h3>
           <div class="card" v-for="t in tables" :key="t.id">
@@ -413,20 +476,40 @@
               <strong>{{t.phaseName}}</strong>
               <span class="muted">{{(t.stages||[]).join(' / ')}}</span>
               <span class="spacer" style="flex:1"></span>
+              <button class="btn sm ghost" v-if="isAdmin" @click="addManeuver(t)">+ Maneuver</button>
+              <button class="btn sm ghost" v-if="isAdmin" @click="editMifStages(t)">Edit stages</button>
+              <button class="btn sm danger" v-if="isAdmin" @click="deleteMifTable(t)">Delete table</button>
             </div>
-            <table style="margin-top:10px">
-              <thead><tr><th>Maneuver</th><th>Weight</th><th v-for="st in (t.stages||[])" :key="st">{{st}} MIF</th></tr></thead>
+            <table class="mif-edit" style="margin-top:10px">
+              <thead><tr><th>Maneuver</th><th style="width:86px">Weight</th><th v-for="st in (t.stages||[])" :key="st" style="width:76px">{{st}} MIF</th><th v-if="isAdmin" style="width:112px"><span class="sr-only">Actions</span></th></tr></thead>
               <tbody>
-                <tr v-for="(m,idx) in (t.maneuvers||[])" :key="m.name">
-                  <td>{{m.name}}</td><td>{{m.factor}}</td>
-                  <td v-for="st in (t.stages||[])" :key="st">{{m.stageMifs[st]}}</td>
+                <tr v-for="(m,idx) in (t.maneuvers||[])" :key="t.id + '-' + idx">
+                  <td>
+                    <input v-if="isAdmin" class="mif-input" :value="m.name" :aria-label="'Maneuver name ' + (idx+1) + ' in ' + t.phaseName" @change="editManeuver(t.id, idx, 'name', $event.target.value)" />
+                    <template v-else>{{m.name}}</template>
+                  </td>
+                  <td>
+                    <input v-if="isAdmin" class="mif-input" type="number" min="0" step="0.1" :value="m.factor" :aria-label="'Weight for ' + m.name" @change="editManeuver(t.id, idx, 'factor', $event.target.value)" />
+                    <template v-else>{{m.factor}}</template>
+                  </td>
+                  <td v-for="st in (t.stages||[])" :key="st">
+                    <input v-if="isAdmin" class="mif-input" type="number" min="0" step="1" :value="(m.stageMifs||{})[st]" :aria-label="st + ' required MIF for ' + m.name" @change="editManeuver(t.id, idx, 'stageMif', { stage: st, mif: $event.target.value })" />
+                    <template v-else>{{(m.stageMifs||{})[st]}}</template>
+                  </td>
+                  <td v-if="isAdmin">
+                    <div class="mif-actions">
+                      <button class="btn sm ghost" :disabled="idx===0" :aria-label="'Move ' + m.name + ' up'" title="Move up" @click="moveManeuver(t, idx, -1)">↑</button>
+                      <button class="btn sm ghost" :disabled="idx===(t.maneuvers||[]).length-1" :aria-label="'Move ' + m.name + ' down'" title="Move down" @click="moveManeuver(t, idx, 1)">↓</button>
+                      <button class="btn sm danger" :aria-label="'Delete ' + m.name" @click="deleteManeuver(t, idx)">✕</button>
+                    </div>
+                  </td>
                 </tr>
-                <tr v-if="!(t.maneuvers||[]).length"><td :colspan="2 + (t.stages||[]).length" class="muted">No maneuvers.</td></tr>
+                <tr v-if="!(t.maneuvers||[]).length"><td :colspan="2 + (t.stages||[]).length + (isAdmin?1:0)" class="muted">No maneuvers. Use “+ Maneuver” to add one.</td></tr>
               </tbody>
             </table>
           </div>
         </div>
-        <div v-if="!mifTables.length" class="muted">No MIF tables yet.</div>
+        <div v-if="!mifTables.length" class="muted">No MIF tables yet. Use “+ Add table” to create one.</div>
       </section>
 
       <!-- EVALUATIONS -->
@@ -447,11 +530,17 @@
             <select v-model="evPhase" aria-label="Evaluations phase filter"><option>All Phases</option><option v-for="p in phaseOptions" :key="p" :value="p">{{p}}</option></select></label></div>
           <div style="flex:1;min-width:140px"><label>School Year
             <select v-model="evYear" aria-label="Evaluations school-year filter"><option>All Years</option><option v-for="yr in years" :key="yr" :value="yr">{{yr}}</option></select></label></div>
+          <div style="flex:1;min-width:150px"><label>Sort
+            <select v-model="evSort" aria-label="Sort evaluations"><option value="date">Newest first</option><option value="oldest">Oldest first</option><option value="student">Student A–Z</option><option value="grade">Highest grade</option></select></label></div>
           <button class="btn sm ghost" @click="evStudent='All Cadets';evAircraft='All Aircraft';evPhase='All Phases';evYear='All Years';evSearch=''">Clear</button>
         </div>
+        <div class="row" style="justify-content:space-between;margin:2px 2px 8px">
+          <span class="muted">Showing {{evalsVisible.length}} of {{evalsSortedByDate.length}} evaluation(s)</span>
+          <button class="btn sm ghost" v-if="evalsSortedByDate.length > evLimit" @click="evLimit += 50">Show 50 more</button>
+        </div>
         <ul class="list">
-          <li v-for="e in evalsSortedByDate" :key="e.id" class="clickable" @click="openEval(e)">
-            <div class="row nowrap">
+          <li v-for="e in evalsVisible" :key="e.id" class="clickable" @click="openEval(e)">
+            <div class="row">
               <strong>{{e.studentName}} · {{e.aircraftType}} {{e.phaseName}} {{e.tripNumber}}</strong>
               <span class="muted">{{fmt(e.date)}} · {{e.instructorName}}</span>
               <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
@@ -487,14 +576,24 @@
 
       <!-- ANALYTICS -->
       <section v-show="tab==='analytics'">
-        <div class="topbar"><h2 style="margin:0">Progress Analytics</h2><span class="spacer"></span>
+        <div class="topbar"><h2 style="margin:0">Analytics</h2><span class="spacer"></span>
           <select v-model="analyticsStudent" aria-label="Analytics student filter" style="max-width:200px">
             <option value="">All Students</option>
             <option v-for="s in students" :key="s.id" :value="s.id">{{s.name}}</option>
           </select>
           <button class="btn sm ghost" @click="exportCSV">Export CSV</button></div>
-        <p class="muted" style="margin:4px 2px 12px">Avg grade, trend, flight hours and readiness per student (same engine as AI Feedback), computed from evaluations in {{activeYearResolved}}.</p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+        <!-- Search + view switch. The per-student trip/hours numbers that used to
+             live in their own "Student Analytics" tab are now the Totals view. -->
+        <div class="card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
+          <div style="flex:2 1 220px;min-width:180px"><label>Search by name</label>
+            <input v-model="analyticsSearch" aria-label="Analytics student search" placeholder="Student name…" /></div>
+          <div class="seg" role="group" aria-label="Analytics view">
+            <button class="seg-btn" :class="{on:analyticsView==='cards'}" @click="analyticsView='cards'">Readiness</button>
+            <button class="seg-btn" :class="{on:analyticsView==='totals'}" @click="analyticsView='totals'">Totals</button>
+          </div>
+        </div>
+        <p class="muted" style="margin:4px 2px 12px">Avg grade, trend, hours and readiness per student (same engine as AI Feedback), from evaluations in {{activeYearResolved}}.</p>
+        <div v-if="analyticsView==='cards'" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
           <div class="card" v-for="a in perStudentAnalytics" :key="a.id" style="cursor:pointer" @click="openStudent(students.find(s=>s.id===a.id))">
             <div class="row" style="align-items:center">
               <strong style="font-size:15px">{{a.name}}</strong>
@@ -517,7 +616,25 @@
             </div>
           </div>
         </div>
-        <div v-if="!perStudentAnalytics.length" class="muted">No students with evaluations for {{activeYearResolved}}.</div>
+        <div v-if="analyticsView==='cards' && !perStudentAnalytics.length" class="muted">No students with evaluations for {{activeYearResolved}}.</div>
+
+        <!-- Totals view: trip count / average / hours per cadet. -->
+        <div v-if="analyticsView==='totals'">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+            <div class="card clickable" v-for="a in studentAnalytics" :key="a.id" @click="openStudentAnalyticsStudent({id:a.id,name:a.name})">
+              <div class="row" style="align-items:center">
+                <strong style="font-size:15px">{{a.name}}</strong>
+                <span class="spacer" style="flex:1"></span>
+                <span class="pill" :class="gradeColor(a.avgGrade)">{{a.avgGrade?a.avgGrade.toFixed(1):'—'}}</span>
+              </div>
+              <div class="row nowrap" style="margin-top:8px;gap:8px">
+                <span class="muted">Trips: {{a.tripCount}}</span>
+                <span class="muted">Hours: {{a.totalHours.toFixed(1)}}</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="!studentAnalytics.length" class="muted">No students with evaluations for {{activeYearResolved}}.</div>
+        </div>
 
         <h3 style="margin:22px 2px 10px">Class Maneuver Difficulty</h3>
         <p class="muted" style="margin:0 2px 12px">Where the cohort as a whole scores below required MIF — useful for syllabus emphasis. Aggregated from all evaluations in {{activeYearResolved}}.</p>
@@ -618,6 +735,13 @@
             </div>
             <span class="muted">Density — compact fits more on small phone screens.</span>
           </div>
+          <div class="row" style="gap:12px;flex-wrap:wrap;margin-top:12px">
+            <div class="seg" role="group" aria-label="Text size">
+              <button class="seg-btn" :class="{on:textSize==='normal'}" @click="textSize='normal'">Normal</button>
+              <button class="seg-btn" :class="{on:textSize==='large'}" @click="textSize='large'">Larger</button>
+            </div>
+            <span class="muted">Text size — larger type for bright sunlight or tired eyes.</span>
+          </div>
         </div>
 
         <div class="card">
@@ -662,11 +786,10 @@
           <div v-if="askResult" class="mannote" style="margin-top:12px;white-space:pre-wrap;font-size:12px;line-height:1.5;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:420px;overflow:auto">{{askResult}}</div>
         </div>
       </section>
-
       <!-- ADMIN BROADCAST -->
       <section v-show="tab==='adminBroadcast'" v-if="isAdmin">
         <div class="topbar"><h2 style="margin:0">Admin Broadcast</h2></div>
-        <p class="muted" style="margin:4px 2px 12px">Compose and send a message to target roles. Ports Android AdminBroadcastActivity.</p>
+        <p class="muted" style="margin:4px 2px 12px">Compose and send a message to target roles. Every broadcast is also posted to Announcements, so recipients actually see it. (Ports Android AdminBroadcastActivity.)</p>
         <div class="card">
           <h3>Compose Broadcast</h3>
           <label>Title</label>
@@ -791,14 +914,27 @@
         </div>
       </div>
       <label>Maneuver Grades</label>
+      <div class="grade-legend muted" v-if="evalForm.maneuverGrades.length">
+        Tap a score: 1 = 65, 2 = 75, 3 = 85, 4 = 95. Tap the selected score again (or N/A) to clear it.
+        Green = meets the required MIF, red = below it.
+      </div>
+      <!-- Bulk entry (audit item 5): set every maneuver at once for a clean-sheet trip -->
+      <div class="row" v-if="evalForm.maneuverGrades.length" style="margin:0 0 10px">
+        <span class="muted">Set all maneuvers:</span>
+        <button class="btn sm ghost" v-for="n in [1,2,3,4]" :key="'bulk'+n" :disabled="saving" @click="applyBulkGrade(n)">{{n}} · {{gradePct(n)}}</button>
+        <button class="btn sm ghost" :disabled="saving" @click="clearBulkGrade">Clear all</button>
+      </div>
       <div class="card" v-if="evalForm.maneuverGrades.length">
         <div class="grade-row" v-for="(m,idx) in evalForm.maneuverGrades" :key="m.name" style="margin-bottom:12px">
           <div class="maneuver-name" :class="{below:m.studentGrade && m.requiredMif!=null && m.studentGrade < m.requiredMif, meets:m.studentGrade && m.requiredMif!=null && m.studentGrade >= m.requiredMif}">
             <span>{{m.name}}</span>
             <span class="req">req MIF {{m.requiredMif}}</span>
           </div>
-          <div class="grade-pick">
-            <button class="gx" v-for="n in [1,2,3,4]" :key="n" :class="gradeBtnClass(m, n)" @click="toggleGrade(m, n)">{{n}}</button>
+          <div class="grade-pick" role="group" :aria-label="'Grade for ' + m.name">
+            <button class="gx" v-for="n in [1,2,3,4]" :key="n" :class="gradeBtnClass(m, n)" :aria-pressed="m.studentGrade===n" :aria-label="gradeLabel(n) + ' (scores ' + gradePct(n) + ') for ' + m.name" @click="toggleGrade(m, n)">
+              <span class="gx-n">{{n}}</span><span class="gx-p">{{gradePct(n)}}</span>
+            </button>
+            <button class="gx na" :disabled="!m.studentGrade" :aria-label="'Clear grade (N/A) for ' + m.name" title="N/A — clear this grade" @click="clearGrade(m)">N/A</button>
           </div>
         </div>
       </div>
@@ -896,7 +1032,7 @@
 
   <!-- GENERIC DIALOG (replaces native prompt()/confirm()) — audit item 2 -->
   <div class="modal-mask" v-if="loggedIn && dlg.open" @click.self="dlgCancel">
-    <div class="modal" style="max-width:480px">
+    <div class="modal" style="max-width:480px" ref="dlgModal">
       <h2 style="margin-top:0">{{dlg.title}}</h2>
       <p v-if="dlg.message" class="muted" style="margin:0 0 10px;line-height:1.5">{{dlg.message}}</p>
       <!-- single text input -->
@@ -973,10 +1109,24 @@
         <span class="pill" :class="selectedStudent.active?'good':'pending'">{{selectedStudent.active?'Active':'Inactive'}}</span>
         {{ (selectedStudent.activeYears||[]).join(', ') }}
       </div>
+      <div class="stats" v-if="selectedStudentStats" style="margin-bottom:10px">
+        <div class="stat"><div class="n">{{selectedStudentStats.trips}}</div><div class="l">Trips</div></div>
+        <div class="stat"><div class="n" :class="gradeColor(parseFloat(selectedStudentStats.avg))">{{selectedStudentStats.avg}}</div><div class="l">Avg Grade</div></div>
+        <div class="stat"><div class="n">{{selectedStudentStats.hours}}</div><div class="l">Hours</div></div>
+        <div class="stat"><div class="n bad">{{selectedStudentStats.fails}}</div><div class="l">Below MIF</div></div>
+        <div class="stat"><div class="n" style="font-size:15px">{{selectedStudentStats.readiness}}</div><div class="l">Readiness</div></div>
+      </div>
+      <div class="muted" v-if="selectedStudentStats" style="margin:0 0 10px">
+        Trend <b>{{selectedStudentStats.trend}}</b> · Last flight {{fmt(selectedStudentStats.last)}}<span v-if="selectedStudentStats.weak.length"> · Weak: {{selectedStudentStats.weak.join(', ')}}</span>
+      </div>
+      <svg v-if="trendChart(selectedStudent.id)" :viewBox="'0 0 '+trendChart(selectedStudent.id).w+' '+trendChart(selectedStudent.id).h" style="width:100%;max-width:320px;height:56px;margin-bottom:10px" preserveAspectRatio="none">
+        <path :d="trendChart(selectedStudent.id).area" fill="rgba(59,130,246,.15)"></path>
+        <path :d="trendChart(selectedStudent.id).path" fill="none" stroke="var(--accent)" stroke-width="2"></path>
+      </svg>
       <h3>Evaluations</h3>
       <ul class="list">
         <li v-for="e in evalForStudent(selectedStudent.id)" :key="e.id" class="clickable" @click="openEval(e); selectedStudent=null">
-        <div class="row nowrap">
+        <div class="row">
             <strong>{{e.aircraftType}} · {{e.phaseName}} {{e.tripNumber}}</strong>
             <span class="muted">{{fmt(e.date)}}</span>
             <span class="pill" :class="gradeColor(e.finalGrade)">{{e.finalGrade ? e.finalGrade.toFixed(1) : '-'}}</span>
